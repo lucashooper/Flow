@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Note, Folder, Dashboard } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { EditorPanel } from '../components/EditorPanel';
-import { Navbar } from '../components/Navbar';
 
 export const NewDashboard = () => {
   const { user } = useAuth();

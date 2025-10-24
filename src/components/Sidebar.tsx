@@ -14,8 +14,6 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { DraggableFolderItem } from './DraggableFolderItem';
-import { NoteItem } from './NoteItem';
-import { FolderItem } from './FolderItem';
 import { DashboardSwitcher } from './DashboardSwitcher';
 
 interface SidebarProps {

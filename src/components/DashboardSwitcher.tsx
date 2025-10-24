@@ -55,7 +55,7 @@ export const DashboardSwitcher = ({
     if (!user?.id || !newDashboardName.trim()) return;
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('dashboards')
         .insert([{
           user_id: user.id,

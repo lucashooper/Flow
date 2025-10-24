@@ -10,7 +10,7 @@ interface EditorPanelProps {
 export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const saveTimeoutRef = useRef<number>();
+  const saveTimeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (note) {

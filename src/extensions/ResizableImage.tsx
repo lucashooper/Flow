@@ -161,25 +161,33 @@ export const ResizableImage = Image.extend({
 
   addAttributes() {
     return {
-      ...this.parent?.(),
+      src: {
+        default: null,
+      },
+      alt: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
       width: {
         default: 500,
-        parseHTML: (element) => {
+        parseHTML: (element: HTMLElement) => {
           const width = element.getAttribute('width');
           return width ? parseInt(width) : 500;
         },
-        renderHTML: (attributes) => {
+        renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.width) return {};
           return { width: attributes.width };
         },
       },
       height: {
         default: null,
-        parseHTML: (element) => {
+        parseHTML: (element: HTMLElement) => {
           const height = element.getAttribute('height');
           return height ? parseInt(height) : null;
         },
-        renderHTML: (attributes) => {
+        renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.height) return {};
           return { height: attributes.height };
         },
