@@ -44,36 +44,54 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
                 if (file) {
                   console.log('⬆️ Starting upload...');
                   
-                  // Insert placeholder immediately for instant feedback
+                  // Insert placeholder with unique ID for tracking
+                  const placeholderId = `placeholder-${Date.now()}`;
                   const { schema, tr } = view.state;
-                  const placeholderNode = schema.nodes.paragraph.create(null, [
-                    schema.text('⏳ Uploading image...')
-                  ]);
-                  const placeholderTr = tr.replaceSelectionWith(placeholderNode);
-                  const placeholderPos = placeholderTr.selection.from - 1;
-                  view.dispatch(placeholderTr);
+                  const placeholderNode = schema.nodes.paragraph.create(
+                    { 'data-placeholder-id': placeholderId },
+                    [schema.text('⏳ Uploading image...')]
+                  );
+                  view.dispatch(tr.replaceSelectionWith(placeholderNode));
                   
                   // Upload in background
                   this.options.uploadImage(file).then((url) => {
                     console.log('✅ Upload complete, URL:', url);
                     if (url) {
-                      // Replace placeholder with actual image
+                      // Find and replace placeholder with actual image
                       const { state, dispatch } = view;
-                      const node = state.schema.nodes.image.create({ src: url });
-                      const transaction = state.tr.replaceRangeWith(
-                        placeholderPos,
-                        placeholderPos + 1,
-                        node
-                      );
-                      dispatch(transaction);
-                      console.log('✅ Image inserted into editor');
+                      let placeholderPos = null;
+                      
+                      // Search for placeholder in document
+                      state.doc.descendants((node, pos) => {
+                        if (node.type.name === 'paragraph' && 
+                            node.textContent === '⏳ Uploading image...') {
+                          placeholderPos = pos;
+                          return false; // Stop searching
+                        }
+                      });
+                      
+                      if (placeholderPos !== null) {
+                        const imageNode = state.schema.nodes.image.create({ src: url });
+                        const tr = state.tr.replaceRangeWith(
+                          placeholderPos,
+                          placeholderPos + 1,
+                          imageNode
+                        );
+                        dispatch(tr);
+                        console.log('✅ Image inserted into editor');
+                      }
                     }
                   }).catch((error) => {
                     console.error('❌ Upload failed:', error);
-                    // Remove placeholder on error
+                    // Find and remove placeholder on error
                     const { state, dispatch } = view;
-                    const transaction = state.tr.delete(placeholderPos, placeholderPos + 1);
-                    dispatch(transaction);
+                    state.doc.descendants((node, pos) => {
+                      if (node.type.name === 'paragraph' && 
+                          node.textContent === '⏳ Uploading image...') {
+                        dispatch(state.tr.delete(pos, pos + node.nodeSize));
+                        return false;
+                      }
+                    });
                   });
                 }
                 return true;

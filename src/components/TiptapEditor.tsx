@@ -9,7 +9,7 @@ import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
-import Image from '@tiptap/extension-image';
+import { ResizableImage } from '../extensions/ResizableImage';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
 import 'prosemirror-view/style/prosemirror.css';
@@ -75,13 +75,9 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
       Subscript,
       Superscript,
       FontSize,
-      Image.configure({
+      ResizableImage.configure({
         inline: false,
         allowBase64: true,
-        HTMLAttributes: {
-          class: 'rounded-lg my-4 image-resizable',
-          style: 'max-width: 400px; height: auto;',
-        },
       }),
       ImagePaste.configure({
         uploadImage,

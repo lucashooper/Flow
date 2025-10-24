@@ -79,7 +79,8 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   };
 
   const contentPreview = note.content
-    .replace(/[#*`]/g, '')
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/[#*`]/g, '') // Remove markdown characters
     .split('\n')
     .find(line => line.trim())
     ?.substring(0, 60) || 'Empty note';
