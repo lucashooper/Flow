@@ -44,55 +44,62 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
                 if (file) {
                   console.log('⬆️ Starting upload...');
                   
-                  // Insert placeholder with unique ID for tracking
-                  const placeholderId = `placeholder-${Date.now()}`;
-                  const { schema, tr } = view.state;
-                  const placeholderNode = schema.nodes.paragraph.create(
-                    { 'data-placeholder-id': placeholderId },
-                    [schema.text('⏳ Uploading image...')]
-                  );
-                  view.dispatch(tr.replaceSelectionWith(placeholderNode));
-                  
-                  // Upload in background
-                  this.options.uploadImage(file).then((url) => {
-                    console.log('✅ Upload complete, URL:', url);
-                    if (url) {
-                      // Find and replace placeholder with actual image
+                  // Create a temporary base64 preview for instant feedback
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const base64 = e.target?.result as string;
+                    const { schema, tr } = view.state;
+                    
+                    // Insert temporary image with base64
+                    const tempImageNode = schema.nodes.image.create({ 
+                      src: base64,
+                      'data-uploading': 'true'
+                    });
+                    view.dispatch(tr.replaceSelectionWith(tempImageNode));
+                    
+                    // Upload actual file in background
+                    this.options.uploadImage(file).then((url) => {
+                      console.log('✅ Upload complete, URL:', url);
+                      if (url) {
+                        // Replace base64 image with uploaded URL
+                        const { state, dispatch } = view;
+                        let tempImagePos = null;
+                        
+                        // Find the temporary image
+                        state.doc.descendants((node, pos) => {
+                          if (node.type.name === 'image' && 
+                              node.attrs['data-uploading'] === 'true') {
+                            tempImagePos = pos;
+                            return false;
+                          }
+                        });
+                        
+                        if (tempImagePos !== null) {
+                          const finalImageNode = state.schema.nodes.image.create({ src: url });
+                          const tr = state.tr.replaceRangeWith(
+                            tempImagePos,
+                            tempImagePos + 1,
+                            finalImageNode
+                          );
+                          dispatch(tr);
+                          console.log('✅ Image replaced with uploaded URL');
+                        }
+                      }
+                    }).catch((error) => {
+                      console.error('❌ Upload failed:', error);
+                      // Remove the temporary image on error
                       const { state, dispatch } = view;
-                      let placeholderPos = null;
-                      
-                      // Search for placeholder in document
                       state.doc.descendants((node, pos) => {
-                        if (node.type.name === 'paragraph' && 
-                            node.textContent === '⏳ Uploading image...') {
-                          placeholderPos = pos;
-                          return false; // Stop searching
+                        if (node.type.name === 'image' && 
+                            node.attrs['data-uploading'] === 'true') {
+                          dispatch(state.tr.delete(pos, pos + node.nodeSize));
+                          return false;
                         }
                       });
-                      
-                      if (placeholderPos !== null) {
-                        const imageNode = state.schema.nodes.image.create({ src: url });
-                        const tr = state.tr.replaceRangeWith(
-                          placeholderPos,
-                          placeholderPos + 1,
-                          imageNode
-                        );
-                        dispatch(tr);
-                        console.log('✅ Image inserted into editor');
-                      }
-                    }
-                  }).catch((error) => {
-                    console.error('❌ Upload failed:', error);
-                    // Find and remove placeholder on error
-                    const { state, dispatch } = view;
-                    state.doc.descendants((node, pos) => {
-                      if (node.type.name === 'paragraph' && 
-                          node.textContent === '⏳ Uploading image...') {
-                        dispatch(state.tr.delete(pos, pos + node.nodeSize));
-                        return false;
-                      }
                     });
-                  });
+                  };
+                  
+                  reader.readAsDataURL(file);
                 }
                 return true;
               }
