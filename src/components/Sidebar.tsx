@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search } from 'lucide-react';
+import { Plus, FolderPlus, Search, LogOut } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -15,6 +15,8 @@ import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { DraggableFolderItem } from './DraggableFolderItem';
 import { DashboardSwitcher } from './DashboardSwitcher';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   notes: Note[];
@@ -60,6 +62,17 @@ export const Sidebar = ({
   const [isResizing, setIsResizing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -236,6 +249,13 @@ export const Sidebar = ({
             <h1 className="text-xl font-bold text-[#e5e5e5]">Flow</h1>
           </div>
           <div className="flex gap-1">
+            <button
+              onClick={handleLogout}
+              className="p-1.5 hover:bg-[#252525] rounded transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4 text-[#888888] hover:text-[#e5e5e5]" />
+            </button>
             <button
               onClick={() => onNoteCreate()}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
