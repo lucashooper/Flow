@@ -31,6 +31,8 @@ interface ContextMenuProps {
   y: number;
   onClose: () => void;
   selectedText: string;
+  misspelledWord?: string;
+  suggestions?: string[];
 }
 
 const fontSizes = [
@@ -97,7 +99,7 @@ const quoteStyles = [
   { label: 'Orange Bold', value: 'orange-bold', color: '#fb923c', italic: false, bold: true },
 ];
 
-export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenuProps) => {
+export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWord, suggestions = [] }: ContextMenuProps) => {
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
@@ -190,6 +192,29 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenu
       }}
     >
       <div className="py-1" style={{ overflow: 'visible' }}>
+        {misspelledWord && suggestions.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 text-xs text-[#888888] font-medium">
+              Spelling Suggestions for "{misspelledWord}"
+            </div>
+            {suggestions.slice(0, 5).map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => {
+                  if (editor) {
+                    editor.chain().focus().insertContent(suggestion).run();
+                    onClose();
+                  }
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#10b981] hover:bg-[#252525] transition-colors flex items-center gap-2 font-medium"
+              >
+                <Check className="w-4 h-4" />
+                {suggestion}
+              </button>
+            ))}
+            <div className="my-1 border-t border-[#2a2a2a]" />
+          </>
+        )}
         {/* Font Size */}
         <div 
           className="relative" 

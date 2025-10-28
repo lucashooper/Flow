@@ -19,6 +19,7 @@ import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { supabase } from '../lib/supabase';
+import { initSpellChecker, getSpellingSuggestions, getWordAtCursor, isWordCorrect } from '../utils/spellcheck';
 
 interface TiptapEditorProps {
   content: string;
@@ -28,7 +29,7 @@ interface TiptapEditorProps {
 
 export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
     return localStorage.getItem('defaultBoldColor') || '';
   });
@@ -111,6 +112,7 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-full',
         style: 'line-height: 1.7; color: #e5e5e5; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
+        spellcheck: 'true',
       },
     },
   });
@@ -174,6 +176,11 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     }
   }, [editor]);
 
+  // Initialize spell checker
+  useEffect(() => {
+    initSpellChecker();
+  }, []);
+
   if (!editor) {
     return null;
   }
@@ -199,17 +206,50 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     }
   }, [editor]);
 
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenu = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!editor) return;
 
     const { from, to } = editor.state.selection;
-    const text = editor.state.doc.textBetween(from, to, ' ');
+    const selectedText = editor.state.doc.textBetween(from, to, ' ');
+
+    // Get word at cursor if no selection
+    let wordToCheck = selectedText;
+    let wordStart = from;
+    let wordEnd = to;
+
+    if (!selectedText) {
+      // Get all text and find word at cursor position
+      const allText = editor.state.doc.textContent;
+      const cursorPos = from;
+      const wordInfo = getWordAtCursor(allText, cursorPos);
+      
+      if (wordInfo) {
+        wordToCheck = wordInfo.word;
+        wordStart = wordInfo.start;
+        wordEnd = wordInfo.end;
+      }
+    }
+
+    // Check if word is misspelled and get suggestions
+    let misspelledWord: string | undefined;
+    let suggestions: string[] = [];
+
+    if (wordToCheck && !isWordCorrect(wordToCheck)) {
+      misspelledWord = wordToCheck;
+      suggestions = getSpellingSuggestions(wordToCheck);
+      console.log('🔍 Misspelled word:', misspelledWord, 'Suggestions:', suggestions);
+      
+      // Select the misspelled word so we can replace it
+      editor.commands.setTextSelection({ from: wordStart, to: wordEnd });
+    }
 
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      text,
+      text: selectedText,
+      misspelledWord,
+      suggestions,
     });
   };
 
@@ -329,8 +369,10 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           editor={editor}
           x={contextMenu.x}
           y={contextMenu.y}
-          selectedText={contextMenu.text}
           onClose={() => setContextMenu(null)}
+          selectedText={contextMenu.text}
+          misspelledWord={contextMenu.misspelledWord}
+          suggestions={contextMenu.suggestions}
         />
       )}
 
