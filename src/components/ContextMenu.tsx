@@ -71,11 +71,11 @@ const boldColors = [
 ];
 
 const highlightColors = [
-  { label: 'Yellow', value: '#fef08a' },
-  { label: 'Green', value: '#86efac' },
-  { label: 'Pink', value: '#fbcfe8' },
-  { label: 'Blue', value: '#bfdbfe' },
-  { label: 'Orange', value: '#fed7aa' },
+  { label: 'Yellow', value: 'rgba(254, 240, 138, 0.3)' },
+  { label: 'Green', value: 'rgba(134, 239, 172, 0.3)' },
+  { label: 'Pink', value: 'rgba(251, 207, 232, 0.3)' },
+  { label: 'Blue', value: 'rgba(191, 219, 254, 0.3)' },
+  { label: 'Orange', value: 'rgba(254, 215, 170, 0.3)' },
 ];
 
 const bulletColors = [
@@ -115,7 +115,7 @@ export const ContextMenu = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const currentDefaultBoldColor = localStorage.getItem('defaultBoldColor') || '';
-  const [currentBulletStyle, setCurrentBulletStyle] = useState<string>(() => {
+  const [currentBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
   const currentQuoteStyle = localStorage.getItem('quoteStyle') || 'default';

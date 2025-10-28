@@ -45,9 +45,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       console.error('❌ Spell checker failed to load:', err);
     });
   }, []);
-  const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
-    return localStorage.getItem('defaultBoldColor') || '';
-  });
   const [bulletStyle, setBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
