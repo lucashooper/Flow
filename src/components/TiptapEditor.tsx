@@ -9,7 +9,7 @@ import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
-import { ResizableImage } from '../extensions/ResizableImage';
+import { ResizableImage } from '../extensions/ResizableImage.tsx';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
 import 'prosemirror-view/style/prosemirror.css';
@@ -27,6 +27,9 @@ interface TiptapEditorProps {
 export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
+    return localStorage.getItem('defaultBoldColor') || '';
+  });
 
   // Handle image upload to Supabase
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -95,8 +98,8 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none px-8 py-6 min-h-full',
-        style: 'line-height: 1.7; color: #e5e5e5;',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-full',
+        style: 'line-height: 1.7; color: #e5e5e5; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
       },
     },
   });
@@ -108,10 +111,11 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     }
   }, [content, editor]);
 
-  // Add keyboard shortcut to jump back to title
+  // Add keyboard shortcut to jump back to title and handle Ctrl+B with color
   useEffect(() => {
     if (editor) {
       const handleKeyDown = (e: KeyboardEvent) => {
+        // Jump to title
         if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
           e.preventDefault();
           const titleInput = document.querySelector('input[placeholder="Untitled"]') as HTMLInputElement;
@@ -119,6 +123,16 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
             titleInput.focus();
             titleInput.select();
           }
+        }
+        // Handle Ctrl+B with default color
+        if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+          e.preventDefault();
+          const chain = editor.chain().focus().toggleBold();
+          const currentBoldColor = localStorage.getItem('defaultBoldColor');
+          if (!editor.isActive('bold') && currentBoldColor) {
+            chain.setColor(currentBoldColor);
+          }
+          chain.run();
         }
       };
 
@@ -214,7 +228,14 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
 
           <button
-            onClick={() => editor.chain().focus().toggleBold().run()}
+            onClick={() => {
+              const chain = editor.chain().focus().toggleBold();
+              // If making text bold and we have a default color, apply it
+              if (!editor.isActive('bold') && defaultBoldColor) {
+                chain.setColor(defaultBoldColor);
+              }
+              chain.run();
+            }}
             className={`p-2 rounded transition-colors ${
               editor.isActive('bold')
                 ? 'bg-[#A0522D] text-white'
@@ -513,6 +534,21 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .ProseMirror ul[data-bullet-color="gray"] li::before {
           color: #888888;
+        }
+
+        /* Bold text with colors - ensure color is preserved */
+        .ProseMirror strong[style*="color"] {
+          font-weight: bold !important;
+        }
+
+        .ProseMirror strong {
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+
+        /* Ensure colored bold text is visible */
+        .ProseMirror strong[style*="color"] {
+          opacity: 1;
         }
       `}</style>
     </div>

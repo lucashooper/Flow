@@ -22,6 +22,7 @@ import {
   Clipboard,
   Search,
   List,
+  Check,
 } from 'lucide-react';
 
 interface ContextMenuProps {
@@ -53,6 +54,18 @@ const textColors = [
   { label: 'White', value: '#e5e5e5' },
 ];
 
+const boldColors = [
+  { label: 'Default (White)', value: '' },
+  { label: 'Purple', value: '#a855f7' },
+  { label: 'Blue', value: '#3b82f6' },
+  { label: 'Cyan', value: '#06b6d4' },
+  { label: 'Green', value: '#10b981' },
+  { label: 'Amber', value: '#f59e0b' },
+  { label: 'Orange', value: '#f97316' },
+  { label: 'Pink', value: '#ec4899' },
+  { label: 'Red', value: '#ef4444' },
+];
+
 const highlightColors = [
   { label: 'Yellow', value: '#fef08a' },
   { label: 'Green', value: '#86efac' },
@@ -74,6 +87,7 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenu
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
+  const currentDefaultBoldColor = localStorage.getItem('defaultBoldColor') || '';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -275,6 +289,66 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenu
                       style={{ backgroundColor: color.value }}
                     />
                     {color.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Bold Color */}
+        <div 
+          className="relative" 
+          onMouseEnter={() => { if (timerRef.current) clearTimeout(timerRef.current); }}
+          onMouseLeave={() => {
+            timerRef.current = window.setTimeout(() => {
+              setActiveSubmenu(null);
+            }, 150);
+          }}
+        >
+          <MenuItem icon={Bold} label="Bold Color" name="Bold Color" hasSubmenu />
+          <AnimatePresence>
+            {activeSubmenu === 'Bold Color' && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px] overflow-hidden"
+              >
+                {boldColors.map((color) => (
+                  <button
+                    key={color.value || 'default'}
+                    onClick={() => {
+                      console.log(`Setting default bold color: ${color.label}`);
+                      // Save as default bold color preference
+                      if (color.value) {
+                        localStorage.setItem('defaultBoldColor', color.value);
+                        // Apply to selected text
+                        editor.chain().focus().toggleBold().setColor(color.value).run();
+                      } else {
+                        localStorage.removeItem('defaultBoldColor');
+                        // Apply to selected text
+                        editor.chain().focus().toggleBold().unsetColor().run();
+                      }
+                      onClose();
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2 justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-4 h-4 rounded border border-[#2a2a2a] flex items-center justify-center font-bold"
+                        style={{ 
+                          backgroundColor: '#0a0a0a',
+                          color: color.value || '#e5e5e5'
+                        }}
+                      >
+                        B
+                      </div>
+                      {color.label}
+                    </div>
+                    {(color.value === currentDefaultBoldColor || (!color.value && !currentDefaultBoldColor)) && (
+                      <Check className="w-4 h-4 text-[#D97706]" />
+                    )}
                   </button>
                 ))}
               </motion.div>
