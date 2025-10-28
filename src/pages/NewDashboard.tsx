@@ -134,20 +134,25 @@ export const NewDashboard = () => {
 
   const handleNoteUpdate = async (noteId: string, updates: Partial<Note>) => {
     try {
+      console.log('📝 Updating note:', noteId, 'with keys:', Object.keys(updates));
       const { error } = await supabase
         .from('notes')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', noteId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
 
+      console.log('✅ Note updated successfully');
       setNotes(prev =>
         prev.map(note =>
           note.id === noteId ? { ...note, ...updates, updated_at: new Date().toISOString() } : note
         )
       );
     } catch (error) {
-      console.error('Error updating note:', error);
+      console.error('❌ Error updating note:', error);
     }
   };
 

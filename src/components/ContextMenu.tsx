@@ -23,6 +23,7 @@ import {
   Search,
   List,
   Check,
+  Pencil,
 } from 'lucide-react';
 
 interface ContextMenuProps {
@@ -33,6 +34,7 @@ interface ContextMenuProps {
   selectedText: string;
   misspelledWord?: string;
   suggestions?: string[];
+  onStartDrawing?: () => void;
 }
 
 const fontSizes = [
@@ -99,7 +101,7 @@ const quoteStyles = [
   { label: 'Orange Bold', value: 'orange-bold', color: '#fb923c', italic: false, bold: true },
 ];
 
-export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWord, suggestions = [] }: ContextMenuProps) => {
+export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWord, suggestions = [], onStartDrawing }: ContextMenuProps) => {
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
@@ -710,6 +712,19 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWor
         </div>
 
         <div className="my-1 border-t border-[#2a2a2a]" />
+
+        {/* Start Drawing */}
+        {onStartDrawing && (
+          <MenuItem
+            icon={Pencil}
+            label="Start Drawing Mode"
+            name="Start Drawing"
+            onClick={() => {
+              onStartDrawing();
+              onClose();
+            }}
+          />
+        )}
 
         {/* Add Link */}
         <MenuItem

@@ -14,22 +14,26 @@ import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
 import { QuoteMark } from '../extensions/QuoteMark';
+import { DrawingNode } from '../extensions/DrawingNode';
 import 'prosemirror-view/style/prosemirror.css';
-import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus } from 'lucide-react';
+import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContextMenu } from './ContextMenu';
+import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { supabase } from '../lib/supabase';
-import { initSpellChecker, getSpellingSuggestions, getWordAtCursor, isWordCorrect } from '../utils/spellcheck';
 
 interface TiptapEditorProps {
   content: string;
   onChange: (content: string) => void;
+  drawingData?: string;
+  onDrawingChange?: (data: string) => void;
   placeholder?: string;
 }
 
-export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorProps) => {
+export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
     return localStorage.getItem('defaultBoldColor') || '';
   });
@@ -75,6 +79,7 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
       }),
       ColoredBold,
       QuoteMark,
+      DrawingNode,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),
@@ -176,10 +181,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     }
   }, [editor]);
 
-  // Initialize spell checker
-  useEffect(() => {
-    initSpellChecker();
-  }, []);
 
   if (!editor) {
     return null;
@@ -207,50 +208,32 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
   }, [editor]);
 
   const handleContextMenu = async (e: React.MouseEvent) => {
+    // Only prevent default if clicking inside the editor content area
+    const target = e.target as HTMLElement;
+    const isEditorContent = target.closest('.ProseMirror') || target.classList.contains('ProseMirror');
+    
+    if (!isEditorContent) {
+      // Allow default context menu for non-editor areas (sidebar, etc.)
+      return;
+    }
+    
     e.preventDefault();
     if (!editor) return;
 
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
 
-    // Get word at cursor if no selection
-    let wordToCheck = selectedText;
-    let wordStart = from;
-    let wordEnd = to;
-
-    if (!selectedText) {
-      // Get all text and find word at cursor position
-      const allText = editor.state.doc.textContent;
-      const cursorPos = from;
-      const wordInfo = getWordAtCursor(allText, cursorPos);
-      
-      if (wordInfo) {
-        wordToCheck = wordInfo.word;
-        wordStart = wordInfo.start;
-        wordEnd = wordInfo.end;
-      }
-    }
-
-    // Check if word is misspelled and get suggestions
-    let misspelledWord: string | undefined;
-    let suggestions: string[] = [];
-
-    if (wordToCheck && !isWordCorrect(wordToCheck)) {
-      misspelledWord = wordToCheck;
-      suggestions = getSpellingSuggestions(wordToCheck);
-      console.log('🔍 Misspelled word:', misspelledWord, 'Suggestions:', suggestions);
-      
-      // Select the misspelled word so we can replace it
-      editor.commands.setTextSelection({ from: wordStart, to: wordEnd });
-    }
-
+    // Show menu immediately - spell check disabled for now to prevent freezing
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       text: selectedText,
-      misspelledWord,
-      suggestions,
+      misspelledWord: undefined,
+      suggestions: [],
     });
+
+    // TODO: Re-enable spell check with proper optimization
+    // The spell check was causing severe performance issues
   };
 
   const increaseFontSize = () => {
@@ -269,8 +252,42 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     editor.chain().focus().setFontSize(newSize).run();
   };
 
+  // Handle ESC key to exit drawing mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isDrawingMode) {
+        setIsDrawingMode(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawingMode]);
+
   return (
     <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle} editor-quote-${quoteStyle}`} onContextMenu={handleContextMenu}>
+      {/* Persistent Drawing Layer */}
+      <PersistentDrawingLayer
+        isDrawingMode={isDrawingMode}
+        onExitDrawingMode={() => setIsDrawingMode(false)}
+        drawingData={initialDrawingData || ''}
+        onDrawingChange={(data) => {
+          if (onDrawingChange) {
+            onDrawingChange(data);
+            console.log('✏️ Drawing auto-saved to database');
+          }
+        }}
+      />
+
+      {/* Floating Drawing Button - Always Visible */}
+      <button
+        onClick={() => setIsDrawingMode(true)}
+        className="fixed bottom-8 right-8 z-40 p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-2xl transition-all hover:scale-110"
+        title="Start Drawing Mode (Draw anywhere!)"
+      >
+        <Pencil className="w-6 h-6" />
+      </button>
+
       {/* Bubble Menu - appears on text selection */}
       {editor && showBubbleMenu && (
         <div className="absolute z-50 flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl p-1"
@@ -360,6 +377,22 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           >
             <LinkIcon className="w-4 h-4" />
           </button>
+
+          <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
+
+          <button
+            onClick={() => {
+              const drawingId = crypto.randomUUID();
+              editor.commands.insertContent({
+                type: 'drawing',
+                attrs: { drawingId },
+              });
+            }}
+            className="p-2 rounded transition-colors text-[#e5e5e5] hover:bg-[#252525]"
+            title="Insert Drawing Canvas (Cmd/Ctrl+Shift+D)"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -373,6 +406,7 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           selectedText={contextMenu.text}
           misspelledWord={contextMenu.misspelledWord}
           suggestions={contextMenu.suggestions}
+          onStartDrawing={() => setIsDrawingMode(true)}
         />
       )}
 
@@ -663,18 +697,22 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
         /* Quote marks - add back with CSS pseudo-elements */
         .quote-mark[data-quote-type="double"]::before {
           content: '"';
+          pointer-events: none;
         }
 
         .quote-mark[data-quote-type="double"]::after {
           content: '"';
+          pointer-events: none;
         }
 
         .quote-mark[data-quote-type="single"]::before {
           content: "'";
+          pointer-events: none;
         }
 
         .quote-mark[data-quote-type="single"]::after {
           content: "'";
+          pointer-events: none;
         }
 
         /* Inline Quote Styles - for quoted text */

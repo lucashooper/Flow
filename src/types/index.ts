@@ -6,6 +6,7 @@ export interface Note {
   title: string;
   content: string;
   emoji: string | null;
+  drawing_data: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -10,12 +10,14 @@ interface EditorPanelProps {
 export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [drawingData, setDrawingData] = useState<string>('');
   const saveTimeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (note) {
       setTitle(note.title);
       setContent(note.content);
+      setDrawingData(note.drawing_data || '');
     }
   }, [note?.id]);
 
@@ -23,13 +25,14 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   useEffect(() => {
     if (!note) return;
 
-    if (title !== note.title || content !== note.content) {
+    if (title !== note.title || content !== note.content || drawingData !== (note.drawing_data || '')) {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        onNoteUpdate(note.id, { title, content });
+        console.log('💾 Auto-saving note with drawing data...');
+        onNoteUpdate(note.id, { title, content, drawing_data: drawingData });
       }, 1000);
     }
 
@@ -38,7 +41,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, content, note]);
+  }, [title, content, drawingData, note]);
 
   if (!note) {
     return (
@@ -81,6 +84,8 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
         <TiptapEditor
           content={content}
           onChange={setContent}
+          drawingData={drawingData}
+          onDrawingChange={setDrawingData}
           placeholder="Start writing..."
         />
       </div>
