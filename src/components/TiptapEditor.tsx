@@ -528,6 +528,17 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           transition: color 100ms ease, background-color 100ms ease;
         }
 
+        /* Ensure bullets are visible */
+        .ProseMirror ul {
+          list-style-type: disc;
+          padding-left: 1.5rem;
+        }
+
+        .ProseMirror ol {
+          list-style-type: decimal;
+          padding-left: 1.5rem;
+        }
+
         /* Bullet Style Colors - Using ::marker for proper styling */
         .editor-bullets-gray .ProseMirror ul li::marker {
           color: #888888;
@@ -538,7 +549,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-purple .ProseMirror ul li::marker {
           color: #a855f7;
-          font-size: 1.2em;
         }
         .editor-bullets-purple .ProseMirror ol li::marker {
           color: #a855f7;
@@ -547,7 +557,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-blue .ProseMirror ul li::marker {
           color: #3b82f6;
-          font-size: 1.2em;
         }
         .editor-bullets-blue .ProseMirror ol li::marker {
           color: #3b82f6;
@@ -556,7 +565,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-cyan .ProseMirror ul li::marker {
           color: #06b6d4;
-          font-size: 1.2em;
         }
         .editor-bullets-cyan .ProseMirror ol li::marker {
           color: #06b6d4;
@@ -565,7 +573,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-green .ProseMirror ul li::marker {
           color: #10b981;
-          font-size: 1.2em;
         }
         .editor-bullets-green .ProseMirror ol li::marker {
           color: #10b981;
@@ -574,7 +581,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-amber .ProseMirror ul li::marker {
           color: #f59e0b;
-          font-size: 1.2em;
         }
         .editor-bullets-amber .ProseMirror ol li::marker {
           color: #f59e0b;
@@ -583,7 +589,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-orange .ProseMirror ul li::marker {
           color: #f97316;
-          font-size: 1.2em;
         }
         .editor-bullets-orange .ProseMirror ol li::marker {
           color: #f97316;
@@ -592,7 +597,6 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
         .editor-bullets-pink .ProseMirror ul li::marker {
           color: #ec4899;
-          font-size: 1.2em;
         }
         .editor-bullets-pink .ProseMirror ol li::marker {
           color: #ec4899;
