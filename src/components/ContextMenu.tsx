@@ -83,11 +83,27 @@ const bulletColors = [
   { label: 'Hot Pink', value: 'pink' },
 ];
 
+const quoteStyles = [
+  { label: 'Default', value: 'default', color: '#e5e5e5', italic: false, bold: false },
+  { label: 'Italic', value: 'italic', color: '#e5e5e5', italic: true, bold: false },
+  { label: 'Bold', value: 'bold', color: '#e5e5e5', italic: false, bold: true },
+  { label: 'Bold Italic', value: 'bold-italic', color: '#e5e5e5', italic: true, bold: true },
+  { label: 'Purple Italic', value: 'purple-italic', color: '#a855f7', italic: true, bold: false },
+  { label: 'Purple Bold', value: 'purple-bold', color: '#a855f7', italic: false, bold: true },
+  { label: 'Cyan Bold', value: 'cyan-bold', color: '#06b6d4', italic: false, bold: true },
+  { label: 'Amber Italic', value: 'amber-italic', color: '#f59e0b', italic: true, bold: false },
+  { label: 'Green Italic', value: 'green-italic', color: '#10b981', italic: true, bold: false },
+  { label: 'Pink Bold', value: 'pink-bold', color: '#ec4899', italic: false, bold: true },
+  { label: 'Orange Bold', value: 'orange-bold', color: '#fb923c', italic: false, bold: true },
+];
+
 export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenuProps) => {
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const currentDefaultBoldColor = localStorage.getItem('defaultBoldColor') || '';
+  const currentBulletStyle = localStorage.getItem('bulletStyle') || 'gray';
+  const currentQuoteStyle = localStorage.getItem('quoteStyle') || 'default';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -434,31 +450,43 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenu
                 exit={{ opacity: 0, x: -10 }}
                 className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px] overflow-hidden"
               >
-                {bulletColors.map((color) => (
+                {bulletColors.map((color) => {
+                  const colorHex = color.value === 'gray' ? '#888888' : 
+                                   color.value === 'purple' ? '#a855f7' :
+                                   color.value === 'blue' ? '#3b82f6' :
+                                   color.value === 'cyan' ? '#06b6d4' :
+                                   color.value === 'amber' ? '#f59e0b' :
+                                   color.value === 'orange' ? '#f97316' :
+                                   color.value === 'green' ? '#10b981' :
+                                   color.value === 'pink' ? '#ec4899' : '#888888';
+                  
+                  return (
                   <button
                     key={color.value}
                     onClick={() => {
-                      console.log('Setting bullet color:', color.value);
+                      console.log('Setting bullet style:', color.value);
+                      localStorage.setItem('bulletStyle', color.value);
+                      // Trigger re-render by dispatching custom event
+                      window.dispatchEvent(new CustomEvent('bulletStyleChanged', { detail: color.value }));
                       onClose();
                     }}
-                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2 justify-between"
                   >
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <div 
-                        className="w-2 h-2 rounded-full"
-                        style={{ 
-                          backgroundColor: color.value === 'gray' ? '#888888' : 
-                                         color.value === 'purple' ? '#a855f7' :
-                                         color.value === 'blue' ? '#06b6d4' :
-                                         color.value === 'amber' ? '#f59e0b' :
-                                         color.value === 'green' ? '#10b981' :
-                                         color.value === 'pink' ? '#ec4899' : '#888888'
-                        }}
-                      />
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: colorHex }}
+                        />
+                      </div>
+                      {color.label}
                     </div>
-                    {color.label}
+                    {color.value === currentBulletStyle && (
+                      <Check className="w-4 h-4 text-[#D97706]" />
+                    )}
                   </button>
-                ))}
+                  );
+                })}
               </motion.div>
             )}
           </AnimatePresence>
@@ -599,6 +627,58 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText }: ContextMenu
                 >
                   <Quote className="w-4 h-4" /> Blockquote
                 </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Quote Style */}
+        <div 
+          className="relative" 
+          onMouseEnter={() => { if (timerRef.current) clearTimeout(timerRef.current); }}
+          onMouseLeave={() => {
+            timerRef.current = window.setTimeout(() => {
+              setActiveSubmenu(null);
+            }, 150);
+          }}
+        >
+          <MenuItem icon={Quote} label="Quote Style" name="Quote Style" hasSubmenu />
+          <AnimatePresence>
+            {activeSubmenu === 'Quote Style' && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px] overflow-hidden"
+              >
+                {quoteStyles.map((style) => (
+                  <button
+                    key={style.value}
+                    onClick={() => {
+                      console.log('Setting quote style:', style.value);
+                      localStorage.setItem('quoteStyle', style.value);
+                      // Trigger re-render
+                      window.dispatchEvent(new CustomEvent('quoteStyleChanged', { detail: style.value }));
+                      onClose();
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2 justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span 
+                        style={{ 
+                          color: style.color,
+                          fontStyle: style.italic ? 'italic' : 'normal',
+                          fontWeight: style.bold ? '600' : 'normal'
+                        }}
+                      >
+                        {style.label}
+                      </span>
+                    </div>
+                    {style.value === currentQuoteStyle && (
+                      <Check className="w-4 h-4 text-[#D97706]" />
+                    )}
+                  </button>
+                ))}
               </motion.div>
             )}
           </AnimatePresence>

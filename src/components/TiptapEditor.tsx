@@ -12,6 +12,8 @@ import Superscript from '@tiptap/extension-superscript';
 import { ResizableImage } from '../extensions/ResizableImage.tsx';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
+import { ColoredBold } from '../extensions/ColoredBold';
+import { QuoteMark } from '../extensions/QuoteMark';
 import 'prosemirror-view/style/prosemirror.css';
 import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -29,6 +31,12 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
     return localStorage.getItem('defaultBoldColor') || '';
+  });
+  const [bulletStyle, setBulletStyle] = useState<string>(() => {
+    return localStorage.getItem('bulletStyle') || 'gray';
+  });
+  const [quoteStyle, setQuoteStyle] = useState<string>(() => {
+    return localStorage.getItem('quoteStyle') || 'default';
   });
 
   // Handle image upload to Supabase
@@ -61,8 +69,11 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
+        bold: false, // Disable default bold to use our custom one
         link: false, // Disable built-in link to avoid duplicates
       }),
+      ColoredBold,
+      QuoteMark,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),
@@ -111,11 +122,10 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
     }
   }, [content, editor]);
 
-  // Add keyboard shortcut to jump back to title and handle Ctrl+B with color
+  // Add keyboard shortcut to jump back to title
   useEffect(() => {
     if (editor) {
       const handleKeyDown = (e: KeyboardEvent) => {
-        // Jump to title
         if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
           e.preventDefault();
           const titleInput = document.querySelector('input[placeholder="Untitled"]') as HTMLInputElement;
@@ -124,20 +134,43 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
             titleInput.select();
           }
         }
-        // Handle Ctrl+B with default color
-        if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
-          e.preventDefault();
-          const chain = editor.chain().focus().toggleBold();
-          const currentBoldColor = localStorage.getItem('defaultBoldColor');
-          if (!editor.isActive('bold') && currentBoldColor) {
-            chain.setColor(currentBoldColor);
-          }
-          chain.run();
-        }
       };
 
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [editor]);
+
+  // Listen for bullet style changes
+  useEffect(() => {
+    const handleBulletStyleChange = (e: CustomEvent) => {
+      setBulletStyle(e.detail);
+    };
+
+    window.addEventListener('bulletStyleChanged', handleBulletStyleChange as EventListener);
+    return () => window.removeEventListener('bulletStyleChanged', handleBulletStyleChange as EventListener);
+  }, []);
+
+  // Listen for quote style changes
+  useEffect(() => {
+    const handleQuoteStyleChange = (e: CustomEvent) => {
+      setQuoteStyle(e.detail);
+    };
+
+    window.addEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
+    return () => window.removeEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
+  }, []);
+
+  // Debug: Verify QuoteMark extension is loaded
+  useEffect(() => {
+    if (editor) {
+      console.log('=== EDITOR DEBUG ===');
+      console.log('All extensions:', editor.extensionManager.extensions.map(ext => ext.name));
+      console.log('QuoteMark loaded?', editor.extensionManager.extensions.some(ext => ext.name === 'quoteMark'));
+      console.log('Available commands:', Object.keys(editor.commands));
+      console.log('Current quote style:', localStorage.getItem('quoteStyle'));
+      console.log('Current bullet style:', localStorage.getItem('bulletStyle'));
+      console.log('Current bold color:', localStorage.getItem('defaultBoldColor'));
     }
   }, [editor]);
 
@@ -197,7 +230,7 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0a0a0a] relative" onContextMenu={handleContextMenu}>
+    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle} editor-quote-${quoteStyle}`} onContextMenu={handleContextMenu}>
       {/* Bubble Menu - appears on text selection */}
       {editor && showBubbleMenu && (
         <div className="absolute z-50 flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl p-1"
@@ -229,12 +262,16 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
 
           <button
             onClick={() => {
-              const chain = editor.chain().focus().toggleBold();
-              // If making text bold and we have a default color, apply it
-              if (!editor.isActive('bold') && defaultBoldColor) {
-                chain.setColor(defaultBoldColor);
+              const wasBold = editor.isActive('bold');
+              const boldColor = localStorage.getItem('defaultBoldColor');
+              
+              // Toggle bold
+              editor.chain().focus().toggleBold().run();
+              
+              // If we just made it bold, apply color
+              if (!wasBold && boldColor) {
+                editor.chain().focus().setColor(boldColor).run();
               }
-              chain.run();
             }}
             className={`p-2 rounded transition-colors ${
               editor.isActive('bold')
@@ -491,49 +528,75 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
           transition: color 100ms ease, background-color 100ms ease;
         }
 
-        /* Premium Bullet Styles */
-        .ProseMirror ul {
-          list-style: none;
-          padding-left: 1.5em;
-        }
-
-        .ProseMirror ul li {
-          position: relative;
-        }
-
-        .ProseMirror ul li::before {
-          content: '•';
-          position: absolute;
-          left: -1.2em;
+        /* Bullet Style Colors - Using ::marker for proper styling */
+        .editor-bullets-gray .ProseMirror ul li::marker {
           color: #888888;
-          font-size: 1.1em;
-          font-weight: bold;
-          transition: color 150ms ease;
+        }
+        .editor-bullets-gray .ProseMirror ol li::marker {
+          color: #888888;
         }
 
-        /* Custom bullet colors */
-        .ProseMirror ul[data-bullet-color="purple"] li::before {
+        .editor-bullets-purple .ProseMirror ul li::marker {
           color: #a855f7;
+          font-size: 1.2em;
+        }
+        .editor-bullets-purple .ProseMirror ol li::marker {
+          color: #a855f7;
+          font-weight: 700;
         }
 
-        .ProseMirror ul[data-bullet-color="blue"] li::before {
+        .editor-bullets-blue .ProseMirror ul li::marker {
+          color: #3b82f6;
+          font-size: 1.2em;
+        }
+        .editor-bullets-blue .ProseMirror ol li::marker {
+          color: #3b82f6;
+          font-weight: 700;
+        }
+
+        .editor-bullets-cyan .ProseMirror ul li::marker {
           color: #06b6d4;
+          font-size: 1.2em;
+        }
+        .editor-bullets-cyan .ProseMirror ol li::marker {
+          color: #06b6d4;
+          font-weight: 700;
         }
 
-        .ProseMirror ul[data-bullet-color="amber"] li::before {
-          color: #f59e0b;
-        }
-
-        .ProseMirror ul[data-bullet-color="green"] li::before {
+        .editor-bullets-green .ProseMirror ul li::marker {
           color: #10b981;
+          font-size: 1.2em;
+        }
+        .editor-bullets-green .ProseMirror ol li::marker {
+          color: #10b981;
+          font-weight: 700;
         }
 
-        .ProseMirror ul[data-bullet-color="pink"] li::before {
+        .editor-bullets-amber .ProseMirror ul li::marker {
+          color: #f59e0b;
+          font-size: 1.2em;
+        }
+        .editor-bullets-amber .ProseMirror ol li::marker {
+          color: #f59e0b;
+          font-weight: 700;
+        }
+
+        .editor-bullets-orange .ProseMirror ul li::marker {
+          color: #f97316;
+          font-size: 1.2em;
+        }
+        .editor-bullets-orange .ProseMirror ol li::marker {
+          color: #f97316;
+          font-weight: 700;
+        }
+
+        .editor-bullets-pink .ProseMirror ul li::marker {
           color: #ec4899;
+          font-size: 1.2em;
         }
-
-        .ProseMirror ul[data-bullet-color="gray"] li::before {
-          color: #888888;
+        .editor-bullets-pink .ProseMirror ol li::marker {
+          color: #ec4899;
+          font-weight: 700;
         }
 
         /* Bold text with colors - ensure color is preserved */
@@ -549,6 +612,84 @@ export const TiptapEditor = ({ content, onChange, placeholder }: TiptapEditorPro
         /* Ensure colored bold text is visible */
         .ProseMirror strong[style*="color"] {
           opacity: 1;
+        }
+
+        /* Quote marks - add back with CSS pseudo-elements */
+        .quote-mark[data-quote-type="double"]::before {
+          content: '"';
+        }
+
+        .quote-mark[data-quote-type="double"]::after {
+          content: '"';
+        }
+
+        .quote-mark[data-quote-type="single"]::before {
+          content: "'";
+        }
+
+        .quote-mark[data-quote-type="single"]::after {
+          content: "'";
+        }
+
+        /* Inline Quote Styles - for quoted text */
+        .quote-mark.quote-default {
+          /* Keep default appearance */
+        }
+
+        .quote-mark.quote-italic {
+          font-style: italic;
+        }
+
+        .quote-mark.quote-bold {
+          font-weight: 600;
+        }
+
+        .quote-mark.quote-bold-italic {
+          font-weight: 600;
+          font-style: italic;
+        }
+
+        .quote-mark.quote-purple-italic {
+          color: #a855f7;
+          font-style: italic;
+        }
+
+        .quote-mark.quote-purple-bold {
+          color: #a855f7;
+          font-weight: 600;
+        }
+
+        .quote-mark.quote-cyan-bold {
+          color: #06b6d4;
+          font-weight: 600;
+        }
+
+        .quote-mark.quote-amber-italic {
+          color: #f59e0b;
+          font-style: italic;
+        }
+
+        .quote-mark.quote-green-italic {
+          color: #10b981;
+          font-style: italic;
+        }
+
+        .quote-mark.quote-pink-bold {
+          color: #ec4899;
+          font-weight: 600;
+        }
+
+        .quote-mark.quote-orange-bold {
+          color: #fb923c;
+          font-weight: 600;
+        }
+
+        /* Blockquote styles (for block quotes) */
+        .ProseMirror blockquote {
+          border-left: 3px solid #888888;
+          padding-left: 1rem;
+          margin: 1rem 0;
+          color: #888888;
         }
       `}</style>
     </div>
