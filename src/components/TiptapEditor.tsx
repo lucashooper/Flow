@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { supabase } from '../lib/supabase';
+import { isWordCorrect, getSpellingSuggestions, initSpellChecker } from '../utils/spellcheck';
 
 interface TiptapEditorProps {
   content: string;
@@ -34,6 +35,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
+
+  // Initialize spell checker on mount
+  useEffect(() => {
+    console.log('🔤 Initializing spell checker...');
+    initSpellChecker().then(() => {
+      console.log('✅ Spell checker ready!');
+    }).catch((err) => {
+      console.error('❌ Spell checker failed to load:', err);
+    });
+  }, []);
   const [defaultBoldColor, setDefaultBoldColor] = useState<string>(() => {
     return localStorage.getItem('defaultBoldColor') || '';
   });
@@ -223,7 +234,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
 
-    // Show menu immediately - spell check disabled for now to prevent freezing
+    // Show menu immediately
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -232,8 +243,46 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       suggestions: [],
     });
 
-    // TODO: Re-enable spell check with proper optimization
-    // The spell check was causing severe performance issues
+    // Check spelling asynchronously (non-blocking)
+    // Get word at cursor even if nothing is selected
+    setTimeout(() => {
+      let wordToCheck = selectedText?.trim();
+      
+      // If no selection, get word at cursor position
+      if (!wordToCheck || wordToCheck.length === 0) {
+        const pos = editor.state.selection.from;
+        const $pos = editor.state.doc.resolve(pos);
+        const textNode = $pos.parent.textContent;
+        const offset = $pos.parentOffset;
+        
+        // Find word boundaries
+        let start = offset;
+        let end = offset;
+        
+        while (start > 0 && /\w/.test(textNode[start - 1])) start--;
+        while (end < textNode.length && /\w/.test(textNode[end])) end++;
+        
+        wordToCheck = textNode.substring(start, end);
+      }
+      
+      // Take first word if multiple words selected
+      const wordAtCursor = wordToCheck?.split(/\s+/)[0];
+      console.log('🔍 Checking spelling for:', wordAtCursor);
+      
+      if (wordAtCursor && wordAtCursor.length > 0) {
+        const isCorrect = isWordCorrect(wordAtCursor);
+        console.log('📝 Word correct?', isCorrect);
+        if (!isCorrect) {
+          const suggestions = getSpellingSuggestions(wordAtCursor);
+          console.log('💡 Suggestions:', suggestions);
+          setContextMenu(prev => prev ? {
+            ...prev,
+            misspelledWord: wordAtCursor,
+            suggestions: suggestions
+          } : null);
+        }
+      }
+    }, 0);
   };
 
   const increaseFontSize = () => {
@@ -410,12 +459,30 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         />
       )}
 
-      {/* Editor Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <EditorContent editor={editor} />
-      </div>
+      {/* Editor */}
+      <EditorContent 
+        editor={editor} 
+        className="h-full overflow-y-auto prose prose-invert max-w-none editor-scrollbar"
+        style={{ 
+          maxWidth: '800px', 
+          margin: '0 auto',
+          padding: '2rem',
+          paddingBottom: '50vh', // Large bottom padding for breathing room
+          width: '100%'
+        }}
+      />
 
       <style>{`
+        /* Hide scrollbar but keep functionality */
+        .editor-scrollbar::-webkit-scrollbar {
+          width: 0px;
+          background: transparent;
+        }
+        .editor-scrollbar {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE/Edge */
+        }
+        
         .custom-scrollbar::-webkit-scrollbar {
           width: 10px;
         }

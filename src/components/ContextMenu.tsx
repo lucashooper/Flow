@@ -101,13 +101,29 @@ const quoteStyles = [
   { label: 'Orange Bold', value: 'orange-bold', color: '#fb923c', italic: false, bold: true },
 ];
 
-export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWord, suggestions = [], onStartDrawing }: ContextMenuProps) => {
+export const ContextMenu = ({
+  editor,
+  x,
+  y,
+  onClose,
+  selectedText,
+  misspelledWord,
+  suggestions = [],
+  onStartDrawing,
+}: ContextMenuProps) => {
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const currentDefaultBoldColor = localStorage.getItem('defaultBoldColor') || '';
-  const currentBulletStyle = localStorage.getItem('bulletStyle') || 'gray';
+  const [currentBulletStyle, setCurrentBulletStyle] = useState<string>(() => {
+    return localStorage.getItem('bulletStyle') || 'gray';
+  });
   const currentQuoteStyle = localStorage.getItem('quoteStyle') || 'default';
+
+  // Smart positioning - flip menu above if too close to bottom
+  const menuHeight = 400; // Approximate menu height
+  const shouldFlipVertical = y + menuHeight > window.innerHeight;
+  const adjustedY = shouldFlipVertical ? y - menuHeight : y;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -187,7 +203,7 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWor
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.1 }}
       className="fixed z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[240px] overflow-visible"
-      style={{ left: x, top: y, pointerEvents: 'auto' }}
+      style={{ left: x, top: adjustedY, pointerEvents: 'auto' }}
       onClick={(e) => {
         console.log('🎯 Context menu clicked');
         e.stopPropagation();
@@ -203,8 +219,45 @@ export const ContextMenu = ({ editor, x, y, onClose, selectedText, misspelledWor
               <button
                 key={suggestion}
                 onClick={() => {
-                  if (editor) {
-                    editor.chain().focus().insertContent(suggestion).run();
+                  if (editor && misspelledWord) {
+                    // Find and replace the misspelled word
+                    const { state } = editor;
+                    const { from, to } = state.selection;
+                    const text = state.doc.textBetween(from, to, ' ');
+                    
+                    // If text is selected and contains the misspelled word, replace it
+                    if (text.includes(misspelledWord)) {
+                      editor.chain().focus().insertContent(suggestion).run();
+                    } else {
+                      // Find the misspelled word in the document
+                      const pos = state.selection.from;
+                      const $pos = state.doc.resolve(pos);
+                      const textNode = $pos.parent.textContent;
+                      const offset = $pos.parentOffset;
+                      
+                      // Find word boundaries
+                      let start = offset;
+                      let end = offset;
+                      
+                      while (start > 0 && /\w/.test(textNode[start - 1])) start--;
+                      while (end < textNode.length && /\w/.test(textNode[end])) end++;
+                      
+                      const wordAtCursor = textNode.substring(start, end);
+                      
+                      if (wordAtCursor === misspelledWord) {
+                        // Calculate absolute positions
+                        const nodeStart = pos - offset;
+                        const deleteFrom = nodeStart + start;
+                        const deleteTo = nodeStart + end;
+                        
+                        // Delete the misspelled word and insert the suggestion
+                        editor.chain()
+                          .focus()
+                          .deleteRange({ from: deleteFrom, to: deleteTo })
+                          .insertContent(suggestion)
+                          .run();
+                      }
+                    }
                     onClose();
                   }
                 }}
