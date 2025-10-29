@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pencil, Eraser, X, Palette, Undo, Redo } from 'lucide-react';
+import { Pencil, Eraser, Palette, Undo, Redo } from 'lucide-react';
 
 interface DrawingOverlayProps {
   isActive: boolean;

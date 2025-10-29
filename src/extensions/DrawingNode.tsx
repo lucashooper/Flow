@@ -46,13 +46,13 @@ export const DrawingNode = Node.create({
     return {
       insertDrawing:
         (attributes: any) =>
-        ({ commands }: any) => {
+        ({ commands }: { commands: any }) => {
           return commands.insertContent({
             type: this.name,
             attrs: attributes,
           });
         },
-    };
+    } as any;
   },
 
   addKeyboardShortcuts() {

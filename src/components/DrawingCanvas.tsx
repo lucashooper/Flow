@@ -36,7 +36,7 @@ export const DrawingCanvas = ({ drawingId, initialData, onSave, height = '400px'
           // Set up auto-save listener
           const cleanup = editor.store.listen(() => {
             if (onSave) {
-              const snapshot = editor.store.getSnapshot();
+              const snapshot = editor.store.serialize('document');
               onSave(snapshot);
             }
           });
