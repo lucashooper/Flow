@@ -211,7 +211,7 @@ export const DashboardSwitcher = ({
             transition={{ duration: 0.15 }}
             className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl overflow-hidden z-50"
           >
-            <div className="max-h-64 overflow-y-auto">
+            <div className="max-h-64 overflow-y-auto scrollbar-hide">
               {dashboards && dashboards.length > 0 ? (
                 dashboards.map((dashboard) => (
                   <div 
