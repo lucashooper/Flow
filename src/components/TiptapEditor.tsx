@@ -2,6 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
+import { DOMParser as PMDOMParser } from 'prosemirror-model';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -15,11 +16,13 @@ import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
 import { QuoteMark } from '../extensions/QuoteMark';
 import { DrawingNode } from '../extensions/DrawingNode';
+import { SpellCheck } from '../extensions/SpellCheck';
 import 'prosemirror-view/style/prosemirror.css';
 import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
+import { WordCount } from './WordCount';
 import { supabase } from '../lib/supabase';
 import { isWordCorrect, getSpellingSuggestions, initSpellChecker } from '../utils/spellcheck';
 
@@ -35,6 +38,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const isInternalUpdate = useRef(false);
 
   // Initialize spell checker on mount
   useEffect(() => {
@@ -116,10 +120,18 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           class: 'text-[#D97706] underline cursor-pointer',
         },
       }),
+      SpellCheck,
     ],
     content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const newContent = editor.getHTML();
+      console.log('📝 Editor onUpdate triggered, content length:', newContent.length);
+      isInternalUpdate.current = true;
+      onChange(newContent);
+      // Reset flag after a short delay to allow prop update
+      setTimeout(() => {
+        isInternalUpdate.current = false;
+      }, 100);
     },
     editorProps: {
       attributes: {
@@ -127,12 +139,197 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         style: 'line-height: 1.7; color: #e5e5e5; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
         spellcheck: 'true',
       },
+      handlePaste: (view, event) => {
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) {
+          console.log('❌ No clipboard data available');
+          return false;
+        }
+
+        console.log('📋 Paste event - Available formats:', Array.from(clipboardData.types));
+
+        // Get both HTML and plain text
+        const html = clipboardData.getData('text/html');
+        const plainText = clipboardData.getData('text/plain');
+
+        // Check if this is from Microsoft Office (has RTF or specific Office markers)
+        const isFromOffice = clipboardData.types.includes('text/rtf') || 
+                            (html && (html.includes('xmlns:o="urn:schemas-microsoft-com') || 
+                                     html.includes('ProgId=') || 
+                                     html.includes('MsoNormal')));
+
+        if (isFromOffice) {
+          console.log('🏢 Detected Microsoft Office paste - using plain text to avoid styling issues');
+          
+          // For Office apps, use plain text to avoid black text and huge fonts
+          if (plainText) {
+            console.log('✅ Pasting plain text from Office:', plainText.substring(0, 100));
+            
+            const { from } = view.state.selection;
+            const tr = view.state.tr.insertText(plainText, from);
+            view.dispatch(tr);
+            console.log('✅ Plain text inserted at position:', from);
+            
+            setTimeout(() => {
+              console.log('📄 Editor content:', editor?.getText().substring(0, 100));
+            }, 50);
+            
+            return true;
+          }
+        }
+
+        // Try HTML for web sources (Google Docs, etc.)
+        if (html && !isFromOffice) {
+          console.log('✅ Found HTML data (web source):', html.substring(0, 200));
+          
+          // Clean up Microsoft Office HTML artifacts and ALL styling
+          let cleanHTML = html
+            .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+            .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+            .replace(/<\/o:p>/g, '') // Remove closing Office tags
+            .replace(/class="[^"]*"/g, '') // Remove ALL classes
+            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (color, font-size, etc.)
+            .replace(/color="[^"]*"/g, '') // Remove color attributes
+            .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
+            .replace(/face="[^"]*"/g, '') // Remove font face
+            .replace(/size="[^"]*"/g, '') // Remove font size
+            .replace(/<font[^>]*>/g, '') // Remove font tags
+            .replace(/<\/font>/g, '')
+            .replace(/<span[^>]*>/g, '<span>') // Strip span attributes but keep tag
+            .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
+            .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
+            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+            .replace(/<html[^>]*>/gi, '') // Remove html tags
+            .replace(/<\/html>/gi, '')
+            .replace(/<body[^>]*>/gi, '') // Remove body tags
+            .replace(/<\/body>/gi, '');
+
+          console.log('🧹 Cleaned HTML:', cleanHTML.substring(0, 200));
+
+          // Parse HTML and insert into editor
+          try {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(cleanHTML, 'text/html');
+            
+            // Extract text content as fallback
+            const textContent = htmlDoc.body.textContent || htmlDoc.body.innerText || '';
+            console.log('📝 Extracted text from HTML:', textContent.substring(0, 100));
+
+            // Try to parse as ProseMirror slice first
+            const { state } = view;
+            const pmParser = PMDOMParser.fromSchema(state.schema);
+            
+            try {
+              const slice = pmParser.parseSlice(htmlDoc.body);
+              
+              // Check if slice has actual content
+              if (slice && slice.size > 0) {
+                const tr = state.tr.replaceSelection(slice);
+                view.dispatch(tr);
+                console.log('✅ HTML slice inserted successfully, size:', slice.size);
+                
+                // Verify content was inserted
+                setTimeout(() => {
+                  console.log('📄 Editor content length:', editor?.getText().length);
+                }, 50);
+                
+                return true;
+              } else {
+                console.log('⚠️ Slice is empty, falling back to text extraction');
+              }
+            } catch (sliceError) {
+              console.error('❌ Slice parsing failed:', sliceError);
+            }
+
+            // Fallback: Insert extracted text content
+            if (textContent.trim()) {
+              const { from } = state.selection;
+              const tr = state.tr.insertText(textContent, from);
+              view.dispatch(tr);
+              console.log('✅ Text content inserted at position:', from);
+              
+              // Verify insertion
+              setTimeout(() => {
+                console.log('📄 Editor content after text insert:', editor?.getText().substring(0, 100));
+              }, 50);
+              
+              return true;
+            }
+
+          } catch (error) {
+            console.error('❌ HTML parsing failed:', error);
+          }
+        }
+
+        // Fallback to plain text (always available)
+        if (plainText) {
+          console.log('✅ Using plain text fallback:', plainText.substring(0, 100));
+          
+          // Insert as plain text at cursor position
+          const { from } = view.state.selection;
+          const tr = view.state.tr.insertText(plainText, from);
+          view.dispatch(tr);
+          console.log('✅ Plain text inserted at position:', from);
+          
+          // Verify insertion
+          setTimeout(() => {
+            console.log('📄 Final editor content:', editor?.getText().substring(0, 100));
+          }, 50);
+          
+          return true;
+        }
+
+        // Handle file paste (images from PowerPoint/Word)
+        const files = Array.from(clipboardData.files);
+        if (files.length > 0) {
+          console.log('📎 Files detected:', files.map(f => f.type));
+          
+          files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = async (e) => {
+                const dataUrl = e.target?.result as string;
+                
+                // Upload to Supabase if available, otherwise use data URL
+                let imageUrl = dataUrl;
+                if (uploadImage) {
+                  const uploaded = await uploadImage(file);
+                  if (uploaded) imageUrl = uploaded;
+                }
+                
+                // Insert image
+                view.dispatch(
+                  view.state.tr.replaceSelectionWith(
+                    view.state.schema.nodes.image.create({ src: imageUrl })
+                  )
+                );
+                console.log('✅ Image pasted successfully');
+              };
+              reader.readAsDataURL(file);
+            }
+          });
+          return true;
+        }
+
+        console.log('⚠️ No compatible paste format found');
+        return false;
+      },
     },
   });
 
   // Update editor content when prop changes (for switching notes)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
+      // Don't reset content if the change came from the editor itself (e.g., paste)
+      if (isInternalUpdate.current) {
+        console.log('⏭️ Skipping setContent - internal update');
+        return;
+      }
+      console.log('🔄 Setting editor content from prop');
       editor.commands.setContent(content);
     }
   }, [content, editor]);
@@ -231,55 +428,66 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
 
-    // Show menu immediately
+    // Check if we clicked on a misspelled word (already marked by SpellCheck extension)
+    let clickedElement = target as HTMLElement;
+    
+    // Check if target itself or any parent has the misspelled-word class
+    if (!clickedElement.classList.contains('misspelled-word')) {
+      clickedElement = target.closest('.misspelled-word') as HTMLElement;
+    }
+    
+    let misspelledWord: string | undefined;
+    let suggestions: string[] = [];
+
+    if (clickedElement && clickedElement.classList.contains('misspelled-word')) {
+      // Try to get word from data attribute first
+      misspelledWord = clickedElement.getAttribute('data-word') || undefined;
+      
+      // If no data attribute, get the text content
+      if (!misspelledWord && clickedElement.textContent) {
+        misspelledWord = clickedElement.textContent.trim();
+      }
+      
+      console.log('🔍 Clicked misspelled word:', misspelledWord);
+      
+      // Get suggestions immediately (cached, so fast)
+      if (misspelledWord) {
+        suggestions = getSpellingSuggestions(misspelledWord);
+        console.log('💡 Suggestions:', suggestions);
+      }
+    } else if (!selectedText || selectedText.length === 0) {
+      // If no selection and not on misspelled word, check word at cursor
+      const pos = editor.state.selection.from;
+      const $pos = editor.state.doc.resolve(pos);
+      const textNode = $pos.parent.textContent;
+      const offset = $pos.parentOffset;
+      
+      // Find word boundaries
+      let start = offset;
+      let end = offset;
+      
+      while (start > 0 && /\w/.test(textNode[start - 1])) start--;
+      while (end < textNode.length && /\w/.test(textNode[end])) end++;
+      
+      const wordAtCursor = textNode.substring(start, end);
+      
+      if (wordAtCursor && wordAtCursor.length > 2) {
+        const isCorrect = isWordCorrect(wordAtCursor);
+        if (!isCorrect) {
+          misspelledWord = wordAtCursor;
+          suggestions = getSpellingSuggestions(wordAtCursor);
+        }
+      }
+    }
+
+    // Show menu immediately with all data
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       text: selectedText,
-      misspelledWord: undefined,
-      suggestions: [],
+      misspelledWord,
+      suggestions,
     });
-
-    // Check spelling asynchronously (non-blocking)
-    // Get word at cursor even if nothing is selected
-    setTimeout(() => {
-      let wordToCheck = selectedText?.trim();
-      
-      // If no selection, get word at cursor position
-      if (!wordToCheck || wordToCheck.length === 0) {
-        const pos = editor.state.selection.from;
-        const $pos = editor.state.doc.resolve(pos);
-        const textNode = $pos.parent.textContent;
-        const offset = $pos.parentOffset;
-        
-        // Find word boundaries
-        let start = offset;
-        let end = offset;
-        
-        while (start > 0 && /\w/.test(textNode[start - 1])) start--;
-        while (end < textNode.length && /\w/.test(textNode[end])) end++;
-        
-        wordToCheck = textNode.substring(start, end);
-      }
-      
-      // Take first word if multiple words selected
-      const wordAtCursor = wordToCheck?.split(/\s+/)[0];
-      console.log('🔍 Checking spelling for:', wordAtCursor);
-      
-      if (wordAtCursor && wordAtCursor.length > 0) {
-        const isCorrect = isWordCorrect(wordAtCursor);
-        console.log('📝 Word correct?', isCorrect);
-        if (!isCorrect) {
-          const suggestions = getSpellingSuggestions(wordAtCursor);
-          console.log('💡 Suggestions:', suggestions);
-          setContextMenu(prev => prev ? {
-            ...prev,
-            misspelledWord: wordAtCursor,
-            suggestions: suggestions
-          } : null);
-        }
-      }
-    }, 0);
   };
 
   const increaseFontSize = () => {
@@ -455,6 +663,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           onStartDrawing={() => setIsDrawingMode(true)}
         />
       )}
+
+      {/* Word Count */}
+      <WordCount editor={editor} />
 
       {/* Editor */}
       <EditorContent 
@@ -661,6 +872,14 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           text-decoration: underline;
           text-decoration-color: #A0522D;
           text-decoration-thickness: 2px;
+        }
+
+        /* Misspelled words - red wavy underline */
+        .ProseMirror .misspelled-word {
+          text-decoration: underline wavy #ef4444;
+          text-decoration-thickness: 1.5px;
+          text-underline-offset: 2px;
+          cursor: pointer;
         }
 
         /* Smooth color transitions */
