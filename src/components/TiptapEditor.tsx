@@ -18,7 +18,7 @@ import { QuoteMark } from '../extensions/QuoteMark';
 import { DrawingNode } from '../extensions/DrawingNode';
 import { SpellCheck } from '../extensions/SpellCheck';
 import 'prosemirror-view/style/prosemirror.css';
-import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil } from 'lucide-react';
+import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
@@ -334,10 +334,11 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     }
   }, [content, editor]);
 
-  // Add keyboard shortcut to jump back to title
+  // Add keyboard shortcuts
   useEffect(() => {
     if (editor) {
       const handleKeyDown = (e: KeyboardEvent) => {
+        // Cmd/Ctrl+ArrowUp: Jump to title
         if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
           e.preventDefault();
           const titleInput = document.querySelector('input[placeholder="Untitled"]') as HTMLInputElement;
@@ -345,6 +346,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
             titleInput.focus();
             titleInput.select();
           }
+        }
+
+        // Cmd/Ctrl+Shift+L: Convert to bullet list
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'L') {
+          e.preventDefault();
+          convertLinesToBulletList();
         }
       };
 
@@ -396,6 +403,50 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     if (url) {
       editor.chain().focus().setLink({ href: url }).run();
     }
+  };
+
+  const convertLinesToBulletList = () => {
+    if (!editor) return;
+
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, '\n');
+
+    if (!selectedText || !selectedText.trim()) {
+      console.log('⚠️ No text selected');
+      return;
+    }
+
+    // Split by line breaks and filter out empty lines
+    const lines = selectedText.split('\n').filter(line => line.trim());
+
+    if (lines.length === 0) {
+      console.log('⚠️ No valid lines to convert');
+      return;
+    }
+
+    console.log('📝 Converting lines to bullet list:', lines);
+
+    // Delete selected text and insert bullet list
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContent({
+        type: 'bulletList',
+        content: lines.map(line => ({
+          type: 'listItem',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: line.trim(),
+            }],
+          }],
+        })),
+      })
+      .run();
+
+    console.log('✅ Converted to bullet list');
   };
 
   useEffect(() => {
@@ -630,6 +681,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
             title="Add Link (Cmd/Ctrl+K)"
           >
             <LinkIcon className="w-4 h-4" />
+          </button>
+
+          <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
+
+          <button
+            onClick={convertLinesToBulletList}
+            className="p-2 rounded transition-colors text-[#a78bfa] hover:bg-[#252525] hover:text-[#c4b5fd]"
+            title="Convert to Bullet List (Cmd/Ctrl+Shift+L)"
+          >
+            <List className="w-4 h-4" />
           </button>
 
           <div className="w-px h-6 bg-[#2a2a2a] mx-1" />

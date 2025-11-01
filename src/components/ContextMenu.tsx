@@ -794,6 +794,43 @@ export const ContextMenu = ({
           shortcut="⌘K"
         />
 
+        {/* Convert to Bullet List */}
+        {selectedText && selectedText.includes('\n') && (
+          <MenuItem
+            icon={List}
+            label="Convert to Bullet List"
+            name="Convert to Bullet List"
+            onClick={() => {
+              const { from, to } = editor.state.selection;
+              const text = editor.state.doc.textBetween(from, to, '\n');
+              const lines = text.split('\n').filter(line => line.trim());
+
+              if (lines.length > 0) {
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from, to })
+                  .insertContent({
+                    type: 'bulletList',
+                    content: lines.map(line => ({
+                      type: 'listItem',
+                      content: [{
+                        type: 'paragraph',
+                        content: [{
+                          type: 'text',
+                          text: line.trim(),
+                        }],
+                      }],
+                    })),
+                  })
+                  .run();
+              }
+              onClose();
+            }}
+            shortcut="⌘⇧L"
+          />
+        )}
+
         <div className="my-1 border-t border-[#2a2a2a]" />
 
         {/* Cut, Copy, Paste */}
