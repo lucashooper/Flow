@@ -62,7 +62,7 @@ export function isWordCorrect(word: string): boolean {
   return isCorrect;
 }
 
-// Get spelling suggestions for a misspelled word
+// Get spelling suggestions for a misspelled word (synchronous, uses cache)
 export function getSpellingSuggestions(word: string): string[] {
   if (!dictionary || !word) return [];
   
@@ -70,7 +70,7 @@ export function getSpellingSuggestions(word: string): string[] {
   const cleanWord = word.replace(/[.,!?;:'"]/g, '');
   if (!cleanWord) return [];
   
-  // Check cache first
+  // Check cache first - instant return
   const cacheKey = cleanWord.toLowerCase();
   if (suggestionCache.has(cacheKey)) {
     return suggestionCache.get(cacheKey)!;
@@ -97,6 +97,22 @@ export function getSpellingSuggestions(word: string): string[] {
   suggestionCache.set(cacheKey, result);
   
   return result;
+}
+
+// Get spelling suggestions asynchronously (non-blocking)
+export async function getSpellingSuggestionsAsync(word: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    // Use setTimeout to make it non-blocking
+    setTimeout(() => {
+      try {
+        const suggestions = getSpellingSuggestions(word);
+        resolve(suggestions);
+      } catch (error) {
+        console.error('Error getting suggestions:', error);
+        resolve([]);
+      }
+    }, 0);
+  });
 }
 
 // Get word at cursor position

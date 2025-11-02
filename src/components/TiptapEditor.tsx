@@ -24,7 +24,7 @@ import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { WordCount } from './WordCount';
 import { supabase } from '../lib/supabase';
-import { isWordCorrect, getSpellingSuggestions, initSpellChecker } from '../utils/spellcheck';
+import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck';
 
 interface TiptapEditorProps {
   content: string;
@@ -488,7 +488,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     }
     
     let misspelledWord: string | undefined;
-    let suggestions: string[] = [];
 
     if (clickedElement && clickedElement.classList.contains('misspelled-word')) {
       // Try to get word from data attribute first
@@ -500,12 +499,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       }
       
       console.log('🔍 Clicked misspelled word:', misspelledWord);
-      
-      // Get suggestions immediately (cached, so fast)
-      if (misspelledWord) {
-        suggestions = getSpellingSuggestions(misspelledWord);
-        console.log('💡 Suggestions:', suggestions);
-      }
     } else if (!selectedText || selectedText.length === 0) {
       // If no selection and not on misspelled word, check word at cursor
       const pos = editor.state.selection.from;
@@ -526,19 +519,38 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         const isCorrect = isWordCorrect(wordAtCursor);
         if (!isCorrect) {
           misspelledWord = wordAtCursor;
-          suggestions = getSpellingSuggestions(wordAtCursor);
         }
       }
     }
 
-    // Show menu immediately with all data
+    // ✅ CRITICAL: Show menu IMMEDIATELY with empty suggestions
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       text: selectedText,
       misspelledWord,
-      suggestions,
+      suggestions: [], // Start with empty, load async
     });
+
+    // Load suggestions asynchronously in the background (non-blocking)
+    if (misspelledWord) {
+      console.log('⏳ Loading suggestions asynchronously for:', misspelledWord);
+      
+      // Use async function to prevent blocking
+      getSpellingSuggestionsAsync(misspelledWord)
+        .then(suggestions => {
+          console.log('💡 Suggestions loaded:', suggestions);
+          
+          // Update context menu with suggestions
+          setContextMenu(prev => prev ? {
+            ...prev,
+            suggestions: suggestions
+          } : null);
+        })
+        .catch(error => {
+          console.error('❌ Failed to load suggestions:', error);
+        });
+    }
   };
 
   const increaseFontSize = () => {
