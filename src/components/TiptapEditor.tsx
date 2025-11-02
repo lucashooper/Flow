@@ -16,15 +16,15 @@ import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
 // import { QuoteMark } from '../extensions/QuoteMark'; // Disabled - causing glitching bug
 import { DrawingNode } from '../extensions/DrawingNode';
-import { SpellCheck } from '../extensions/SpellCheck';
+// import { SpellCheck } from '../extensions/SpellCheck'; // Disabled - using browser native
 import 'prosemirror-view/style/prosemirror.css';
-import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List } from 'lucide-react';
+import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { WordCount } from './WordCount';
 import { supabase } from '../lib/supabase';
-import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck';
+// import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
   content: string;
@@ -40,15 +40,15 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const isInternalUpdate = useRef(false);
 
-  // Initialize spell checker on mount
-  useEffect(() => {
-    console.log('🔤 Initializing spell checker...');
-    initSpellChecker().then(() => {
-      console.log('✅ Spell checker ready!');
-    }).catch((err) => {
-      console.error('❌ Spell checker failed to load:', err);
-    });
-  }, []);
+  // Spell checker initialization removed - using browser native spell check
+  // useEffect(() => {
+  //   console.log('🔤 Initializing spell checker...');
+  //   initSpellChecker().then(() => {
+  //     console.log('✅ Spell checker ready!');
+  //   }).catch((err) => {
+  //     console.error('❌ Spell checker failed to load:', err);
+  //   });
+  // }, []);
   const [bulletStyle, setBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
@@ -91,6 +91,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       }),
       ColoredBold,
       // QuoteMark, // ❌ DISABLED - causing glitching bug when pressing Enter inside quotes
+      // SpellCheck, // ❌ DISABLED - causing 6+ second delays, using browser native instead
       DrawingNode,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
@@ -120,7 +121,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           class: 'text-[#D97706] underline cursor-pointer',
         },
       }),
-      SpellCheck,
+      // SpellCheck, // Disabled - using browser native spell check
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -463,95 +464,10 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     }
   }, [editor]);
 
-  const handleContextMenu = async (e: React.MouseEvent) => {
-    // Only prevent default if clicking inside the editor content area
-    const target = e.target as HTMLElement;
-    const isEditorContent = target.closest('.ProseMirror') || target.classList.contains('ProseMirror');
-    
-    if (!isEditorContent) {
-      // Allow default context menu for non-editor areas (sidebar, etc.)
-      return;
-    }
-    
-    e.preventDefault();
-    if (!editor) return;
-
-    const { from, to } = editor.state.selection;
-    const selectedText = editor.state.doc.textBetween(from, to, ' ');
-
-    // Check if we clicked on a misspelled word (already marked by SpellCheck extension)
-    let clickedElement = target as HTMLElement;
-    
-    // Check if target itself or any parent has the misspelled-word class
-    if (!clickedElement.classList.contains('misspelled-word')) {
-      clickedElement = target.closest('.misspelled-word') as HTMLElement;
-    }
-    
-    let misspelledWord: string | undefined;
-
-    if (clickedElement && clickedElement.classList.contains('misspelled-word')) {
-      // Try to get word from data attribute first
-      misspelledWord = clickedElement.getAttribute('data-word') || undefined;
-      
-      // If no data attribute, get the text content
-      if (!misspelledWord && clickedElement.textContent) {
-        misspelledWord = clickedElement.textContent.trim();
-      }
-      
-      console.log('🔍 Clicked misspelled word:', misspelledWord);
-    } else if (!selectedText || selectedText.length === 0) {
-      // If no selection and not on misspelled word, check word at cursor
-      const pos = editor.state.selection.from;
-      const $pos = editor.state.doc.resolve(pos);
-      const textNode = $pos.parent.textContent;
-      const offset = $pos.parentOffset;
-      
-      // Find word boundaries
-      let start = offset;
-      let end = offset;
-      
-      while (start > 0 && /\w/.test(textNode[start - 1])) start--;
-      while (end < textNode.length && /\w/.test(textNode[end])) end++;
-      
-      const wordAtCursor = textNode.substring(start, end);
-      
-      if (wordAtCursor && wordAtCursor.length > 2) {
-        const isCorrect = isWordCorrect(wordAtCursor);
-        if (!isCorrect) {
-          misspelledWord = wordAtCursor;
-        }
-      }
-    }
-
-    // ✅ CRITICAL: Show menu IMMEDIATELY with empty suggestions
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      text: selectedText,
-      misspelledWord,
-      suggestions: [], // Start with empty, load async
-    });
-
-    // Load suggestions asynchronously in the background (non-blocking)
-    if (misspelledWord) {
-      console.log('⏳ Loading suggestions asynchronously for:', misspelledWord);
-      
-      // Use async function to prevent blocking
-      getSpellingSuggestionsAsync(misspelledWord)
-        .then(suggestions => {
-          console.log('💡 Suggestions loaded:', suggestions);
-          
-          // Update context menu with suggestions
-          setContextMenu(prev => prev ? {
-            ...prev,
-            suggestions: suggestions
-          } : null);
-        })
-        .catch(error => {
-          console.error('❌ Failed to load suggestions:', error);
-        });
-    }
-  };
+  // handleContextMenu removed - using browser native context menu for spell check
+  // const handleContextMenu = async (e: React.MouseEvent) => {
+  //   // Browser handles spell check natively
+  // };
 
   const increaseFontSize = () => {
     if (!editor) return;
@@ -582,7 +498,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, [isDrawingMode]);
 
   return (
-    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle}`} onContextMenu={handleContextMenu}>
+    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle}`}>
       {/* Persistent Drawing Layer */}
       <PersistentDrawingLayer
         isDrawingMode={isDrawingMode}
@@ -720,10 +636,32 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           >
             <Pencil className="w-4 h-4" />
           </button>
+
+          <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
+
+          {/* More Options - Opens custom context menu */}
+          <button
+            onClick={(e) => {
+              const { from, to } = editor.state.selection;
+              const selectedText = editor.state.doc.textBetween(from, to, ' ');
+              
+              setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                text: selectedText,
+                misspelledWord: undefined,
+                suggestions: [],
+              });
+            }}
+            className="p-2 rounded transition-colors text-[#a78bfa] hover:bg-[#252525] hover:text-[#c4b5fd]"
+            title="More Options (Font Size, Colors, Highlight, etc.)"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* Context Menu */}
+      {/* Context Menu - Opened via More Options button in bubble menu */}
       {contextMenu && (
         <ContextMenu
           editor={editor}
