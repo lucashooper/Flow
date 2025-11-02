@@ -14,7 +14,7 @@ import { ResizableImage } from '../extensions/ResizableImage.tsx';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
-import { QuoteMark } from '../extensions/QuoteMark';
+// import { QuoteMark } from '../extensions/QuoteMark'; // Disabled - causing glitching bug
 import { DrawingNode } from '../extensions/DrawingNode';
 import { SpellCheck } from '../extensions/SpellCheck';
 import 'prosemirror-view/style/prosemirror.css';
@@ -52,9 +52,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [bulletStyle, setBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
-  const [quoteStyle, setQuoteStyle] = useState<string>(() => {
-    return localStorage.getItem('quoteStyle') || 'default';
-  });
+  // const [quoteStyle, setQuoteStyle] = useState<string>(() => {
+  //   return localStorage.getItem('quoteStyle') || 'default';
+  // }); // Disabled - QuoteMark extension removed
 
   // Handle image upload to Supabase
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -90,7 +90,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         link: false, // Disable built-in link to avoid duplicates
       }),
       ColoredBold,
-      QuoteMark,
+      // QuoteMark, // ❌ DISABLED - causing glitching bug when pressing Enter inside quotes
       DrawingNode,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
@@ -371,14 +371,14 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, []);
 
   // Listen for quote style changes
-  useEffect(() => {
-    const handleQuoteStyleChange = (e: CustomEvent) => {
-      setQuoteStyle(e.detail);
-    };
+  // useEffect(() => {
+  //   const handleQuoteStyleChange = (e: CustomEvent) => {
+  //     setQuoteStyle(e.detail);
+  //   };
 
-    window.addEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
-    return () => window.removeEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
-  }, []);
+  //   window.addEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
+  //   return () => window.removeEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
+  // }, []); // Disabled - QuoteMark extension removed
 
   // Debug: Verify QuoteMark extension is loaded
   useEffect(() => {
@@ -570,7 +570,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, [isDrawingMode]);
 
   return (
-    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle} editor-quote-${quoteStyle}`} onContextMenu={handleContextMenu}>
+    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle}`} onContextMenu={handleContextMenu}>
       {/* Persistent Drawing Layer */}
       <PersistentDrawingLayer
         isDrawingMode={isDrawingMode}
