@@ -12,9 +12,14 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
   const saveTimeoutRef = useRef<number | undefined>(undefined);
+  const currentNoteIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (note) {
+    // Only update state if the note ID actually changed (switching notes)
+    // This prevents unnecessary re-renders when tabbing away and back
+    if (note && note.id !== currentNoteIdRef.current) {
+      console.log('📝 Switching to note:', note.id);
+      currentNoteIdRef.current = note.id;
       setTitle(note.title);
       setContent(note.content);
       setDrawingData(note.drawing_data || '');

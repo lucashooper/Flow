@@ -349,16 +349,29 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     },
   });
 
+  // Track last content prop to prevent unnecessary updates
+  const lastContentProp = useRef<string>('');
+
   // Update editor content when prop changes (for switching notes)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (!editor) return;
+    
+    // Only update if content prop actually changed
+    if (content !== lastContentProp.current) {
+      lastContentProp.current = content;
+      
       // Don't reset content if the change came from the editor itself (e.g., paste)
       if (isInternalUpdate.current) {
         console.log('⏭️ Skipping setContent - internal update');
+        isInternalUpdate.current = false;
         return;
       }
-      console.log('🔄 Setting editor content from prop');
-      editor.commands.setContent(content);
+      
+      // Only update if editor content is different from prop
+      if (content !== editor.getHTML()) {
+        console.log('🔄 Setting editor content from prop');
+        editor.commands.setContent(content);
+      }
     }
   }, [content, editor]);
 

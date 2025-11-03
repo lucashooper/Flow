@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,9 +19,12 @@ export const NewDashboard = () => {
   );
   const [loading, setLoading] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const hasLoadedDashboards = useRef(false);
 
   useEffect(() => {
-    if (user) {
+    // Only fetch dashboards once when user is available
+    if (user && !hasLoadedDashboards.current) {
+      hasLoadedDashboards.current = true;
       fetchDashboards();
     }
   }, [user]);
@@ -30,7 +33,7 @@ export const NewDashboard = () => {
     if (activeDashboard) {
       fetchData();
     }
-  }, [activeDashboard]);
+  }, [activeDashboard?.id]); // Only refetch when dashboard ID changes, not the object reference
 
   const fetchDashboards = async () => {
     try {
