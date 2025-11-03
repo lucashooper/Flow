@@ -149,16 +149,22 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
         console.log('📋 Paste event - Available formats:', Array.from(clipboardData.types));
 
-        // ✅ CRITICAL: Check for files/images FIRST (before text/HTML)
-        // This fixes Snipping Tool paste (Win+Shift+S)
+        // Get text content first to check if this is a text paste
+        const html = clipboardData.getData('text/html');
+        const plainText = clipboardData.getData('text/plain');
+        
+        // ✅ CRITICAL: Check for files/images ONLY if there's no text content
+        // This fixes Snipping Tool paste while preserving PowerPoint text paste
         const files = Array.from(clipboardData.files);
-        if (files.length > 0) {
-          console.log('📎 Files detected:', files.map(f => `${f.name} (${f.type})`));
+        const hasTextContent = plainText.trim().length > 0 || html.trim().length > 0;
+        
+        if (files.length > 0 && !hasTextContent) {
+          console.log('📎 Files detected (no text):', files.map(f => `${f.name} (${f.type})`));
           
           const imageFiles = files.filter(file => file.type.startsWith('image/'));
           
           if (imageFiles.length > 0) {
-            console.log('🖼️ Processing', imageFiles.length, 'image(s)');
+            console.log('🖼️ Processing', imageFiles.length, 'image(s) from clipboard');
             event.preventDefault(); // Block default handling
             
             imageFiles.forEach(file => {
@@ -204,10 +210,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
             return true; // We handled it
           }
         }
-
-        // Get both HTML and plain text
-        const html = clipboardData.getData('text/html');
-        const plainText = clipboardData.getData('text/plain');
 
         // Check if this is from Microsoft Office (has RTF or specific Office markers)
         const isFromOffice = clipboardData.types.includes('text/rtf') || 
