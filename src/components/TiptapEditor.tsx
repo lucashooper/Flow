@@ -149,6 +149,62 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
         console.log('📋 Paste event - Available formats:', Array.from(clipboardData.types));
 
+        // ✅ CRITICAL: Check for files/images FIRST (before text/HTML)
+        // This fixes Snipping Tool paste (Win+Shift+S)
+        const files = Array.from(clipboardData.files);
+        if (files.length > 0) {
+          console.log('📎 Files detected:', files.map(f => `${f.name} (${f.type})`));
+          
+          const imageFiles = files.filter(file => file.type.startsWith('image/'));
+          
+          if (imageFiles.length > 0) {
+            console.log('🖼️ Processing', imageFiles.length, 'image(s)');
+            event.preventDefault(); // Block default handling
+            
+            imageFiles.forEach(file => {
+              console.log('📸 Reading image:', file.name || 'clipboard-image', file.type);
+              
+              const reader = new FileReader();
+              reader.onload = async (e) => {
+                const dataUrl = e.target?.result as string;
+                console.log('✅ Image loaded, size:', Math.round(dataUrl.length / 1024), 'KB');
+                
+                // Upload to Supabase if available, otherwise use data URL
+                let imageUrl = dataUrl;
+                if (uploadImage) {
+                  console.log('☁️ Uploading to Supabase...');
+                  const uploaded = await uploadImage(file);
+                  if (uploaded) {
+                    imageUrl = uploaded;
+                    console.log('✅ Uploaded to Supabase:', imageUrl);
+                  }
+                }
+                
+                // Insert image into editor (use resizableImage node name)
+                const imageNode = view.state.schema.nodes.resizableImage || view.state.schema.nodes.image;
+                if (imageNode) {
+                  view.dispatch(
+                    view.state.tr.replaceSelectionWith(
+                      imageNode.create({ src: imageUrl })
+                    )
+                  );
+                  console.log('✅ Image inserted into editor');
+                } else {
+                  console.error('❌ Image node not found in schema');
+                }
+              };
+              
+              reader.onerror = (error) => {
+                console.error('❌ Image read failed:', error);
+              };
+              
+              reader.readAsDataURL(file);
+            });
+            
+            return true; // We handled it
+          }
+        }
+
         // Get both HTML and plain text
         const html = clipboardData.getData('text/html');
         const plainText = clipboardData.getData('text/plain');
@@ -284,38 +340,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           return true;
         }
 
-        // Handle file paste (images from PowerPoint/Word)
-        const files = Array.from(clipboardData.files);
-        if (files.length > 0) {
-          console.log('📎 Files detected:', files.map(f => f.type));
-          
-          files.forEach(file => {
-            if (file.type.startsWith('image/')) {
-              const reader = new FileReader();
-              reader.onload = async (e) => {
-                const dataUrl = e.target?.result as string;
-                
-                // Upload to Supabase if available, otherwise use data URL
-                let imageUrl = dataUrl;
-                if (uploadImage) {
-                  const uploaded = await uploadImage(file);
-                  if (uploaded) imageUrl = uploaded;
-                }
-                
-                // Insert image
-                view.dispatch(
-                  view.state.tr.replaceSelectionWith(
-                    view.state.schema.nodes.image.create({ src: imageUrl })
-                  )
-                );
-                console.log('✅ Image pasted successfully');
-              };
-              reader.readAsDataURL(file);
-            }
-          });
-          return true;
-        }
-
+        // No compatible paste format found
         console.log('⚠️ No compatible paste format found');
         return false;
       },
