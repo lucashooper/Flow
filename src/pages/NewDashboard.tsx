@@ -257,19 +257,6 @@ export const NewDashboard = () => {
 
   return (
     <div className="flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden">
-      {/* Dashboard Cover Photo (Notion-style) */}
-      {activeDashboard?.cover_image && (
-        <div 
-          className="fixed top-0 left-0 right-0 h-48 bg-cover bg-center z-0"
-          style={{ 
-            backgroundImage: `url(${activeDashboard.cover_image})`,
-            marginLeft: `${sidebarWidth}px`
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0a0a0a]" />
-        </div>
-      )}
-      
       {/* Sidebar */}
       <Sidebar
         notes={notes}

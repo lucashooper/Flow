@@ -192,7 +192,17 @@ export const DashboardSwitcher = ({
         className="w-full flex items-center justify-between p-3 hover:bg-[#1a1a1a] transition-colors rounded-lg group"
       >
         <div className="flex items-center gap-2">
-          <span className="text-lg">{activeDashboard?.emoji || '📝'}</span>
+          {activeDashboard?.cover_image ? (
+            <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
+              <img 
+                src={activeDashboard.cover_image} 
+                alt={activeDashboard.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <span className="text-lg">{activeDashboard?.emoji || '📝'}</span>
+          )}
           <span className="text-sm font-medium text-[#e5e5e5] truncate">
             {activeDashboard?.name || 'My Notes'}
           </span>
@@ -231,7 +241,17 @@ export const DashboardSwitcher = ({
                       className="w-full flex items-center justify-between p-3 hover:bg-[#252525] transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{dashboard.emoji}</span>
+                        {dashboard.cover_image ? (
+                          <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
+                            <img 
+                              src={dashboard.cover_image} 
+                              alt={dashboard.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-lg">{dashboard.emoji}</span>
+                        )}
                         <span className="text-sm text-[#e5e5e5] truncate">
                           {dashboard.name}
                         </span>
@@ -261,6 +281,24 @@ export const DashboardSwitcher = ({
             <div className="border-t border-[#2a2a2a]">
               {isCreating ? (
                 <div className="p-3 space-y-3">
+                  {/* Cover Photo Preview */}
+                  {newDashboardCover && (
+                    <div className="relative w-full h-24 rounded-lg overflow-hidden border border-[#2a2a2a]">
+                      <img 
+                        src={newDashboardCover} 
+                        alt="Cover preview" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => setNewDashboardCover(null)}
+                        className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white rounded p-1 transition-colors"
+                        title="Remove cover"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       {showEmojiPicker && (
@@ -304,7 +342,9 @@ export const DashboardSwitcher = ({
                           <span className="text-xs text-[#888888]">Uploading...</span>
                         ) : newDashboardCover ? (
                           <span className="text-xs text-[#10b981]">✓</span>
-                        ) : null}
+                        ) : (
+                          <span className="text-xs text-[#888888]">Cover</span>
+                        )}
                       </button>
                     </div>
                   </div>
