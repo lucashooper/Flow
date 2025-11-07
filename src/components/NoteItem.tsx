@@ -79,7 +79,8 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   };
 
   const handleToggleStar = () => {
-    onUpdate(note.id, { is_starred: !note.is_starred });
+    const currentStarred = note.is_starred ?? false;
+    onUpdate(note.id, { is_starred: !currentStarred });
     setShowContextMenu(false);
   };
 
@@ -133,7 +134,7 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
                   <div className="text-sm text-[#e5e5e5] truncate font-medium">
                     {note.title}
                   </div>
-                  {note.is_starred && (
+                  {(note.is_starred ?? false) && (
                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
                   )}
                 </div>
@@ -165,8 +166,8 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
               onClick={handleToggleStar}
               className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
             >
-              <Star className={`w-4 h-4 ${note.is_starred ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-              {note.is_starred ? 'Unstar' : 'Star'}
+              <Star className={`w-4 h-4 ${(note.is_starred ?? false) ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+              {(note.is_starred ?? false) ? 'Unstar' : 'Star'}
             </button>
 
             <div className="my-1 border-t border-[#2a2a2a]" />

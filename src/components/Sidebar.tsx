@@ -157,9 +157,11 @@ export const Sidebar = ({
       note.content.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // Starred notes come first
-      if (a.is_starred && !b.is_starred) return -1;
-      if (!a.is_starred && b.is_starred) return 1;
+      // Starred notes come first (handle undefined as false)
+      const aStarred = a.is_starred ?? false;
+      const bStarred = b.is_starred ?? false;
+      if (aStarred && !bStarred) return -1;
+      if (!aStarred && bStarred) return 1;
       // Then sort by updated_at
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
