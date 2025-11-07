@@ -36,9 +36,12 @@ interface TiptapEditorProps {
 
 export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
+  const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const isInternalUpdate = useRef(false);
+  const showMenuTimeout = useRef<number | null>(null);
+  const lastSelectionTime = useRef<number>(0);
 
   // Spell checker initialization removed - using browser native spell check
   // useEffect(() => {
@@ -492,14 +495,89 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
   useEffect(() => {
     if (editor) {
+      const calculateMenuPosition = () => {
+        const { from, to } = editor.state.selection;
+        const { view } = editor;
+        const start = view.coordsAtPos(from);
+        const end = view.coordsAtPos(to);
+        
+        // Get the editor container's position
+        const editorElement = view.dom.getBoundingClientRect();
+        
+        // Calculate selection bounds
+        const selectionTop = Math.min(start.top, end.top);
+        const selectionBottom = Math.max(start.bottom, end.bottom);
+        
+        // Bubble menu dimensions
+        const menuHeight = 48;
+        const menuOffset = 12;
+        
+        // Position above selection by default
+        let top = selectionTop - menuHeight - menuOffset;
+        
+        // If not enough room above, position below
+        if (top < editorElement.top + 20) {
+          top = selectionBottom + menuOffset;
+        }
+        
+        // CONSISTENT horizontal position: center of viewport
+        const viewportWidth = window.innerWidth;
+        const left = viewportWidth / 2;
+        
+        return { top, left };
+      };
+
       const handleSelectionUpdate = () => {
         const { from, to } = editor.state.selection;
-        setShowBubbleMenu(from !== to);
+        const hasSelection = from !== to;
+        
+        // Clear any pending timeout
+        if (showMenuTimeout.current) {
+          clearTimeout(showMenuTimeout.current);
+          showMenuTimeout.current = null;
+        }
+        
+        if (!hasSelection) {
+          setShowBubbleMenu(false);
+          setBubbleMenuPosition(null);
+          return;
+        }
+        
+        // DEBOUNCE: Wait 300ms after selection stops changing
+        showMenuTimeout.current = window.setTimeout(() => {
+          const { from: currentFrom, to: currentTo } = editor.state.selection;
+          if (currentFrom !== currentTo) {
+            setBubbleMenuPosition(calculateMenuPosition());
+            setShowBubbleMenu(true);
+          }
+        }, 300);
+      };
+
+      const handleMouseDown = (e: MouseEvent) => {
+        // Only track if clicking in editor
+        const target = e.target as HTMLElement;
+        if (target.closest('.ProseMirror')) {
+          setShowBubbleMenu(false);
+          lastSelectionTime.current = Date.now();
+        }
+      };
+
+      const handleMouseUp = () => {
+        // Update timestamp on mouseup
+        lastSelectionTime.current = Date.now();
       };
 
       editor.on('selectionUpdate', handleSelectionUpdate);
+      document.addEventListener('mousedown', handleMouseDown);
+      document.addEventListener('mouseup', handleMouseUp);
+      
       return () => {
         editor.off('selectionUpdate', handleSelectionUpdate);
+        document.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('mouseup', handleMouseUp);
+        if (showMenuTimeout.current) {
+          clearTimeout(showMenuTimeout.current);
+        }
       };
     }
   }, [editor]);
@@ -555,20 +633,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       {/* Floating Drawing Button - Always Visible */}
       <button
         onClick={() => setIsDrawingMode(true)}
-        className="fixed bottom-8 right-8 z-40 p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-2xl transition-all hover:scale-110"
+        className="fixed bottom-8 right-8 z-40 p-4 bg-purple-600/85 hover:bg-purple-600 text-white rounded-full shadow-lg transition-all hover:scale-105"
         title="Start Drawing Mode (Draw anywhere!)"
       >
-        <Pencil className="w-6 h-6" />
+        <Pencil className="w-5 h-5" />
       </button>
 
       {/* Bubble Menu - appears on text selection */}
-      {editor && showBubbleMenu && (
-        <div className="absolute z-50 flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl p-1"
+      {editor && showBubbleMenu && bubbleMenuPosition && (
+        <div className="fixed z-50 flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl p-1 animate-fadeIn"
           style={{
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+            top: `${bubbleMenuPosition.top}px`,
+            left: `${bubbleMenuPosition.left}px`,
+            transform: 'translateX(-50%)',
             pointerEvents: 'auto',
+            animation: 'fadeIn 0.2s ease-out',
           }}
         >
           {/* Font Size Controls */}
@@ -732,6 +811,18 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       />
 
       <style>{`
+        /* Smooth fade-in animation for bubble menu */
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+        
         /* Hide scrollbar but keep functionality */
         .editor-scrollbar::-webkit-scrollbar {
           width: 0px;

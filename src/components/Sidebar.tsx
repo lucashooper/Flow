@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, LogOut } from 'lucide-react';
+import { Plus, FolderPlus, Search, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -245,10 +245,16 @@ export const Sidebar = ({
         <div className="p-4 border-b border-[#2a2a2a]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <img src="/Flow-icon.webp" alt="Flow" className="w-6 h-6" />
-            <h1 className="text-xl font-bold text-[#e5e5e5]">Flow</h1>
+            <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
           </div>
           <div className="flex gap-1">
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-1.5 hover:bg-[#252525] rounded transition-colors"
+              title="Settings"
+            >
+              <SettingsIcon className="w-4 h-4 text-[#888888] hover:text-[#e5e5e5]" />
+            </button>
             <button
               onClick={handleLogout}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"

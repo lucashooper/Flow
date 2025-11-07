@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Note, Folder, Dashboard } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { EditorPanel } from '../components/EditorPanel';
+import { NoteTabs } from '../components/NoteTabs';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
@@ -19,6 +20,11 @@ export const NewDashboard = () => {
   );
   const [loading, setLoading] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [openNotes, setOpenNotes] = useState<Note[]>([]);
+  const [tabsEnabled, setTabsEnabled] = useState(() => {
+    const saved = localStorage.getItem('tabsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const hasLoadedDashboards = useRef(false);
 
   useEffect(() => {
@@ -93,6 +99,28 @@ export const NewDashboard = () => {
   const handleNoteSelect = (noteId: string) => {
     setSelectedNoteId(noteId);
     setSearchParams({ note: noteId });
+    
+    // Add to open tabs if tabs are enabled
+    if (tabsEnabled) {
+      const note = notes.find(n => n.id === noteId);
+      if (note && !openNotes.some(n => n.id === noteId)) {
+        setOpenNotes(prev => [...prev, note]);
+      }
+    }
+  };
+  
+  const handleTabClose = (noteId: string) => {
+    setOpenNotes(prev => prev.filter(n => n.id !== noteId));
+    // If closing active tab, switch to another tab or clear selection
+    if (selectedNoteId === noteId) {
+      const remainingNotes = openNotes.filter(n => n.id !== noteId);
+      if (remainingNotes.length > 0) {
+        handleNoteSelect(remainingNotes[remainingNotes.length - 1].id);
+      } else {
+        setSelectedNoteId(null);
+        setSearchParams({});
+      }
+    }
   };
 
   const handleNoteCreate = async (folderId?: string) => {
@@ -278,11 +306,24 @@ export const NewDashboard = () => {
         loading={loading}
       />
 
-      {/* Editor Panel */}
-      <EditorPanel
-        note={selectedNote}
-        onNoteUpdate={handleNoteUpdate}
-      />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Note Tabs */}
+        {tabsEnabled && (
+          <NoteTabs
+            openNotes={openNotes}
+            activeNoteId={selectedNoteId}
+            onTabClick={handleNoteSelect}
+            onTabClose={handleTabClose}
+          />
+        )}
+        
+        {/* Editor Panel */}
+        <EditorPanel
+          note={selectedNote}
+          onNoteUpdate={handleNoteUpdate}
+        />
+      </div>
     </div>
   );
 };
