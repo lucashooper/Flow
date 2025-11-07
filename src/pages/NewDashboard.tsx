@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Note, Folder, Dashboard } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { EditorPanel } from '../components/EditorPanel';
-import { NoteTabs } from '../components/NoteTabs';
+import { EditorHeader } from '../components/EditorHeader';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
@@ -21,10 +21,10 @@ export const NewDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [openNotes, setOpenNotes] = useState<Note[]>([]);
-  const [tabsEnabled, setTabsEnabled] = useState(() => {
+  const tabsEnabled = (() => {
     const saved = localStorage.getItem('tabsEnabled');
     return saved !== null ? JSON.parse(saved) : true;
-  });
+  })();
   const hasLoadedDashboards = useRef(false);
 
   useEffect(() => {
@@ -308,15 +308,14 @@ export const NewDashboard = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Note Tabs */}
-        {tabsEnabled && (
-          <NoteTabs
-            openNotes={openNotes}
-            activeNoteId={selectedNoteId}
-            onTabClick={handleNoteSelect}
-            onTabClose={handleTabClose}
-          />
-        )}
+        {/* Unified Header with Tabs */}
+        <EditorHeader
+          openNotes={openNotes}
+          activeNoteId={selectedNoteId}
+          tabsEnabled={tabsEnabled}
+          onTabClick={handleNoteSelect}
+          onTabClose={handleTabClose}
+        />
         
         {/* Editor Panel */}
         <EditorPanel

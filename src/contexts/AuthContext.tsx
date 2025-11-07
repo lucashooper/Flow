@@ -9,10 +9,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (_userId: string) => {
-    // Profiles table is optional - skip for now to avoid 406 errors
-    // Uncomment when you create a profiles table
-    /*
+  const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -21,11 +18,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (error && error.code !== 'PGRST116') throw error;
-      setUserProfile(data);
+      if (data) setUserProfile(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
     }
-    */
   };
 
   useEffect(() => {
@@ -94,11 +90,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserProfile(null);
   };
 
-  const updateUsername = async (_username: string) => {
+  const updateUsername = async (username: string) => {
     if (!user) throw new Error('No user logged in');
     
-    // Profiles table optional - commented out to avoid errors
-    /*
     const { error } = await supabase
       .from('profiles')
       .upsert({ 
@@ -110,7 +104,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (error) throw error;
     await fetchUserProfile(user.id);
-    */
   };
 
   return (

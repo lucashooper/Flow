@@ -12,7 +12,7 @@ export const NoteTabs = ({ openNotes, activeNoteId, onTabClick, onTabClose }: No
   if (openNotes.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2 bg-[#0a0a0a] border-b border-[#2a2a2a] overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-1 px-4 py-2 bg-[#0a0a0a] overflow-x-auto scrollbar-hide">
       {openNotes.map((note) => (
         <div
           key={note.id}

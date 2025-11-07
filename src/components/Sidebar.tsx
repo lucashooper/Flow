@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, FolderPlus, Search, Settings as SettingsIcon } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +15,6 @@ import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { DraggableFolderItem } from './DraggableFolderItem';
 import { DashboardSwitcher } from './DashboardSwitcher';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
@@ -62,17 +61,7 @@ export const Sidebar = ({
   const [isResizing, setIsResizing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const { signOut } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -161,11 +150,19 @@ export const Sidebar = ({
     }
   }, [isResizing]);
 
-  // Filter notes based on search
-  const filteredNotes = notes.filter(note =>
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort notes based on search, with starred notes at the top
+  const filteredNotes = notes
+    .filter(note =>
+      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Starred notes come first
+      if (a.is_starred && !b.is_starred) return -1;
+      if (!a.is_starred && b.is_starred) return 1;
+      // Then sort by updated_at
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
 
   // Get root folders (no parent)
   const rootFolders = folders.filter(f => !f.parent_id);
@@ -249,20 +246,6 @@ export const Sidebar = ({
           </div>
           <div className="flex gap-1">
             <button
-              onClick={() => navigate('/settings')}
-              className="p-1.5 hover:bg-[#252525] rounded transition-colors"
-              title="Settings"
-            >
-              <SettingsIcon className="w-4 h-4 text-[#888888] hover:text-[#e5e5e5]" />
-            </button>
-            <button
-              onClick={handleLogout}
-              className="p-1.5 hover:bg-[#252525] rounded transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4 text-[#888888] hover:text-[#e5e5e5]" />
-            </button>
-            <button
               onClick={() => onNoteCreate()}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
               title="New Note"
@@ -333,7 +316,7 @@ export const Sidebar = ({
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-[#A0522D] opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
-      {/* Dashboard Switcher */}
+      {/* Dashboard Switcher with Settings */}
       <div className="border-t border-[#2a2a2a] p-2">
         <DashboardSwitcher
           dashboards={dashboards}
@@ -341,6 +324,14 @@ export const Sidebar = ({
           onDashboardChange={onDashboardChange}
           onDashboardsUpdate={onDashboardsUpdate}
         />
+        <button
+          onClick={() => navigate('/settings')}
+          className="w-full mt-2 p-2 flex items-center justify-center gap-2 hover:bg-[#1a1a1a] rounded transition-colors text-[#888888] hover:text-[#e5e5e5]"
+          title="Settings"
+        >
+          <SettingsIcon className="w-4 h-4" />
+          <span className="text-sm">Settings</span>
+        </button>
       </div>
 
       <style>{`

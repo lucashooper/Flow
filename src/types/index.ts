@@ -7,6 +7,7 @@ export interface Note {
   content: string;
   emoji: string | null;
   drawing_data: string | null;
+  is_starred: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,7 @@ export interface UserProfile {
   id: string;
   username: string;
   email: string;
+  profile_picture_url: string | null;
   created_at: string;
   updated_at: string;
 }
