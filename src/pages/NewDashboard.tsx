@@ -19,7 +19,7 @@ export const NewDashboard = () => {
     searchParams.get('note')
   );
   const [loading, setLoading] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
   const [openNotes, setOpenNotes] = useState<Note[]>([]);
   const tabsEnabled = (() => {
     const saved = localStorage.getItem('tabsEnabled');

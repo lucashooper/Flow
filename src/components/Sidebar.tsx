@@ -317,7 +317,7 @@ export const Sidebar = ({
       </div>
 
       {/* Dashboard Switcher footer */}
-      <div className="border-t border-[#2a2a2a] p-2">
+      <div className="mt-1 px-3 py-2.5 border-t border-[#181818]">
         <DashboardSwitcher
           dashboards={dashboards}
           activeDashboard={activeDashboard}

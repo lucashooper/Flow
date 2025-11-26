@@ -191,9 +191,13 @@ export const DashboardSwitcher = ({
     <div ref={switcherRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 hover:bg-[#1a1a1a] transition-colors rounded-lg group"
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#1a1a1a] transition-colors rounded-lg group"
       >
-        <div className="flex items-center gap-2">
+        {/* Left: chevron + current dashboard */}
+        <div className="flex items-center gap-2 min-w-0">
+          <ChevronUp
+            className={`w-4 h-4 text-[#888888] transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
           {activeDashboard?.cover_image ? (
             <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
               <img 
@@ -203,28 +207,25 @@ export const DashboardSwitcher = ({
               />
             </div>
           ) : (
-            <span className="text-lg">{activeDashboard?.emoji || '📝'}</span>
+            <span className="text-lg flex-shrink-0">{activeDashboard?.emoji || '📝'}</span>
           )}
           <span className="text-sm font-medium text-[#e5e5e5] truncate">
             {activeDashboard?.name || 'My Notes'}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/settings');
-            }}
-            className="p-1.5 rounded hover:bg-[#1f1f1f] text-[#888888] hover:text-[#e5e5e5] transition-colors"
-            title="Settings"
-          >
-            <SettingsIcon className="w-4 h-4" />
-          </button>
-          <ChevronUp 
-            className={`w-4 h-4 text-[#888888] transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-          />
-        </div>
+
+        {/* Right: settings icon */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/settings');
+          }}
+          className="p-1.5 rounded hover:bg-[#1f1f1f] text-[#888888] hover:text-[#e5e5e5] transition-colors flex-shrink-0"
+          title="Settings"
+        >
+          <SettingsIcon className="w-4 h-4" />
+        </button>
       </button>
 
       <AnimatePresence>

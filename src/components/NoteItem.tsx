@@ -94,10 +94,10 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   return (
     <>
       <div
-        className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all ${
+        className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all border-l-2 ${
           isSelected
-            ? 'bg-[#1a1a1a]'
-            : 'hover:bg-[#252525]'
+            ? 'bg-[#1a1a1a] border-[#A0522D]'
+            : 'border-transparent hover:bg-[#252525]'
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={onSelect}
