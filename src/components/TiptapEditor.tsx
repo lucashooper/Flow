@@ -140,7 +140,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     editorProps: {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-full',
-        style: 'line-height: 1.7; color: #e5e5e5; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
+        style: 'line-height: 1.7; color: #e0e0e0; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
         spellcheck: 'true',
       },
       handlePaste: (view, event) => {
@@ -1049,10 +1049,10 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         }
 
         .editor-bullets-purple .ProseMirror ul li::marker {
-          color: #a855f7;
+          color: #c4b5fd;
         }
         .editor-bullets-purple .ProseMirror ol li::marker {
-          color: #a855f7;
+          color: #c4b5fd;
           font-weight: 700;
         }
 

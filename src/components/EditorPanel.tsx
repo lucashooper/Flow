@@ -62,7 +62,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   return (
     <div className="flex-1 bg-[#0a0a0a] flex flex-col overflow-hidden">
       {/* Editor Header */}
-      <div className="border-b border-[#2a2a2a] py-4">
+      <div className="pt-6 pb-4">
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 2rem', width: '100%' }}>
         <input
           type="text"

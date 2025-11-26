@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, FolderPlus, Search } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +15,6 @@ import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { DraggableFolderItem } from './DraggableFolderItem';
 import { DashboardSwitcher } from './DashboardSwitcher';
-import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   notes: Note[];
@@ -61,7 +60,6 @@ export const Sidebar = ({
   const [isResizing, setIsResizing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -318,7 +316,7 @@ export const Sidebar = ({
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-[#A0522D] opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
-      {/* Dashboard Switcher with Settings */}
+      {/* Dashboard Switcher footer */}
       <div className="border-t border-[#2a2a2a] p-2">
         <DashboardSwitcher
           dashboards={dashboards}
@@ -326,14 +324,6 @@ export const Sidebar = ({
           onDashboardChange={onDashboardChange}
           onDashboardsUpdate={onDashboardsUpdate}
         />
-        <button
-          onClick={() => navigate('/settings')}
-          className="w-full mt-2 p-2 flex items-center justify-center gap-2 hover:bg-[#1a1a1a] rounded transition-colors text-[#888888] hover:text-[#e5e5e5]"
-          title="Settings"
-        >
-          <SettingsIcon className="w-4 h-4" />
-          <span className="text-sm">Settings</span>
-        </button>
       </div>
 
       <style>{`

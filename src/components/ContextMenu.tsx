@@ -48,7 +48,7 @@ const fontSizes = [
 
 const textColors = [
   { label: 'Default', value: '' },
-  { label: 'Purple', value: '#a855f7' },
+  { label: 'Purple', value: '#c4b5fd' },
   { label: 'Amber', value: '#f59e0b' },
   { label: 'Orange', value: '#f97316' },
   { label: 'Cyan', value: '#06b6d4' },
@@ -60,7 +60,7 @@ const textColors = [
 
 const boldColors = [
   { label: 'Default (White)', value: '' },
-  { label: 'Purple', value: '#a855f7' },
+  { label: 'Purple', value: '#c4b5fd' },
   { label: 'Blue', value: '#3b82f6' },
   { label: 'Cyan', value: '#06b6d4' },
   { label: 'Green', value: '#10b981' },
@@ -92,8 +92,8 @@ const quoteStyles = [
   { label: 'Italic', value: 'italic', color: '#e5e5e5', italic: true, bold: false },
   { label: 'Bold', value: 'bold', color: '#e5e5e5', italic: false, bold: true },
   { label: 'Bold Italic', value: 'bold-italic', color: '#e5e5e5', italic: true, bold: true },
-  { label: 'Purple Italic', value: 'purple-italic', color: '#a855f7', italic: true, bold: false },
-  { label: 'Purple Bold', value: 'purple-bold', color: '#a855f7', italic: false, bold: true },
+  { label: 'Purple Italic', value: 'purple-italic', color: '#c4b5fd', italic: true, bold: false },
+  { label: 'Purple Bold', value: 'purple-bold', color: '#c4b5fd', italic: false, bold: true },
   { label: 'Cyan Bold', value: 'cyan-bold', color: '#06b6d4', italic: false, bold: true },
   { label: 'Amber Italic', value: 'amber-italic', color: '#f59e0b', italic: true, bold: false },
   { label: 'Green Italic', value: 'green-italic', color: '#10b981', italic: true, bold: false },

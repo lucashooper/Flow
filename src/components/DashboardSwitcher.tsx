@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronUp, Plus, Trash2, Image, Edit2 } from 'lucide-react';
+import { ChevronUp, Plus, Trash2, Image, Edit2, Settings as SettingsIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import type { Dashboard } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface DashboardSwitcherProps {
   dashboards: Dashboard[];
@@ -33,6 +34,7 @@ export const DashboardSwitcher = ({
   const [editEmoji, setEditEmoji] = useState('');
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
   const switcherRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
@@ -207,9 +209,22 @@ export const DashboardSwitcher = ({
             {activeDashboard?.name || 'My Notes'}
           </span>
         </div>
-        <ChevronUp 
-          className={`w-4 h-4 text-[#888888] transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-        />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/settings');
+            }}
+            className="p-1.5 rounded hover:bg-[#1f1f1f] text-[#888888] hover:text-[#e5e5e5] transition-colors"
+            title="Settings"
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
+          <ChevronUp 
+            className={`w-4 h-4 text-[#888888] transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          />
+        </div>
       </button>
 
       <AnimatePresence>

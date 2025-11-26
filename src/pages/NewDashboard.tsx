@@ -123,6 +123,10 @@ export const NewDashboard = () => {
     }
   };
 
+  const handleTabReorder = (reorderedNotes: Note[]) => {
+    setOpenNotes(reorderedNotes);
+  };
+
   const handleNoteCreate = async (folderId?: string) => {
     if (!user?.id) {
       alert('You must be logged in to create notes');
@@ -315,6 +319,7 @@ export const NewDashboard = () => {
           tabsEnabled={tabsEnabled}
           onTabClick={handleNoteSelect}
           onTabClose={handleTabClose}
+          onTabReorder={handleTabReorder}
         />
         
         {/* Editor Panel */}
