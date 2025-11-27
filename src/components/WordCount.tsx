@@ -7,39 +7,61 @@ interface WordCountProps {
   editor: Editor | null;
 }
 
+type TextStats = {
+  words: number;
+  characters: number;
+  noSpaces: number;
+};
+
+function computeTextStats(text: string): TextStats {
+  const characters = text.length;
+  const noSpaces = text.replace(/\s+/g, '').length;
+  const words = text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  return { words, characters, noSpaces };
+}
+
 export const WordCount = ({ editor }: WordCountProps) => {
   const [isVisible, setIsVisible] = useState(() => {
     return localStorage.getItem('wordCountVisible') === 'true';
   });
-  const [wordCount, setWordCount] = useState(0);
-  const [charCount, setCharCount] = useState(0);
-  const [charCountNoSpaces, setCharCountNoSpaces] = useState(0);
+  const [documentStats, setDocumentStats] = useState<TextStats>({ words: 0, characters: 0, noSpaces: 0 });
+  const [selectionStats, setSelectionStats] = useState<TextStats | null>(null);
 
   useEffect(() => {
     if (!editor) return;
 
     const updateCounts = () => {
-      const text = editor.getText();
+      // Get full document text
+      const fullText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n', '\n');
+      setDocumentStats(computeTextStats(fullText));
       
-      // Word count - split by whitespace and filter empty strings
-      const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-      setWordCount(words.length);
+      // Check if there's a selection
+      const { state } = editor;
+      const { from, to } = state.selection;
+      const hasSelection = from !== to;
       
-      // Character count with spaces
-      setCharCount(text.length);
-      
-      // Character count without spaces
-      setCharCountNoSpaces(text.replace(/\s/g, '').length);
+      if (hasSelection) {
+        const selectionText = state.doc.textBetween(from, to, '\n', '\n');
+        setSelectionStats(computeTextStats(selectionText));
+      } else {
+        setSelectionStats(null);
+      }
     };
 
-    // Update on editor changes
+    // Update on editor changes and selection changes
     editor.on('update', updateCounts);
+    editor.on('selectionUpdate', updateCounts);
     
     // Initial count
     updateCounts();
 
     return () => {
       editor.off('update', updateCounts);
+      editor.off('selectionUpdate', updateCounts);
     };
   }, [editor]);
 
@@ -82,26 +104,61 @@ export const WordCount = ({ editor }: WordCountProps) => {
               </button>
             </div>
             
-            <div className="px-3 py-2 space-y-1.5">
-              <div className="flex items-center justify-between gap-8">
-                <span className="text-xs text-[#888888]">Words</span>
-                <span className="text-sm font-semibold text-[#e5e5e5] tabular-nums">
-                  {wordCount.toLocaleString()}
-                </span>
-              </div>
+            <div className="px-3 py-2">
+              {selectionStats && (
+                <div className="mb-3 pb-3 border-b border-[#2a2a2a]">
+                  <div className="text-xs font-semibold text-[#e5e5e5] mb-2">Selection</div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-8">
+                      <span className="text-xs text-[#888888]">Words</span>
+                      <span className="text-sm font-semibold text-[#e5e5e5] tabular-nums">
+                        {selectionStats.words.toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-8">
+                      <span className="text-xs text-[#888888]">Characters</span>
+                      <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
+                        {selectionStats.characters.toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-8">
+                      <span className="text-xs text-[#888888]">No spaces</span>
+                      <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
+                        {selectionStats.noSpaces.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
               
-              <div className="flex items-center justify-between gap-8">
-                <span className="text-xs text-[#888888]">Characters</span>
-                <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
-                  {charCount.toLocaleString()}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between gap-8">
-                <span className="text-xs text-[#888888]">No spaces</span>
-                <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
-                  {charCountNoSpaces.toLocaleString()}
-                </span>
+              <div>
+                {selectionStats && (
+                  <div className="text-xs font-semibold text-[#e5e5e5] mb-2">Document</div>
+                )}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-8">
+                    <span className="text-xs text-[#888888]">Words</span>
+                    <span className="text-sm font-semibold text-[#e5e5e5] tabular-nums">
+                      {documentStats.words.toLocaleString()}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-8">
+                    <span className="text-xs text-[#888888]">Characters</span>
+                    <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
+                      {documentStats.characters.toLocaleString()}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-8">
+                    <span className="text-xs text-[#888888]">No spaces</span>
+                    <span className="text-sm font-medium text-[#a5a5a5] tabular-nums">
+                      {documentStats.noSpaces.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>
