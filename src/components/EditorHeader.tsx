@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react';
+import { FileText, Minimize2, Pencil } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -12,6 +12,7 @@ import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortabl
 import { useState } from 'react';
 import type { Note } from '../types';
 import { DraggableTab } from './DraggableTab';
+import { useFocusMode } from '../contexts/FocusModeContext';
 
 interface EditorHeaderProps {
   openNotes: Note[];
@@ -31,6 +32,7 @@ export const EditorHeader = ({
   onTabReorder
 }: EditorHeaderProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { isFocusMode, toggleFocusMode } = useFocusMode();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -69,11 +71,7 @@ export const EditorHeader = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-[#151515] border-b border-[#2a2a2a] px-4 py-2 flex items-center gap-4">
-        {/* Left side - File icon */}
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-[#888888]" />
-        </div>
+      <div className="tabs top-nav bg-[#151515] border-b border-[#2a2a2a] px-4 py-2 flex items-center gap-4">
 
         {/* Tabs area */}
         {tabsEnabled && openNotes.length > 0 && (
@@ -91,6 +89,36 @@ export const EditorHeader = ({
             </div>
           </SortableContext>
         )}
+
+        {/* Right-side actions */}
+        <div className="ml-auto nav-actions">
+          {/* Word count toggle */}
+          <button
+            onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}
+            className="nav-item p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
+            title="Toggle word count"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+
+          {/* Drawing toggle */}
+          <button
+            onClick={() => window.dispatchEvent(new Event('toggleDrawingMode'))}
+            className="nav-item p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
+            title="Toggle drawing mode"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+
+          {/* Focus Mode toggle */}
+          <button
+            onClick={toggleFocusMode}
+            className="nav-item focus-toggle p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
+            title="Toggle Focus Mode"
+          >
+            <Minimize2 className={`w-4 h-4 ${isFocusMode ? 'text-[#e5e5e5]' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Drag Overlay */}

@@ -51,19 +51,14 @@ export const WordCount = ({ editor }: WordCountProps) => {
     setIsVisible(!isVisible);
   };
 
+  useEffect(() => {
+    const handler = () => toggleVisibility();
+    window.addEventListener('toggleWordCount', handler as EventListener);
+    return () => window.removeEventListener('toggleWordCount', handler as EventListener);
+  }, []);
+
   return (
     <>
-      {/* Toggle Button */}
-      {!isVisible && (
-        <button
-          onClick={toggleVisibility}
-          className="fixed top-4 right-4 z-50 p-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg hover:bg-[#252525] transition-colors shadow-lg"
-          title="Show word count"
-        >
-          <FileText className="w-5 h-5 text-[#888888]" />
-        </button>
-      )}
-
       {/* Word Count Panel */}
       <AnimatePresence>
         {isVisible && (

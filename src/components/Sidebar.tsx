@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search } from 'lucide-react';
+import { Plus, FolderPlus, Search, Star } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -57,9 +57,21 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [blurredNotes, setBlurredNotes] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = window.localStorage.getItem('flow_blurred_notes');
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw) as string[];
+      return new Set(parsed);
+    } catch {
+      return new Set();
+    }
+  });
   const [isResizing, setIsResizing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -130,6 +142,21 @@ export const Sidebar = ({
     setIsResizing(false);
   };
 
+  const toggleNoteBlur = (noteId: string) => {
+    setBlurredNotes(prev => {
+      const next = new Set(prev);
+      if (next.has(noteId)) {
+        next.delete(noteId);
+      } else {
+        next.add(noteId);
+      }
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('flow_blurred_notes', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+  };
+
   // Add/remove event listeners for resizing - FIX: Use useEffect to prevent stuck resizing
   useEffect(() => {
     if (isResizing) {
@@ -148,12 +175,13 @@ export const Sidebar = ({
     }
   }, [isResizing]);
 
-  // Filter and sort notes based on search, with starred notes at the top
+  // Filter and sort notes based on search and starred-only toggle, with starred notes at the top
   const filteredNotes = notes
     .filter(note =>
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.content.toLowerCase().includes(searchQuery.toLowerCase())
     )
+    .filter(note => !showStarredOnly || (note.is_starred ?? false))
     .sort((a, b) => {
       // Starred notes come first (handle undefined as false)
       const aStarred = a.is_starred ?? false;
@@ -213,9 +241,11 @@ export const Sidebar = ({
                 note={note}
                 depth={depth + 1}
                 isSelected={note.id === selectedNoteId}
+                isBlurred={blurredNotes.has(note.id)}
                 onSelect={() => onNoteSelect(note.id)}
                 onUpdate={onNoteUpdate}
                 onDelete={onNoteDelete}
+                onToggleBlur={() => toggleNoteBlur(note.id)}
               />
             ))}
           </div>
@@ -235,7 +265,7 @@ export const Sidebar = ({
       onDragEnd={handleDragEnd}
     >
       <div
-        className="relative bg-[#111111] border-r border-[#2a2a2a] flex flex-col"
+        className="sidebar relative bg-[#111111] border-r border-[#2a2a2a] flex flex-col"
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
       >
         {/* Header */}
@@ -244,7 +274,16 @@ export const Sidebar = ({
           <div className="flex items-center gap-2">
             <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowStarredOnly(prev => !prev)}
+              className={`p-1.5 rounded transition-colors ${
+                showStarredOnly ? 'bg-[#1f1f1f] text-yellow-400' : 'hover:bg-[#252525] text-[#888888]'
+              }`}
+              title={showStarredOnly ? 'Show all notes' : 'Show starred only'}
+            >
+              <Star className={`w-4 h-4 ${showStarredOnly ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+            </button>
             <button
               onClick={() => onNoteCreate()}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
@@ -292,9 +331,11 @@ export const Sidebar = ({
                   note={note}
                   depth={0}
                   isSelected={note.id === selectedNoteId}
+                  isBlurred={blurredNotes.has(note.id)}
                   onSelect={() => onNoteSelect(note.id)}
                   onUpdate={onNoteUpdate}
                   onDelete={onNoteDelete}
+                  onToggleBlur={() => toggleNoteBlur(note.id)}
                 />
               ))}
 
@@ -339,6 +380,18 @@ export const Sidebar = ({
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #3a3a3a;
+        }
+
+        /* Faded notes in sidebar */
+        .sidebar .note-faded {
+          opacity: 0.65;
+          filter: blur(3px) brightness(0.85);
+          transition: opacity 0.25s ease, filter 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
+        }
+
+        .sidebar .note-faded:hover {
+          opacity: 0.75;
+          filter: blur(2px) brightness(0.9);
         }
       `}</style>
       </div>

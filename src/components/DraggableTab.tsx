@@ -36,9 +36,9 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
       style={style}
       {...attributes}
       {...listeners}
-      className={`group flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
+      className={`group tab flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
         isActive
-          ? 'bg-[#1a1a1a] text-[#e5e5e5]'
+          ? 'active bg-[#1a1a1a] text-[#e5e5e5]'
           : 'bg-[#151515] text-[#888888] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]'
       } ${isDragging ? 'z-50 shadow-lg' : ''}`}
       onClick={() => onTabClick(note.id)}

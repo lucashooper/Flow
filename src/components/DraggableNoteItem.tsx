@@ -10,6 +10,8 @@ interface DraggableNoteItemProps {
   onSelect: () => void;
   onUpdate: (noteId: string, updates: Partial<Note>) => void;
   onDelete: (noteId: string) => void;
+  isBlurred?: boolean;
+  onToggleBlur?: () => void;
 }
 
 export const DraggableNoteItem = (props: DraggableNoteItemProps) => {

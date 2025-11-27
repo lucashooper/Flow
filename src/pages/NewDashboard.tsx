@@ -6,6 +6,7 @@ import type { Note, Folder, Dashboard } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { EditorPanel } from '../components/EditorPanel';
 import { EditorHeader } from '../components/EditorHeader';
+import { FocusModeContext } from '../contexts/FocusModeContext';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export const NewDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [openNotes, setOpenNotes] = useState<Note[]>([]);
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const tabsEnabled = (() => {
     const saved = localStorage.getItem('tabsEnabled');
     return saved !== null ? JSON.parse(saved) : true;
@@ -287,8 +289,13 @@ export const NewDashboard = () => {
 
   const selectedNote = notes.find(note => note.id === selectedNoteId);
 
+  const toggleFocusMode = () => {
+    setIsFocusMode(prev => !prev);
+  };
+
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden">
+    <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
+      <div className={`flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`}>
       {/* Sidebar */}
       <Sidebar
         notes={notes}
@@ -311,7 +318,7 @@ export const NewDashboard = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden editor-container">
         {/* Unified Header with Tabs */}
         <EditorHeader
           openNotes={openNotes}
@@ -329,5 +336,6 @@ export const NewDashboard = () => {
         />
       </div>
     </div>
+    </FocusModeContext.Provider>
   );
 };

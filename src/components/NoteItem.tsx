@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Trash2, Edit3, Smile, Star } from 'lucide-react';
+import { Trash2, Edit3, Smile, Star, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Note } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -12,9 +12,11 @@ interface NoteItemProps {
   onSelect: () => void;
   onUpdate: (noteId: string, updates: Partial<Note>) => void;
   onDelete: (noteId: string) => void;
+  isBlurred?: boolean;
+  onToggleBlur?: () => void;
 }
 
-export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete }: NoteItemProps) => {
+export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete, isBlurred, onToggleBlur }: NoteItemProps) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [isRenaming, setIsRenaming] = useState(false);
@@ -98,7 +100,7 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
           isSelected
             ? 'bg-[#1a1a1a] border-[#A0522D]'
             : 'border-transparent hover:bg-[#252525]'
-        }`}
+        } ${isBlurred ? 'note-faded' : ''}`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={onSelect}
         onContextMenu={handleContextMenu}
@@ -179,6 +181,18 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
               <Edit3 className="w-4 h-4" />
               Rename
             </button>
+            {onToggleBlur && (
+              <button
+                onClick={() => {
+                  onToggleBlur();
+                  setShowContextMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
+              >
+                <EyeOff className="w-4 h-4" />
+                {isBlurred ? 'Unfade note' : 'Fade note'}
+              </button>
+            )}
             
             <button
               onClick={() => {

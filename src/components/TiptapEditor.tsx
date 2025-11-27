@@ -617,6 +617,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isDrawingMode]);
 
+  useEffect(() => {
+    const handler = () => setIsDrawingMode(prev => !prev);
+    window.addEventListener('toggleDrawingMode', handler as EventListener);
+    return () => window.removeEventListener('toggleDrawingMode', handler as EventListener);
+  }, []);
+
   return (
     <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle}`}>
       {/* Persistent Drawing Layer */}
@@ -631,15 +637,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           }
         }}
       />
-
-      {/* Floating Drawing Button - Always Visible */}
-      <button
-        onClick={() => setIsDrawingMode(true)}
-        className="fixed bottom-8 right-8 z-40 p-4 bg-purple-600/85 hover:bg-purple-600 text-white rounded-full shadow-lg transition-all hover:scale-105"
-        title="Start Drawing Mode (Draw anywhere!)"
-      >
-        <Pencil className="w-5 h-5" />
-      </button>
 
       {/* Bubble Menu - appears on text selection */}
       {editor && showBubbleMenu && bubbleMenuPosition && (

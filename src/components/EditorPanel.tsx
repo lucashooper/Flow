@@ -60,9 +60,9 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   }
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] flex flex-col overflow-hidden">
+    <div className="flex-1 bg-[#0a0a0a] flex flex-col overflow-hidden editor-background editor-root">
       {/* Editor Header */}
-      <div className="pt-6 pb-4">
+      <div className="pt-6 pb-4 editor-header">
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 2rem', width: '100%' }}>
         <input
           type="text"
@@ -85,7 +85,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
       </div>
 
       {/* Editor Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden editor-content">
         <TiptapEditor
           content={content}
           onChange={setContent}
