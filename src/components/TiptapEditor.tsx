@@ -16,6 +16,7 @@ import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
 // import { QuoteMark } from '../extensions/QuoteMark'; // Disabled - causing glitching bug
 import { DrawingNode } from '../extensions/DrawingNode';
+import { EmojiIconDecorator } from '../extensions/EmojiIconDecorator';
 // import { SpellCheck } from '../extensions/SpellCheck'; // Disabled - using browser native
 import 'prosemirror-view/style/prosemirror.css';
 import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical } from 'lucide-react';
@@ -124,6 +125,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           class: 'text-[#D97706] underline cursor-pointer',
         },
       }),
+      EmojiIconDecorator,
       // SpellCheck, // Disabled - using browser native spell check
     ],
     content,
@@ -894,6 +896,28 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           letter-spacing: -0.02em;
           border-bottom: 2px solid #2a2a2a;
           padding-bottom: 0.5rem;
+        }
+
+        /* Emoji icons at the start of headings should keep native color */
+        .ProseMirror .emoji-icon {
+          color: initial !important;
+          -webkit-text-fill-color: initial !important;
+          background: none !important;
+          -webkit-background-clip: initial !important;
+          background-clip: initial !important;
+        }
+
+        .ProseMirror h1 .emoji-icon,
+        .ProseMirror h2 .emoji-icon,
+        .ProseMirror h3 .emoji-icon,
+        .ProseMirror h4 .emoji-icon,
+        .ProseMirror h5 .emoji-icon,
+        .ProseMirror h6 .emoji-icon {
+          color: initial !important;
+          -webkit-text-fill-color: initial !important;
+          background: none !important;
+          -webkit-background-clip: initial !important;
+          background-clip: initial !important;
         }
 
         .ProseMirror h2 {
