@@ -21,6 +21,8 @@ import { EmojiIconDecorator } from '../extensions/EmojiIconDecorator';
 import 'prosemirror-view/style/prosemirror.css';
 import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import { applyFormattingAction, STARRED_FORMATTING_KEY } from '../utils/applyFormattingAction';
+import type { StarredFormattingAction } from '../utils/applyFormattingAction';
 import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { WordCount } from './WordCount';
@@ -56,9 +58,60 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [bulletStyle, setBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
+  // Deduplicate starred actions by (type, value) pair
+  const dedupeStarred = (list: StarredFormattingAction[]): StarredFormattingAction[] => {
+    const seen = new Set<string>();
+    const result: StarredFormattingAction[] = [];
+
+    for (const item of list) {
+      const key = `${item.type}:${item.value}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+    return result;
+  };
+
+  const [starredFormatting, setStarredFormatting] = useState<StarredFormattingAction[]>(() => {
+    try {
+      const raw = localStorage.getItem(STARRED_FORMATTING_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const deduped = dedupeStarred(parsed);
+      console.log('[⭐] Loaded starredActions', deduped);
+      return deduped;
+    } catch {
+      return [];
+    }
+  });
   // const [quoteStyle, setQuoteStyle] = useState<string>(() => {
   //   return localStorage.getItem('quoteStyle') || 'default';
   // }); // Disabled - QuoteMark extension removed
+
+  // Define stable order for starred action types
+  const STARRED_TYPE_ORDER = [
+    'fontSize',
+    'textColor',
+    'highlight',
+    'boldColor',
+    'bulletStyle',
+  ];
+
+  // Sort starred actions by type for organized toolbar display
+  const sortStarredActions = (actions: StarredFormattingAction[]): StarredFormattingAction[] => {
+    return [...actions].sort((a, b) => {
+      const ia = STARRED_TYPE_ORDER.indexOf(a.type);
+      const ib = STARRED_TYPE_ORDER.indexOf(b.type);
+
+      const aIndex = ia === -1 ? Number.MAX_SAFE_INTEGER : ia;
+      const bIndex = ib === -1 ? Number.MAX_SAFE_INTEGER : ib;
+
+      if (aIndex !== bIndex) return aIndex - bIndex;
+
+      // Same type → keep original order (stable)
+      return 0;
+    });
+  };
 
   // Handle image upload to Supabase
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -416,15 +469,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     return () => window.removeEventListener('bulletStyleChanged', handleBulletStyleChange as EventListener);
   }, []);
 
-  // Listen for quote style changes
-  // useEffect(() => {
-  //   const handleQuoteStyleChange = (e: CustomEvent) => {
-  //     setQuoteStyle(e.detail);
-  //   };
+  // Listen for starred formatting actions changes
+  useEffect(() => {
+    const handleStarredFormattingActionsChange = (e: CustomEvent) => {
+      const actions = Array.isArray(e.detail) ? e.detail : [];
+      setStarredFormatting(dedupeStarred(actions));
+    };
 
-  //   window.addEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
-  //   return () => window.removeEventListener('quoteStyleChanged', handleQuoteStyleChange as EventListener);
-  // }, []); // Disabled - QuoteMark extension removed
+    window.addEventListener('starredFormattingActionsChanged', handleStarredFormattingActionsChange as EventListener);
+    return () => window.removeEventListener('starredFormattingActionsChanged', handleStarredFormattingActionsChange as EventListener);
+  }, []);
 
   // Debug: Verify QuoteMark extension is loaded
   useEffect(() => {
@@ -740,6 +794,61 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           </button>
 
           <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
+
+          {/* Starred formatting actions row */}
+          {starredFormatting.length > 0 && (() => {
+            const sortedStarred = sortStarredActions(starredFormatting);
+            return (
+              <div className="flex items-center gap-2 pl-2 ml-2 border-l border-neutral-700">
+                {sortedStarred.map((action, index) => {
+                  const prev = sortedStarred[index - 1];
+                  const isNewGroup = index > 0 && prev.type !== action.type;
+
+                  return (
+                    <button
+                      key={action.type + ':' + action.value}
+                      onClick={() => applyFormattingAction(editor, action)}
+                      className={`px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-sm flex items-center gap-1 ${
+                        isNewGroup ? 'ml-3' : ''
+                      }`}
+                      title={`Apply ${action.type}: ${action.value}`}
+                    >
+                      {action.type === 'textColor' && (
+                        <span
+                          className="w-3 h-3 rounded-full border border-[#2a2a2a]"
+                          style={{ backgroundColor: action.value || '#e5e5e5' }}
+                        />
+                      )}
+                      {action.type === 'highlight' && (
+                        <span
+                          className="w-4 h-2 rounded border border-[#2a2a2a]"
+                          style={{ backgroundColor: action.value }}
+                        />
+                      )}
+                      {action.type === 'boldColor' && (
+                        <span
+                          className="text-[10px] font-bold"
+                          style={{ color: action.value || '#e5e5e5' }}
+                        >
+                          B
+                        </span>
+                      )}
+                      {action.type === 'bulletStyle' && (
+                        <span className="w-3 h-3 flex items-center justify-center">
+                          <span className="w-2 h-2 rounded-full bg-[#e5e5e5]" />
+                        </span>
+                      )}
+                      {action.type === 'fontSize' && (
+                        <span className="text-[10px] text-[#e5e5e5]">
+                          {action.value.replace('rem', '')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           <button
             onClick={() => {

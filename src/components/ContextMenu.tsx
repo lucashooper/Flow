@@ -24,6 +24,7 @@ import {
   List,
   Check,
   Pencil,
+  Star,
 } from 'lucide-react';
 
 interface ContextMenuProps {
@@ -119,6 +120,66 @@ export const ContextMenu = ({
     return localStorage.getItem('bulletStyle') || 'gray';
   });
   const currentQuoteStyle = localStorage.getItem('quoteStyle') || 'default';
+
+  type StarredFormattingType =
+    'textColor' | 'highlight' | 'boldColor' | 'bulletStyle' | 'fontSize';
+
+  interface StarredFormattingAction {
+    type: StarredFormattingType;
+    value: string;
+  }
+
+  const STARRED_FORMATTING_KEY = 'flow.starredFormattingActions';
+
+  // Deduplicate starred actions by (type, value) pair
+  const dedupeStarred = (list: StarredFormattingAction[]): StarredFormattingAction[] => {
+    const seen = new Set<string>();
+    const result: StarredFormattingAction[] = [];
+
+    for (const item of list) {
+      const key = `${item.type}:${item.value}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+    return result;
+  };
+
+  // ⭐ Starred formatting actions – base implementation
+  const [starredFormatting, setStarredFormatting] = useState<StarredFormattingAction[]>(() => {
+    try {
+      const raw = localStorage.getItem(STARRED_FORMATTING_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return dedupeStarred(parsed);
+    } catch {
+      return [];
+    }
+  });
+
+  const isStarred = (type: StarredFormattingType, value: string) =>
+    starredFormatting.some(a => a.type === type && a.value === value);
+
+  const toggleStar = (type: StarredFormattingType, value: string) => {
+    setStarredFormatting(prev => {
+      // Find exact match by type AND value
+      const index = prev.findIndex(a => a.type === type && a.value === value);
+      
+      let next: StarredFormattingAction[];
+      if (index >= 0) {
+        // Already starred - remove it (un-star)
+        next = [...prev.slice(0, index), ...prev.slice(index + 1)];
+      } else {
+        // Not starred - add it
+        next = [...prev, { type, value }];
+      }
+      
+      localStorage.setItem(STARRED_FORMATTING_KEY, JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('starredFormattingActionsChanged', { detail: next }));
+      console.log('[⭐] Toggled star', { type, value, starred: index < 0 });
+      return next;
+    });
+  };
 
   // Smart positioning - flip menu above if too close to bottom
   const menuHeight = 400; // Approximate menu height
@@ -326,10 +387,27 @@ export const ContextMenu = ({
                         onMouseDown={() => {
                           console.log('🟡 MOUSE DOWN on:', size.label);
                         }}
-                        className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors cursor-pointer"
+                        className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors cursor-pointer flex items-center justify-between"
                         style={{ pointerEvents: 'auto' }}
                       >
-                        {size.label}
+                        <span>{size.label}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleStar('fontSize', size.value);
+                          }}
+                          className="p-1 rounded hover:bg-[#2a2a2a] text-xs"
+                        >
+                          <Star
+                            className={
+                              'w-3 h-3 ' +
+                              (isStarred('fontSize', size.value)
+                                ? 'text-[#a855f7] fill-[#a855f7]'
+                                : 'text-[#6b7280]')
+                            }
+                          />
+                        </button>
                       </button>
                       );
                     })}
@@ -378,13 +456,32 @@ export const ContextMenu = ({
                       console.log('Attributes after:', editor.getAttributes('textStyle'));
                       onClose();
                     }}
-                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2 justify-between"
                   >
-                    <div
-                      className="w-4 h-4 rounded border border-[#2a2a2a]"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    {color.label}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-4 h-4 rounded border border-[#2a2a2a]"
+                        style={{ backgroundColor: color.value }}
+                      />
+                      {color.label}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStar('textColor', color.value || 'default');
+                      }}
+                      className="p-1 rounded hover:bg-[#2a2a2a] text-xs"
+                    >
+                      <Star
+                        className={
+                          'w-3 h-3 ' +
+                          (isStarred('textColor', color.value || 'default')
+                            ? 'text-[#a855f7] fill-[#a855f7]'
+                            : 'text-[#6b7280]')
+                        }
+                      />
+                    </button>
                   </button>
                 ))}
               </motion.div>
@@ -442,9 +539,28 @@ export const ContextMenu = ({
                       </div>
                       {color.label}
                     </div>
-                    {(color.value === currentDefaultBoldColor || (!color.value && !currentDefaultBoldColor)) && (
-                      <Check className="w-4 h-4 text-[#D97706]" />
-                    )}
+                    <div className="flex items-center gap-1">
+                      {(color.value === currentDefaultBoldColor || (!color.value && !currentDefaultBoldColor)) && (
+                        <Check className="w-4 h-4 text-[#D97706]" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStar('boldColor', color.value || 'default');
+                        }}
+                        className="p-1 rounded hover:bg-[#2a2a2a] text-xs"
+                      >
+                        <Star
+                          className={
+                            'w-3 h-3 ' +
+                            (isStarred('boldColor', color.value || 'default')
+                              ? 'text-[#a855f7] fill-[#a855f7]'
+                              : 'text-[#6b7280]')
+                          }
+                        />
+                      </button>
+                    </div>
                   </button>
                 ))}
               </motion.div>
@@ -483,13 +599,32 @@ export const ContextMenu = ({
                       }
                       onClose();
                     }}
-                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2 justify-between"
                   >
-                    <div
-                      className="w-4 h-4 rounded border border-[#2a2a2a]"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    {color.label}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-4 h-4 rounded border border-[#2a2a2a]"
+                        style={{ backgroundColor: color.value }}
+                      />
+                      {color.label}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStar('highlight', color.value);
+                      }}
+                      className="p-1 rounded hover:bg-[#2a2a2a] text-xs"
+                    >
+                      <Star
+                        className={
+                          'w-3 h-3 ' +
+                          (isStarred('highlight', color.value)
+                            ? 'text-[#a855f7] fill-[#a855f7]'
+                            : 'text-[#6b7280]')
+                        }
+                      />
+                    </button>
                   </button>
                 ))}
                 <button
@@ -561,9 +696,28 @@ export const ContextMenu = ({
                       </div>
                       {color.label}
                     </div>
-                    {color.value === currentBulletStyle && (
-                      <Check className="w-4 h-4 text-[#D97706]" />
-                    )}
+                    <div className="flex items-center gap-1">
+                      {color.value === currentBulletStyle && (
+                        <Check className="w-4 h-4 text-[#D97706]" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStar('bulletStyle', color.value);
+                        }}
+                        className="p-1 rounded hover:bg-[#2a2a2a] text-xs"
+                      >
+                        <Star
+                          className={
+                            'w-3 h-3 ' +
+                            (isStarred('bulletStyle', color.value)
+                              ? 'text-[#a855f7] fill-[#a855f7]'
+                              : 'text-[#6b7280]')
+                          }
+                        />
+                      </button>
+                    </div>
                   </button>
                   );
                 })}
