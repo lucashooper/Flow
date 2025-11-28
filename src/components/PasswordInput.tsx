@@ -11,17 +11,34 @@ export const PasswordInput = ({ label, className = '', ...props }: PasswordInput
 
   return (
     <div className="w-full">
-      {label && <label className="block text-sm font-medium mb-2">{label}</label>}
+      {label && <label className="block text-sm font-medium mb-2" style={{ color: '#e5e5e5' }}>{label}</label>}
       <div className="relative">
         <input
           type={showPassword ? 'text' : 'password'}
-          className={`w-full px-4 py-2 pr-12 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+          className={`w-full px-4 py-3 pr-12 rounded-xl transition-all duration-200 ${className}`}
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: '#e5e5e5',
+            outline: 'none'
+          }}
+          onFocus={(e) => {
+            e.target.style.border = '1px solid rgba(255, 122, 24, 0.5)';
+            e.target.style.boxShadow = '0 0 0 3px rgba(255, 122, 24, 0.1)';
+          }}
+          onBlur={(e) => {
+            e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+            e.target.style.boxShadow = 'none';
+          }}
           {...props}
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+          style={{ color: '#888888' }}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#ff7a18'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#888888'}
           tabIndex={-1}
         >
           {showPassword ? (
