@@ -7,12 +7,13 @@ import { Sidebar } from '../components/Sidebar';
 import { EditorPanel } from '../components/EditorPanel';
 import { EditorHeader } from '../components/EditorHeader';
 import { FocusModeContext } from '../contexts/FocusModeContext';
+import { WelcomeModal } from '../components/WelcomeModal';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<Note[] | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
@@ -103,7 +104,7 @@ export const NewDashboard = () => {
     setSearchParams({ note: noteId });
     
     // Add to open tabs if tabs are enabled
-    if (tabsEnabled) {
+    if (tabsEnabled && notes) {
       const note = notes.find(n => n.id === noteId);
       if (note && !openNotes.some(n => n.id === noteId)) {
         setOpenNotes(prev => [...prev, note]);
@@ -158,7 +159,7 @@ export const NewDashboard = () => {
       
       if (data) {
         console.log('Note created:', data);
-        setNotes(prev => [data, ...prev]);
+        setNotes(prev => [data, ...(prev || [])]);
         handleNoteSelect(data.id);
       }
     } catch (error: any) {
@@ -184,7 +185,7 @@ export const NewDashboard = () => {
 
       console.log('✅ Note updated successfully');
       setNotes(prev =>
-        prev.map(note =>
+        (prev || []).map(note =>
           note.id === noteId ? { ...note, ...updates, updated_at: new Date().toISOString() } : note
         )
       );
@@ -198,7 +199,7 @@ export const NewDashboard = () => {
       const { error } = await supabase.from('notes').delete().eq('id', noteId);
       if (error) throw error;
 
-      setNotes(prev => prev.filter(note => note.id !== noteId));
+      setNotes(prev => (prev || []).filter(note => note.id !== noteId));
       if (selectedNoteId === noteId) {
         setSelectedNoteId(null);
         setSearchParams({});
@@ -287,18 +288,22 @@ export const NewDashboard = () => {
     fetchDashboards();
   };
 
-  const selectedNote = notes.find(note => note.id === selectedNoteId);
+  const selectedNote = notes?.find(note => note.id === selectedNoteId);
 
   const toggleFocusMode = () => {
     setIsFocusMode(prev => !prev);
   };
 
   return (
-    <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
+    <>
+      {/* Welcome Modal - shows once after email verification */}
+      <WelcomeModal userConfirmed={!!(user as any)?.email_confirmed_at} />
+      
+      <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
       <div className={`flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`}>
       {/* Sidebar */}
       <Sidebar
-        notes={notes}
+        notes={notes || []}
         folders={folders}
         dashboards={dashboards}
         activeDashboard={activeDashboard}
@@ -337,5 +342,6 @@ export const NewDashboard = () => {
       </div>
     </div>
     </FocusModeContext.Provider>
+    </>
   );
 };

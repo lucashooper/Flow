@@ -39,20 +39,15 @@ export const Landing = () => {
         <div className="mb-16">
           {/* Flow Logo */}
           <div className="flex justify-center mb-8">
-            <div
-              className="p-2 rounded-3xl"
+            <img 
+              src="/Flow-icon.webp" 
+              alt="Flow" 
+              className="w-24 h-24 rounded-3xl"
               style={{
-                background: 'linear-gradient(135deg, rgba(255, 122, 24, 0.1), rgba(255, 179, 71, 0.1))',
-                border: '2px solid rgba(255, 122, 24, 0.3)',
-                boxShadow: '0 0 60px rgba(255, 122, 24, 0.4), 0 0 100px rgba(255, 179, 71, 0.2), inset 0 0 20px rgba(255, 122, 24, 0.1)'
+                boxShadow: '0 0 80px rgba(255, 122, 24, 0.3), 0 0 40px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255, 122, 24, 0.15)'
               }}
-            >
-              <img 
-                src="/Flow-icon.webp" 
-                alt="Flow" 
-                className="w-20 h-20 rounded-2xl"
-              />
-            </div>
+            />
           </div>
           
           {/* Title */}

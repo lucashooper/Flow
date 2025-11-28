@@ -51,19 +51,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
+    console.log('=== [Signup] Starting signup process ===');
+    console.log('[Signup] Email:', email);
+    console.log('[Signup] Username:', username);
+    console.log('[Signup] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('[Signup] Has Anon Key:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    
+    // Validate inputs before calling Supabase
+    if (!email || !password || !username) {
+      const error = new Error('Missing required fields');
+      console.error('[Signup] Validation error:', { email: !!email, password: !!password, username: !!username });
+      throw error;
+    }
+    
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: {
         data: {
           username: username
-        }
+        },
+        emailRedirectTo: window.location.origin
       }
     });
-    if (error) throw error;
+    
+    if (error) {
+      console.error('=== [Signup] Auth signup FAILED ===');
+      console.error('[Signup] Full error object:', error);
+      console.error('[Signup] Error message:', error?.message);
+      console.error('[Signup] Error status:', error?.status);
+      console.error('[Signup] Error name:', error?.name);
+      console.error('[Signup] Error code:', (error as any)?.code);
+      console.error('[Signup] Error details:', (error as any)?.details);
+      console.error('[Signup] Error hint:', (error as any)?.hint);
+      console.error('[Signup] Error stack:', error?.stack);
+      throw error;
+    }
+    
+    console.log('=== [Signup] Auth user created successfully ===');
+    console.log('[Signup] User ID:', data.user?.id);
+    console.log('[Signup] User email:', data.user?.email);
+    console.log('[Signup] User confirmed:', data.user?.confirmed_at);
+    console.log('[Signup] Session:', !!data.session);
     
     // Create user profile in user_profiles table
     if (data.user) {
+      console.log('[Signup] Attempting to create user profile in user_profiles table...');
       const { error: profileError } = await supabase
         .from('user_profiles')
         .insert([{ 
@@ -73,8 +106,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }]);
       
       if (profileError) {
-        console.error('Error creating profile:', profileError);
+        console.error('=== [Signup] Profile creation FAILED ===');
+        console.error('[Signup] Profile error code:', profileError.code);
+        console.error('[Signup] Profile error message:', profileError.message);
+        console.error('[Signup] Profile error details:', profileError.details);
+        console.error('[Signup] Profile error hint:', profileError.hint);
         // Don't throw - user is created, profile can be added later
+      } else {
+        console.log('=== [Signup] Profile created successfully ===');
       }
     }
   };

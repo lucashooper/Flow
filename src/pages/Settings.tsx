@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Palette, Type, Layers, Upload } from 'lucide-react';
+import { ArrowLeft, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -21,6 +21,9 @@ export const Settings = () => {
   });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -109,6 +112,47 @@ export const Settings = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setError('Please type DELETE to confirm');
+      return;
+    }
+
+    setDeletingAccount(true);
+    setError('');
+
+    try {
+      // Delete all user's notes
+      const { error: notesError } = await supabase
+        .from('notes')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (notesError) {
+        console.error('Error deleting notes:', notesError);
+      }
+
+      // Delete user profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', user?.id);
+
+      if (profileError) {
+        console.error('Error deleting profile:', profileError);
+      }
+
+      // Sign out and redirect
+      await signOut();
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete account');
+      console.error('Delete account error:', err);
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -347,12 +391,107 @@ export const Settings = () => {
                       Logout
                     </button>
                   </div>
+
+                  {/* Danger Zone */}
+                  <div className="pt-8 mt-8 border-t border-[#2a2a2a]">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-red-400" />
+                      Danger Zone
+                    </h3>
+                    <p className="text-sm text-[#888888] mb-4">
+                      Once you delete your account, there is no going back. All your notes and data will be permanently deleted.
+                    </p>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Account
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(8px)'
+          }}
+          onClick={() => {
+            setShowDeleteModal(false);
+            setDeleteConfirmText('');
+            setError('');
+          }}
+        >
+          <div 
+            className="w-full max-w-md p-8 rounded-2xl"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 rounded-full bg-red-600/20">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-[#e5e5e5]">Delete Account</h2>
+            </div>
+
+            <p className="text-[#888888] mb-6">
+              This action cannot be undone. This will permanently delete your account and all your notes.
+            </p>
+
+            {error && (
+              <div className="bg-red-900/20 border border-red-900/50 text-red-400 p-3 rounded-lg mb-4 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2 text-[#e5e5e5]">
+                Type <span className="font-bold text-red-400">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="w-full px-4 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#e5e5e5] placeholder-[#666666] focus:outline-none focus:border-red-600 transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText('');
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-[#e5e5e5] font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount || deleteConfirmText !== 'DELETE'}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-900/30 disabled:text-red-800 text-white font-medium rounded-lg transition-colors"
+              >
+                {deletingAccount ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

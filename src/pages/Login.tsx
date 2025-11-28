@@ -62,20 +62,15 @@ export const Login = () => {
         >
           {/* Flow Logo and Branding */}
           <div className="flex flex-col items-center mb-8">
-            <div
-              className="p-2 rounded-3xl mb-6"
+            <img 
+              src="/Flow-icon.webp" 
+              alt="Flow" 
+              className="w-20 h-20 rounded-3xl mb-6"
               style={{
-                background: 'linear-gradient(135deg, rgba(255, 122, 24, 0.1), rgba(255, 179, 71, 0.1))',
-                border: '2px solid rgba(255, 122, 24, 0.3)',
-                boxShadow: '0 0 60px rgba(255, 122, 24, 0.4), 0 0 100px rgba(255, 179, 71, 0.2), inset 0 0 20px rgba(255, 122, 24, 0.1)'
+                boxShadow: '0 0 60px rgba(255, 122, 24, 0.3), 0 0 30px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255, 122, 24, 0.15)'
               }}
-            >
-              <img 
-                src="/Flow-icon.webp" 
-                alt="Flow" 
-                className="w-16 h-16 rounded-2xl"
-              />
-            </div>
+            />
             <h1 className="text-3xl font-bold mb-2" style={{ color: '#e5e5e5' }}>
               Sign in to Flow
             </h1>
