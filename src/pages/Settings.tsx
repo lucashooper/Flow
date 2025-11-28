@@ -125,31 +125,20 @@ export const Settings = () => {
     setError('');
 
     try {
-      // Delete all user's notes
-      const { error: notesError } = await supabase
-        .from('notes')
-        .delete()
-        .eq('user_id', user?.id);
+      // Call the delete_user database function (needs to be created in Supabase)
+      // This will cascade delete all related data and remove the auth user
+      const { error: deleteError } = await supabase.rpc('delete_user_account');
 
-      if (notesError) {
-        console.error('Error deleting notes:', notesError);
-      }
-
-      // Delete user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('id', user?.id);
-
-      if (profileError) {
-        console.error('Error deleting profile:', profileError);
+      if (deleteError) {
+        console.error('Error deleting account:', deleteError);
+        throw deleteError;
       }
 
       // Sign out and redirect
       await signOut();
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Failed to delete account');
+      setError(err.message || 'Failed to delete account. Please contact support.');
       console.error('Delete account error:', err);
     } finally {
       setDeletingAccount(false);
