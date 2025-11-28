@@ -189,12 +189,12 @@ export const DashboardSwitcher = ({
 
   return (
     <div ref={switcherRef} className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#1a1a1a] transition-colors rounded-lg group"
-      >
+      <div className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#1a1a1a] transition-colors rounded-lg group">
         {/* Left: chevron + current dashboard */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div 
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+        >
           <ChevronUp
             className={`w-4 h-4 text-[#888888] transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
@@ -226,7 +226,7 @@ export const DashboardSwitcher = ({
         >
           <SettingsIcon className="w-4 h-4" />
         </button>
-      </button>
+      </div>
 
       <AnimatePresence>
         {isOpen && (

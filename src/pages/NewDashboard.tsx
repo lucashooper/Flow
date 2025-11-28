@@ -41,6 +41,11 @@ export const NewDashboard = () => {
   useEffect(() => {
     if (activeDashboard) {
       fetchData();
+    } else if (hasLoadedDashboards.current) {
+      // If we've loaded dashboards but there's no active one, set loading to false
+      setLoading(false);
+      setNotes([]);
+      setFolders([]);
     }
   }, [activeDashboard?.id]); // Only refetch when dashboard ID changes, not the object reference
 
