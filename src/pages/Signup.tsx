@@ -54,14 +54,8 @@ export const Signup = () => {
 
   if (success) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center z-50 relative overflow-hidden" style={{ backgroundColor: '#0d0d0d' }}>
-        {/* Blurred orange orb background - matching login page */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-30 blur-[100px] pointer-events-none" style={{ background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 50%, transparent 70%)' }} />
-        
-        {/* Noise texture overlay */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
-        
-        <div className="w-full max-w-md rounded-2xl px-10 py-12 text-center relative z-10" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1) inset', animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-6" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}>
+        <div className="w-full max-w-md rounded-2xl px-10 py-12 text-center" style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255, 122, 24, 0.2)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 122, 24, 0.15)', animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg, rgba(255, 122, 24, 0.2), rgba(255, 179, 71, 0.2))', border: '2px solid rgba(255, 122, 24, 0.4)', boxShadow: '0 0 40px rgba(255, 122, 24, 0.4), 0 0 20px rgba(255, 179, 71, 0.3)' }}>
             <CheckCircle className="h-10 w-10" style={{ color: '#ff7a18' }} />
           </div>
