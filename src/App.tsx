@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { NewDashboard } from './pages/NewDashboard';
 import { Settings } from './pages/Settings';
+import { Tasks } from './pages/Tasks';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -26,6 +27,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <Tasks />
             </ProtectedRoute>
           }
         />

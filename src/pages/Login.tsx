@@ -30,8 +30,8 @@ export const Login = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
-      style={{ backgroundColor: '#0d0d0d' }}
+      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none"
+      style={{ backgroundColor: '#0d0d0d', cursor: 'default' }}
     >
       {/* Blurred orange orb background */}
       <div 
@@ -61,15 +61,18 @@ export const Login = () => {
           }}
         >
           {/* Flow Logo and Branding */}
-          <div className="flex flex-col items-center mb-8">
+          <div className="flex flex-col items-center mb-8 select-none" style={{ cursor: 'default' }}>
             <img 
               src="/Flow-icon.webp" 
               alt="Flow" 
-              className="w-20 h-20 rounded-3xl mb-6"
+              className="w-20 h-20 rounded-3xl mb-6 select-none"
               style={{
                 boxShadow: '0 0 60px rgba(255, 122, 24, 0.3), 0 0 30px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 122, 24, 0.15)'
+                border: '1px solid rgba(255, 122, 24, 0.15)',
+                cursor: 'default',
+                userSelect: 'none'
               }}
+              draggable={false}
             />
             <h1 className="text-3xl font-bold mb-2" style={{ color: '#e5e5e5' }}>
               Sign in to Flow

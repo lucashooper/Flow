@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, Star } from 'lucide-react';
+import { Plus, FolderPlus, Search, Star, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
@@ -55,6 +56,7 @@ export const Sidebar = ({
   onDashboardsUpdate,
   loading,
 }: SidebarProps) => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [blurredNotes, setBlurredNotes] = useState<Set<string>>(() => {
@@ -273,6 +275,13 @@ export const Sidebar = ({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
+            <button
+              onClick={() => navigate('/tasks')}
+              className="p-1.5 hover:bg-[#252525] rounded transition-colors group"
+              title="Tasks"
+            >
+              <CheckCircle className="w-4 h-4 text-[#888888] group-hover:text-[#ff7a18] transition-colors" />
+            </button>
           </div>
           <div className="flex items-center gap-1">
             <button

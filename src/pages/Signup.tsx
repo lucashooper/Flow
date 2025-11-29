@@ -79,13 +79,24 @@ export const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden" style={{ backgroundColor: '#0d0d0d' }}>
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none" style={{ backgroundColor: '#0d0d0d', cursor: 'default' }}>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-30 blur-[100px] pointer-events-none" style={{ background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 50%, transparent 70%)' }} />
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
       <div className="w-full max-w-md relative z-10" style={{ animation: 'cardFadeIn 0.6s ease-out' }}>
         <div className="rounded-2xl p-10 shadow-2xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1) inset' }}>
-          <div className="flex flex-col items-center mb-8">
-            <img src="/Flow-icon.webp" alt="Flow" className="w-20 h-20 rounded-3xl mb-6" style={{ boxShadow: '0 0 60px rgba(255, 122, 24, 0.3), 0 0 30px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)', border: '1px solid rgba(255, 122, 24, 0.15)' }} />
+          <div className="flex flex-col items-center mb-8 select-none" style={{ cursor: 'default' }}>
+            <img 
+              src="/Flow-icon.webp" 
+              alt="Flow" 
+              className="w-20 h-20 rounded-3xl mb-6 select-none"
+              draggable={false}
+              style={{
+                boxShadow: '0 0 60px rgba(255, 122, 24, 0.3), 0 0 30px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255, 122, 24, 0.15)',
+                cursor: 'default',
+                userSelect: 'none'
+              }}
+            />
             <h1 className="text-3xl font-bold mb-2" style={{ color: '#e5e5e5' }}>Create your Flow account</h1>
             <p className="text-sm" style={{ color: '#888888' }}>Write, think and focus in one calm space</p>
           </div>
