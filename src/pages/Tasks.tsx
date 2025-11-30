@@ -1,20 +1,41 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, GripVertical, MoreVertical, Calendar, Trash2, Flag, X } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { CheckCircle, Calendar, Flag, X, ChevronDown, Inbox } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Task } from '../types';
 import { AppLayout } from '../components/AppLayout';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { TaskCard } from '../components/TaskCard';
+import { PomodoroTimer } from '../components/PomodoroTimer';
 
-type TaskPriority = 1 | 2 | 3 | null;
+type TaskPriority = 1 | 2 | 3;
+
+const TASK_LISTS = ['Inbox', 'Personal', 'Work'];
 
 export const Tasks = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
   
   // Use shared dashboard data hook
   const {
@@ -36,17 +57,31 @@ export const Tasks = () => {
     handleDashboardsUpdate,
   } = useDashboardData();
   
-  // Quick-add state
+  // Composer state - ALWAYS expanded on Tasks page
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [isAddingTask, setIsAddingTask] = useState(false);
-  const [quickAddPriority, setQuickAddPriority] = useState<TaskPriority>(null);
+  const [quickAddPriority, setQuickAddPriority] = useState<TaskPriority>(2);
   const [quickAddDueDate, setQuickAddDueDate] = useState<string | null>(null);
+  const [quickAddList, setQuickAddList] = useState<string>('Inbox');
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showDateMenu, setShowDateMenu] = useState(false);
+  const [showListMenu, setShowListMenu] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const priorityMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuRef = useRef<HTMLDivElement>(null);
+  const listMenuRef = useRef<HTMLDivElement>(null);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     if (user) {
@@ -63,6 +98,9 @@ export const Tasks = () => {
       if (dateMenuRef.current && !dateMenuRef.current.contains(e.target as Node)) {
         setShowDateMenu(false);
       }
+      if (listMenuRef.current && !listMenuRef.current.contains(e.target as Node)) {
+        setShowListMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -74,7 +112,7 @@ export const Tasks = () => {
         .from('tasks')
         .select('*')
         .eq('completed', false)
-        .order('created_at', { ascending: false });
+        .order('position', { ascending: true });
 
       if (error) throw error;
       setTasks(data || []);
@@ -85,7 +123,6 @@ export const Tasks = () => {
     }
   };
 
-  // Navigate to dashboard when clicking a note
   const handleNoteSelect = (noteId: string) => {
     dashboardHandleNoteSelect(noteId);
     navigate(`/dashboard?note=${noteId}`);
@@ -94,31 +131,34 @@ export const Tasks = () => {
   const addTask = async () => {
     if (!newTaskTitle.trim() || !user) return;
 
+    const maxPosition = tasks.length > 0 ? Math.max(...tasks.map(t => t.position)) : 0;
+
     const newTask = {
       user_id: user.id,
       title: newTaskTitle.trim(),
       description: null,
       due_date: quickAddDueDate,
-      priority: quickAddPriority || 2,
+      priority: quickAddPriority,
       completed: false,
+      position: maxPosition + 1,
+      list: quickAddList,
     };
 
-    // Optimistic UI update
     const tempId = crypto.randomUUID();
     const optimisticTask: Task = {
       ...newTask,
       id: tempId,
-      priority: (quickAddPriority || 2) as 1 | 2 | 3,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setTasks(prev => [optimisticTask, ...prev]);
     
-    // Reset form
+    setTasks(prev => [...prev, optimisticTask]);
+    
+    // Reset form (keep expanded)
     setNewTaskTitle('');
-    setQuickAddPriority(null);
+    setQuickAddPriority(2);
     setQuickAddDueDate(null);
-    setIsAddingTask(false);
+    setQuickAddList('Inbox');
 
     try {
       const { data, error } = await supabase
@@ -132,6 +172,40 @@ export const Tasks = () => {
     } catch (error) {
       console.error('Error adding task:', error);
       setTasks(prev => prev.filter(t => t.id !== tempId));
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = tasks.findIndex(t => t.id === active.id);
+    const newIndex = tasks.findIndex(t => t.id === over.id);
+
+    const reorderedTasks = arrayMove(tasks, oldIndex, newIndex);
+    setTasks(reorderedTasks);
+
+    try {
+      const updates = reorderedTasks.map((task, index) => ({
+        id: task.id,
+        position: index,
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('tasks')
+          .update({ position: update.position })
+          .eq('id', update.id);
+      }
+    } catch (error) {
+      console.error('Error updating task positions:', error);
+      fetchTasks();
     }
   };
 
@@ -183,18 +257,6 @@ export const Tasks = () => {
     }
   };
 
-  const isToday = (date: string | null) => {
-    if (!date) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return date === today;
-  };
-
-  const isFuture = (date: string | null) => {
-    if (!date) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return date > today;
-  };
-
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getTomorrowDate = () => {
     const tomorrow = new Date();
@@ -207,10 +269,6 @@ export const Tasks = () => {
     return nextWeek.toISOString().split('T')[0];
   };
 
-  const todayTasks = tasks.filter(t => isToday(t.due_date));
-  const upcomingTasks = tasks.filter(t => isFuture(t.due_date));
-  const noDateTasks = tasks.filter(t => !t.due_date);
-
   const getPriorityColor = (priority: 1 | 2 | 3) => {
     switch (priority) {
       case 1: return '#ef4444';
@@ -220,7 +278,6 @@ export const Tasks = () => {
   };
 
   const getPriorityLabel = (priority: TaskPriority) => {
-    if (!priority) return 'Priority';
     switch (priority) {
       case 1: return 'P1';
       case 2: return 'P2';
@@ -243,12 +300,29 @@ export const Tasks = () => {
       addTask();
     }
     if (e.key === 'Escape') {
-      setIsAddingTask(false);
       setNewTaskTitle('');
-      setQuickAddPriority(null);
+      setQuickAddPriority(2);
       setQuickAddDueDate(null);
+      setQuickAddList('Inbox');
+      inputRef.current?.blur();
     }
   };
+
+  const handleCancel = () => {
+    setNewTaskTitle('');
+    setQuickAddPriority(2);
+    setQuickAddDueDate(null);
+    setQuickAddList('Inbox');
+  };
+
+  const tasksByList = tasks.reduce((acc, task) => {
+    const list = task.list || 'Inbox';
+    if (!acc[list]) acc[list] = [];
+    acc[list].push(task);
+    return acc;
+  }, {} as Record<string, Task[]>);
+
+  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
 
   return (
     <AppLayout
@@ -271,404 +345,283 @@ export const Tasks = () => {
       showHeader={false}
     >
       <div className="max-w-4xl mx-auto px-8 py-12 select-none">
-        {/* Header */}
+        {/* Header - No subtitle */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle className="w-8 h-8 text-[#ff7a18]" />
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-8 h-8 text-[#ff7a18]" style={{ userSelect: 'none' }} />
             <h1 className="text-4xl font-bold">Tasks</h1>
           </div>
-          <p className="text-[#888888]">Stay focused, get things done</p>
         </div>
 
-        {/* Quick Add Task */}
-        <div className="mb-12">
-          {!isAddingTask ? (
-            <button
-              onClick={() => {
-                setIsAddingTask(true);
-                setTimeout(() => inputRef.current?.focus(), 0);
-              }}
-              className="w-full text-left bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-4 text-[#666666] hover:border-[#3a3a3a] transition-colors cursor-text"
-            >
-              + Add a new task...
-            </button>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-[#1a1a1a] border border-[#ff7a18]/30 rounded-xl p-4 shadow-lg shadow-[#ff7a18]/10"
-            >
-              {/* Title Input */}
+        {/* Always-Expanded Composer */}
+        <div className="mb-8">
+          <div
+            className="rounded-xl"
+            style={{
+              background: 'rgba(18, 18, 18, 0.7)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 122, 24, 0.05)',
+              boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            {/* Row 1: Task Name Input */}
+            <div className="p-4 pb-3">
               <input
                 ref={inputRef}
                 type="text"
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Task name"
-                className="w-full bg-transparent border-none outline-none text-[#e5e5e5] placeholder-[#666666] mb-3 text-base"
+                placeholder="Add a new task..."
+                className="w-full bg-transparent border-none outline-none text-[#e5e5e5] placeholder-[#666666] text-base"
                 style={{ userSelect: 'text', cursor: 'text' }}
               />
+            </div>
 
-              {/* Metadata Row */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Due Date Chip */}
-                <div className="relative" ref={dateMenuRef}>
-                  <button
-                    onClick={() => {
-                      setShowDateMenu(!showDateMenu);
-                      setShowPriorityMenu(false);
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      quickAddDueDate
-                        ? 'bg-[#ff7a18]/20 text-[#ff7a18] border border-[#ff7a18]/30'
-                        : 'bg-[#2a2a2a] text-[#888888] border border-[#3a3a3a] hover:border-[#4a4a4a]'
-                    }`}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{getDateLabel(quickAddDueDate)}</span>
-                    {quickAddDueDate && (
-                      <X
-                        className="w-3 h-3 ml-0.5"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQuickAddDueDate(null);
+            {/* Row 2 & 3: Meta + Actions (always visible) */}
+            <div>
+                  {/* Row 2: Meta Pills */}
+                  <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+                    {/* List Selector */}
+                    <div className="relative" ref={listMenuRef}>
+                      <button
+                        onClick={() => {
+                          setShowListMenu(!showListMenu);
+                          setShowPriorityMenu(false);
+                          setShowDateMenu(false);
                         }}
-                      />
-                    )}
-                  </button>
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-[#2a2a2a]/50 text-[#888888] border border-[#3a3a3a] hover:border-[#4a4a4a] transition-colors"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Inbox className="w-3.5 h-3.5" />
+                        <span>{quickAddList}</span>
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
 
-                  {showDateMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[140px]"
+                      {showListMenu && (
+                        <div className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[140px]">
+                          {TASK_LISTS.map(list => (
+                            <button
+                              key={list}
+                              onClick={() => {
+                                setQuickAddList(list);
+                                setShowListMenu(false);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {list}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Due Date Chip */}
+                    <div className="relative" ref={dateMenuRef}>
+                      <button
+                        onClick={() => {
+                          setShowDateMenu(!showDateMenu);
+                          setShowPriorityMenu(false);
+                          setShowListMenu(false);
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                          quickAddDueDate
+                            ? 'bg-[#ff7a18]/20 text-[#ff7a18] border border-[#ff7a18]/30'
+                            : 'bg-[#2a2a2a]/50 text-[#888888] border border-[#3a3a3a] hover:border-[#4a4a4a]'
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{getDateLabel(quickAddDueDate)}</span>
+                        {quickAddDueDate && (
+                          <X
+                            className="w-3 h-3 ml-0.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickAddDueDate(null);
+                            }}
+                          />
+                        )}
+                      </button>
+
+                      {showDateMenu && (
+                        <div className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[140px]">
+                          <button
+                            onClick={() => {
+                              setQuickAddDueDate(getTodayDate());
+                              setShowDateMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            Today
+                          </button>
+                          <button
+                            onClick={() => {
+                              setQuickAddDueDate(getTomorrowDate());
+                              setShowDateMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            Tomorrow
+                          </button>
+                          <button
+                            onClick={() => {
+                              setQuickAddDueDate(getNextWeekDate());
+                              setShowDateMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            Next week
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Priority Chip */}
+                    <div className="relative" ref={priorityMenuRef}>
+                      <button
+                        onClick={() => {
+                          setShowPriorityMenu(!showPriorityMenu);
+                          setShowDateMenu(false);
+                          setShowListMenu(false);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-[#2a2a2a]/50 text-[#888888] border border-[#3a3a3a] hover:border-[#4a4a4a] transition-colors"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Flag className="w-3.5 h-3.5" />
+                        <span>{getPriorityLabel(quickAddPriority)}</span>
+                      </button>
+
+                      {showPriorityMenu && (
+                        <div className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[140px]">
+                          <button
+                            onClick={() => {
+                              setQuickAddPriority(1);
+                              setShowPriorityMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                            P1 (High)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setQuickAddPriority(2);
+                              setShowPriorityMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="w-2 h-2 rounded-full bg-[#ff7a18]" />
+                            P2 (Medium)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setQuickAddPriority(3);
+                              setShowPriorityMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                            P3 (Low)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 3: Actions */}
+                  <div className="px-4 pb-4 flex items-center justify-end gap-2">
+                    <button
+                      onClick={handleCancel}
+                      className="px-3 py-1.5 text-sm text-[#888888] hover:text-[#e5e5e5] transition-colors"
+                      style={{ cursor: 'pointer' }}
                     >
-                      <button
-                        onClick={() => {
-                          setQuickAddDueDate(getTodayDate());
-                          setShowDateMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        Today
-                      </button>
-                      <button
-                        onClick={() => {
-                          setQuickAddDueDate(getTomorrowDate());
-                          setShowDateMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        Tomorrow
-                      </button>
-                      <button
-                        onClick={() => {
-                          setQuickAddDueDate(getNextWeekDate());
-                          setShowDateMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        Next week
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Priority Chip */}
-                <div className="relative" ref={priorityMenuRef}>
-                  <button
-                    onClick={() => {
-                      setShowPriorityMenu(!showPriorityMenu);
-                      setShowDateMenu(false);
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      quickAddPriority
-                        ? 'bg-[#ff7a18]/20 text-[#ff7a18] border border-[#ff7a18]/30'
-                        : 'bg-[#2a2a2a] text-[#888888] border border-[#3a3a3a] hover:border-[#4a4a4a]'
-                    }`}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <Flag className="w-3.5 h-3.5" />
-                    <span>{getPriorityLabel(quickAddPriority)}</span>
-                    {quickAddPriority && (
-                      <X
-                        className="w-3 h-3 ml-0.5"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQuickAddPriority(null);
-                        }}
-                      />
-                    )}
-                  </button>
-
-                  {showPriorityMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[140px]"
+                      Cancel
+                    </button>
+                    <button
+                      onClick={addTask}
+                      disabled={!newTaskTitle.trim()}
+                      className="px-4 py-1.5 bg-[#ff7a18] text-white rounded-lg text-sm font-medium hover:bg-[#ff8c3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ cursor: newTaskTitle.trim() ? 'pointer' : 'not-allowed' }}
                     >
-                      <button
-                        onClick={() => {
-                          setQuickAddPriority(1);
-                          setShowPriorityMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="w-2 h-2 rounded-full bg-[#ef4444]" />
-                        P1 (High)
-                      </button>
-                      <button
-                        onClick={() => {
-                          setQuickAddPriority(2);
-                          setShowPriorityMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="w-2 h-2 rounded-full bg-[#ff7a18]" />
-                        P2 (Medium)
-                      </button>
-                      <button
-                        onClick={() => {
-                          setQuickAddPriority(3);
-                          setShowPriorityMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
-                        P3 (Low)
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Spacer */}
-                <div className="flex-1" />
-
-                {/* Action Buttons */}
-                <button
-                  onClick={() => {
-                    setIsAddingTask(false);
-                    setNewTaskTitle('');
-                    setQuickAddPriority(null);
-                    setQuickAddDueDate(null);
-                  }}
-                  className="px-3 py-1.5 text-sm text-[#888888] hover:text-[#e5e5e5] transition-colors"
-                  style={{ cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={addTask}
-                  disabled={!newTaskTitle.trim()}
-                  className="px-4 py-1.5 bg-[#ff7a18] text-white rounded-lg text-sm font-medium hover:bg-[#ff8c3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ cursor: newTaskTitle.trim() ? 'pointer' : 'not-allowed' }}
-                >
-                  Add task
-                </button>
-              </div>
-            </motion.div>
-          )}
+                      Add task
+                    </button>
+                  </div>
+            </div>
+          </div>
         </div>
 
-        {/* Today Section */}
-        {todayTasks.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-6 text-[#ff7a18]">Today</h2>
-            <div className="space-y-2">
-              <AnimatePresence>
-                {todayTasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={toggleComplete}
-                    onDelete={deleteTask}
-                    onUpdatePriority={updateTaskPriority}
-                    getPriorityColor={getPriorityColor}
-                  />
-                ))}
-              </AnimatePresence>
+        {/* Task Lists - No redundant headings */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          {Object.entries(tasksByList).map(([listName, listTasks]) => (
+            <div key={listName} className="mb-8">
+              <SortableContext
+                items={listTasks.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  <AnimatePresence mode="popLayout">
+                    {listTasks.map(task => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onToggleComplete={toggleComplete}
+                        onDelete={deleteTask}
+                        onUpdatePriority={updateTaskPriority}
+                        getPriorityColor={getPriorityColor}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </SortableContext>
             </div>
-          </div>
-        )}
+          ))}
 
-        {/* Upcoming Section */}
-        {upcomingTasks.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-6">Upcoming</h2>
-            <div className="space-y-2">
-              <AnimatePresence>
-                {upcomingTasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={toggleComplete}
-                    onDelete={deleteTask}
-                    onUpdatePriority={updateTaskPriority}
-                    getPriorityColor={getPriorityColor}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
-        {/* Inbox Section */}
-        {noDateTasks.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-6">Inbox</h2>
-            <div className="space-y-2">
-              <AnimatePresence>
-                {noDateTasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={toggleComplete}
-                    onDelete={deleteTask}
-                    onUpdatePriority={updateTaskPriority}
-                    getPriorityColor={getPriorityColor}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
+          <DragOverlay>
+            {activeTask && (
+              <div
+                className="rounded-xl p-4"
+                style={{
+                  background: 'rgba(18, 18, 18, 0.95)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 122, 24, 0.2)',
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+                  transform: 'scale(1.02)',
+                  cursor: 'grabbing',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(activeTask.priority) }} />
+                  <p className="text-[#e5e5e5]">{activeTask.title}</p>
+                </div>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
 
         {/* Empty State */}
         {tasks.length === 0 && !tasksLoading && (
           <div className="text-center py-20">
-            <CheckCircle className="w-16 h-16 text-[#2a2a2a] mx-auto mb-4" />
+            <CheckCircle className="w-16 h-16 text-[#2a2a2a] mx-auto mb-4" style={{ userSelect: 'none' }} />
             <p className="text-[#888888] text-lg">No tasks yet. Add one above to get started!</p>
           </div>
         )}
       </div>
+
+      {/* Pomodoro Timer - Floating */}
+      <PomodoroTimer tasks={tasks} position="floating" />
     </AppLayout>
-  );
-};
-
-interface TaskCardProps {
-  task: Task;
-  onToggleComplete: (task: Task) => void;
-  onDelete: (taskId: string) => void;
-  onUpdatePriority: (taskId: string, priority: 1 | 2 | 3) => void;
-  getPriorityColor: (priority: 1 | 2 | 3) => string;
-}
-
-const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, getPriorityColor }: TaskCardProps) => {
-  const [showMenu, setShowMenu] = useState(false);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 hover:border-[#3a3a3a] transition-colors"
-      style={{ userSelect: 'none', cursor: 'default' }}
-    >
-      <div className="flex items-center gap-3">
-        {/* Drag Handle */}
-        <GripVertical className="w-4 h-4 text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity" style={{ cursor: 'grab' }} />
-
-        {/* Checkbox */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => onToggleComplete(task)}
-          className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-[#666666] hover:border-[#ff7a18] transition-colors flex items-center justify-center"
-          style={{ cursor: 'pointer' }}
-        />
-
-        {/* Priority Dot */}
-        <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: getPriorityColor(task.priority) }}
-        />
-
-        {/* Title */}
-        <div className="flex-1 min-w-0">
-          <p className="text-[#e5e5e5]">{task.title}</p>
-        </div>
-
-        {/* Due Date */}
-        {task.due_date && (
-          <div className="flex items-center gap-1 text-xs text-[#888888] bg-[#2a2a2a] px-2 py-1 rounded-lg">
-            <Calendar className="w-3 h-3" />
-            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </div>
-        )}
-
-        {/* Menu */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-1 hover:bg-[#2a2a2a] rounded transition-colors opacity-0 group-hover:opacity-100"
-            style={{ cursor: 'pointer' }}
-          >
-            <MoreVertical className="w-4 h-4 text-[#888888]" />
-          </button>
-
-          {showMenu && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="absolute right-0 top-full mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 z-10 min-w-[160px]"
-            >
-              <button
-                onClick={() => {
-                  onUpdatePriority(task.id, 1);
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="w-2 h-2 rounded-full bg-[#ef4444]" />
-                High Priority
-              </button>
-              <button
-                onClick={() => {
-                  onUpdatePriority(task.id, 2);
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="w-2 h-2 rounded-full bg-[#ff7a18]" />
-                Medium Priority
-              </button>
-              <button
-                onClick={() => {
-                  onUpdatePriority(task.id, 3);
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
-                Low Priority
-              </button>
-              <div className="border-t border-[#2a2a2a] my-1" />
-              <button
-                onClick={() => {
-                  onDelete(task.id);
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#ef4444] hover:bg-[#2a2a2a] transition-colors flex items-center gap-2"
-                style={{ cursor: 'pointer' }}
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </motion.div>
-          )}
-        </div>
-      </div>
-    </motion.div>
   );
 };

@@ -6,6 +6,7 @@ import { FocusModeContext } from '../contexts/FocusModeContext';
 import { WelcomeModal } from '../components/WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { PomodoroTimer } from '../components/PomodoroTimer';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
@@ -88,6 +89,9 @@ export const NewDashboard = () => {
           onNoteUpdate={handleNoteUpdate}
         />
       </div>
+
+      {/* Pomodoro Timer - Floating */}
+      <PomodoroTimer position="floating" />
     </div>
     </FocusModeContext.Provider>
     </>

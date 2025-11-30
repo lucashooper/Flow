@@ -57,6 +57,8 @@ export interface Task {
   due_date: string | null;
   priority: 1 | 2 | 3; // 1 = high, 2 = medium, 3 = low
   completed: boolean;
+  position: number; // For drag-and-drop ordering
+  list: string; // Project/list name (e.g., 'Inbox', 'Personal', 'Work')
   created_at: string;
   updated_at: string;
 }
