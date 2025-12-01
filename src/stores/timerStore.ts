@@ -8,7 +8,10 @@ interface TimerState {
   mode: TimerMode;
   attachedTaskId: string | null;
   pomodorosCompleted: number;
-  
+
+  // UI: global floating timer toggle
+  floatingEnabled: boolean;
+
   // Actions
   start: () => void;
   pause: () => void;
@@ -17,6 +20,7 @@ interface TimerState {
   setMode: (mode: TimerMode) => void;
   attachTask: (taskId: string | null) => void;
   completePomodoro: () => void;
+  setFloatingEnabled: (value: boolean) => void;
 }
 
 const DURATIONS = {
@@ -31,6 +35,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   mode: 'work',
   attachedTaskId: null,
   pomodorosCompleted: 0,
+
+  floatingEnabled: false,
 
   start: () => set({ isRunning: true }),
   
@@ -94,5 +100,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => ({ 
       pomodorosCompleted: state.pomodorosCompleted + 1 
     }));
+  },
+
+  setFloatingEnabled: (value: boolean) => {
+    set({ floatingEnabled: value });
   },
 }));

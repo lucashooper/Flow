@@ -1,4 +1,4 @@
-import { FileText, Minimize2, Pencil } from 'lucide-react';
+import { FileText, Minimize2, Pencil, Timer } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -21,6 +21,8 @@ interface EditorHeaderProps {
   onTabClick: (noteId: string) => void;
   onTabClose: (noteId: string) => void;
   onTabReorder: (reorderedNotes: Note[]) => void;
+  isTimerVisible: boolean;
+  setIsTimerVisible: (value: boolean) => void;
 }
 
 export const EditorHeader = ({ 
@@ -29,7 +31,9 @@ export const EditorHeader = ({
   tabsEnabled,
   onTabClick, 
   onTabClose,
-  onTabReorder
+  onTabReorder,
+  isTimerVisible,
+  setIsTimerVisible,
 }: EditorHeaderProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
@@ -91,7 +95,7 @@ export const EditorHeader = ({
         )}
 
         {/* Right-side actions */}
-        <div className="ml-auto nav-actions">
+        <div className="ml-auto nav-actions flex items-center gap-1.5">
           {/* Word count toggle */}
           <button
             onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}
@@ -117,6 +121,24 @@ export const EditorHeader = ({
             title="Toggle Focus Mode"
           >
             <Minimize2 className={`w-4 h-4 ${isFocusMode ? 'text-[#e5e5e5]' : ''}`} />
+          </button>
+
+          {/* Floating Focus Timer toggle */}
+          <button
+            type="button"
+            onClick={() => setIsTimerVisible(!isTimerVisible)}
+            title={isTimerVisible ? 'Hide timer' : 'Show timer'}
+            className={
+              'nav-item p-1.5 rounded hover:bg-[#222222] transition-colors ' +
+              (isTimerVisible ? 'text-[#e5e5e5]' : 'text-[#888888] hover:text-[#e5e5e5]')
+            }
+          >
+            <Timer
+              className="w-4 h-4"
+              style={{
+                filter: isTimerVisible ? 'drop-shadow(0 0 6px rgba(168,85,247,0.65))' : 'none',
+              }}
+            />
           </button>
         </div>
       </div>

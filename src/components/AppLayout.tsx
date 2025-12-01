@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { EditorHeader } from './EditorHeader';
 import type { Note, Folder, Dashboard } from '../types';
+import FocusFloat from '../../landing/components/FocusFloat';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -57,9 +58,10 @@ export const AppLayout = ({
   onTabReorder,
 }: AppLayoutProps) => {
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden select-none">
-      {/* Sidebar */}
-      <Sidebar
+    <>
+      <div className="flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden select-none">
+        {/* Sidebar */}
+        <Sidebar
         notes={notes}
         folders={folders}
         dashboards={dashboards}
@@ -79,10 +81,10 @@ export const AppLayout = ({
         loading={loading}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header with Tabs (optional) */}
-        {showHeader && (
+        {showHeader && tabsEnabled && (
           <EditorHeader
             openNotes={openNotes}
             activeNoteId={selectedNoteId || null}
@@ -90,14 +92,20 @@ export const AppLayout = ({
             onTabClick={onTabClick || (() => {})}
             onTabClose={onTabClose || (() => {})}
             onTabReorder={onTabReorder || (() => {})}
+            isTimerVisible={false}
+            setIsTimerVisible={() => {}}
           />
         )}
         
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          {children}
+          {/* Main Content */}
+          <div className="flex-1 overflow-auto">
+            {children}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Floating focus timer toggle */}
+      <FocusFloat />
+    </>
   );
 };

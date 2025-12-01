@@ -24,7 +24,6 @@ import type { Task } from '../types';
 import { AppLayout } from '../components/AppLayout';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { TaskCard } from '../components/TaskCard';
-import { PomodoroTimer } from '../components/PomodoroTimer';
 
 type TaskPriority = 1 | 2 | 3;
 
@@ -619,9 +618,6 @@ export const Tasks = () => {
           </div>
         )}
       </div>
-
-      {/* Pomodoro Timer - Floating */}
-      <PomodoroTimer tasks={tasks} position="floating" />
     </AppLayout>
   );
 };

@@ -6,11 +6,12 @@ import type { Task } from '../types';
 
 interface PomodoroTimerProps {
   tasks?: Task[];
-  position?: 'inline' | 'floating';
+  /** Controls visibility from the outside (FocusFloat / popup). */
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export const PomodoroTimer = ({ tasks = [], position = 'floating' }: PomodoroTimerProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+export const PomodoroTimer = ({ tasks = [], isOpen, onClose }: PomodoroTimerProps) => {
   const [showTaskMenu, setShowTaskMenu] = useState(false);
   
   const { 
@@ -57,77 +58,37 @@ export const PomodoroTimer = ({ tasks = [], position = 'floating' }: PomodoroTim
 
   const attachedTask = tasks.find(t => t.id === attachedTaskId);
 
-  const containerClass = position === 'floating'
-    ? 'fixed bottom-6 right-6 z-40'
-    : 'w-full';
+  if (!isOpen) return null;
 
-  // Collapsed view
-  if (!isExpanded) {
-    return (
-      <motion.div
-        className={containerClass}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <motion.button
-          onClick={() => setIsExpanded(true)}
-          className="relative flex items-center gap-3 px-4 py-3 rounded-full cursor-pointer select-none"
-          style={{
-            background: 'rgba(18, 18, 18, 0.85)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255, 122, 24, 0.2)',
-            boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6)',
-          }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {/* Pulsing ring when running */}
-          {isRunning && (
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{
-                border: '2px solid rgba(255, 122, 24, 0.5)',
-              }}
-              animate={{
-                scale: [1, 1.1, 1],
-                opacity: [0.5, 0.8, 0.5],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            />
-          )}
-          
-          <Clock className="w-4 h-4 text-[#ff7a18]" />
-          <span className="text-[#e5e5e5] text-sm font-medium">
-            {formatTime(secondsLeft)}
-          </span>
-          {attachedTask && (
-            <span className="text-[#888888] text-xs max-w-[120px] truncate">
-              {attachedTask.title}
-            </span>
-          )}
-        </motion.button>
-      </motion.div>
-    );
-  }
-
-  // Expanded view
   return (
     <motion.div
-      className={containerClass}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+      className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: 'easeInOut' }}
     >
+      {/* Backdrop */}
       <div
-        className="rounded-2xl p-6 min-w-[320px]"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <motion.div
+        className="relative rounded-2xl p-6 min-w-[320px] max-w-md mx-4 mb-8 sm:mb-0"
         style={{
           background: 'rgba(18, 18, 18, 0.85)',
           backdropFilter: 'blur(12px)',
           border: '1px solid rgba(255, 122, 24, 0.15)',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7)',
+        }}
+        initial={{ opacity: 0, transform: 'translateY(12px) scale(0.96)' }}
+        animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
+        exit={{ opacity: 0, transform: 'translateY(12px) scale(0.96)' }}
+        transition={{
+          opacity: { duration: 0.16, ease: 'easeInOut' },
+          transform: { duration: 0.2, ease: [0.22, 1, 0.36, 1] },
         }}
       >
         {/* Header */}
@@ -137,7 +98,7 @@ export const PomodoroTimer = ({ tasks = [], position = 'floating' }: PomodoroTim
             <h3 className="text-[#e5e5e5] font-semibold">{getModeLabel()}</h3>
           </div>
           <button
-            onClick={() => setIsExpanded(false)}
+            onClick={onClose}
             className="p-1 rounded hover:bg-white/5 transition-colors"
             style={{ cursor: 'pointer' }}
           >
@@ -286,7 +247,7 @@ export const PomodoroTimer = ({ tasks = [], position = 'floating' }: PomodoroTim
             </AnimatePresence>
           </div>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   );
 };

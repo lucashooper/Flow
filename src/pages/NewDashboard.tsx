@@ -6,11 +6,12 @@ import { FocusModeContext } from '../contexts/FocusModeContext';
 import { WelcomeModal } from '../components/WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
-import { PomodoroTimer } from '../components/PomodoroTimer';
+import FloatingTimer from '../components/FloatingTimer';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isTimerVisible, setIsTimerVisible] = useState(false);
   
   // Use shared dashboard data hook
   const {
@@ -81,6 +82,8 @@ export const NewDashboard = () => {
           onTabClick={handleNoteSelect}
           onTabClose={handleTabClose}
           onTabReorder={handleTabReorder}
+          isTimerVisible={isTimerVisible}
+          setIsTimerVisible={setIsTimerVisible}
         />
         
         {/* Editor Panel */}
@@ -89,11 +92,14 @@ export const NewDashboard = () => {
           onNoteUpdate={handleNoteUpdate}
         />
       </div>
-
-      {/* Pomodoro Timer - Floating */}
-      <PomodoroTimer position="floating" />
     </div>
     </FocusModeContext.Provider>
+
+    {/* Simple floating timer for dashboard */}
+    <FloatingTimer
+      isVisible={isTimerVisible}
+      onClose={() => setIsTimerVisible(false)}
+    />
     </>
   );
 };
