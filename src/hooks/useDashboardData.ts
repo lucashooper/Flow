@@ -220,23 +220,27 @@ export const useDashboardData = () => {
       return;
     }
 
-    const folderName = prompt('Enter folder name:');
-    if (!folderName) return;
-
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('folders')
         .insert([{
-          name: folderName,
+          name: 'New folder',
           user_id: user.id,
           parent_id: parentId || null,
           dashboard_id: activeDashboard?.id || null,
-        }]);
+        }])
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       // Refresh folders list
       await fetchData();
+
+      // Notify UI to auto-enter rename mode for this folder
+      if (data?.id) {
+        window.dispatchEvent(new CustomEvent('folderCreated', { detail: { id: data.id } }));
+      }
     } catch (error) {
       console.error('Error creating folder:', error);
       alert('Failed to create folder');

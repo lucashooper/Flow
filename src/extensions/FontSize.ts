@@ -52,7 +52,11 @@ export const FontSize = Extension.create<FontSizeOptions>({
           return chain().setMark('textStyle', { fontSize: fontSize }).run();
         },
       unsetFontSize: () => ({ chain }) => {
-        return chain().unsetMark('textStyle').run();
+        // Only remove the fontSize attribute, preserving other textStyle attributes (e.g., color)
+        return chain()
+          .setMark('textStyle', { fontSize: null })
+          .removeEmptyTextStyle()
+          .run();
       },
     };
   },

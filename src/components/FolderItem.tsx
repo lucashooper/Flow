@@ -13,6 +13,8 @@ interface FolderItemProps {
   onDelete: (folderId: string) => void;
   onCreateNote: () => void;
   onCreateSubfolder: () => void;
+  autoRenameId?: string;
+  onRenameStarted?: (folderId: string) => void;
 }
 
 export const FolderItem = ({
@@ -24,6 +26,8 @@ export const FolderItem = ({
   onDelete,
   onCreateNote,
   onCreateSubfolder,
+  autoRenameId,
+  onRenameStarted,
 }: FolderItemProps) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -39,6 +43,14 @@ export const FolderItem = ({
       inputRef.current.select();
     }
   }, [isRenaming]);
+
+  // Enter rename mode automatically for freshly-created folder
+  useEffect(() => {
+    if (autoRenameId && autoRenameId === folder.id && !isRenaming) {
+      setIsRenaming(true);
+      onRenameStarted && onRenameStarted(folder.id);
+    }
+  }, [autoRenameId, folder.id, isRenaming, onRenameStarted]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

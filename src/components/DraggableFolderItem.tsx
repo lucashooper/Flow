@@ -13,6 +13,8 @@ interface DraggableFolderItemProps {
   onCreateNote: () => void;
   onCreateSubfolder: () => void;
   isOver?: boolean;
+  autoRenameId?: string;
+  onRenameStarted?: (folderId: string) => void;
 }
 
 export const DraggableFolderItem = ({ isOver, ...props }: DraggableFolderItemProps) => {

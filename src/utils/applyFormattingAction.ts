@@ -20,14 +20,26 @@ export const applyFormattingAction = (editor: Editor, action: StarredFormattingA
   switch (action.type) {
     case 'textColor':
       if (action.value) {
-        chain.setColor(action.value).run();
+        const current = (editor.getAttributes('textStyle')?.color as string) || null;
+        if (current && current.toLowerCase() === action.value.toLowerCase()) {
+          chain.unsetColor().run();
+        } else {
+          chain.setColor(action.value).run();
+        }
       } else {
         chain.unsetColor().run();
       }
       break;
 
     case 'highlight':
-      chain.setHighlight({ color: action.value }).run();
+      {
+        const isActive = editor.isActive('highlight', { color: action.value });
+        if (isActive) {
+          chain.unsetHighlight().run();
+        } else {
+          chain.setHighlight({ color: action.value }).run();
+        }
+      }
       break;
 
     case 'boldColor':
@@ -48,7 +60,15 @@ export const applyFormattingAction = (editor: Editor, action: StarredFormattingA
       break;
 
     case 'fontSize':
-      chain.setFontSize(action.value).run();
+      {
+        // Toggle behavior: if current selection already has this font size, unset it
+        const current = (editor.getAttributes('textStyle')?.fontSize as string) || null;
+        if (current === action.value) {
+          chain.unsetFontSize().run();
+        } else {
+          chain.setFontSize(action.value).run();
+        }
+      }
       break;
   }
 };

@@ -74,6 +74,7 @@ export const Sidebar = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [autoRenameFolderId, setAutoRenameFolderId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -82,6 +83,16 @@ export const Sidebar = ({
       },
     })
   );
+
+  // Listen for folderCreated event to enter rename mode automatically
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { id?: string } | undefined;
+      if (detail?.id) setAutoRenameFolderId(detail.id);
+    };
+    window.addEventListener('folderCreated', handler as EventListener);
+    return () => window.removeEventListener('folderCreated', handler as EventListener);
+  }, []);
 
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id);
@@ -229,6 +240,10 @@ export const Sidebar = ({
           onDelete={onFolderDelete}
           onCreateNote={() => onNoteCreate(folder.id)}
           onCreateSubfolder={() => onFolderCreate(folder.id)}
+          autoRenameId={autoRenameFolderId || undefined}
+          onRenameStarted={(id: string) => {
+            if (autoRenameFolderId === id) setAutoRenameFolderId(null);
+          }}
         />
 
         {isExpanded && (
