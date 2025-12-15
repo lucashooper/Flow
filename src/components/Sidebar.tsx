@@ -282,11 +282,11 @@ export const Sidebar = ({
       onDragEnd={handleDragEnd}
     >
       <div
-        className="sidebar relative bg-[#111111] border-r border-[#2a2a2a] flex flex-col"
+        className="sidebar relative border-r border-theme flex flex-col"
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
       >
         {/* Header */}
-        <div className="p-4 border-b border-[#2a2a2a]">
+        <div className="p-4 border-b border-theme">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />

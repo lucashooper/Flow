@@ -50,7 +50,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
 
   if (!note) {
     return (
-      <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center">
+      <div className="flex-1 editor-root flex items-center justify-center">
         <div className="text-center">
           <div className="text-[#888888] text-lg mb-2">No note selected</div>
           <div className="text-[#666666] text-sm">Select a note from the sidebar or create a new one</div>
@@ -60,7 +60,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   }
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] flex flex-col overflow-hidden editor-background editor-root">
+    <div className="flex-1 flex flex-col overflow-hidden editor-background editor-root">
       {/* Editor Header */}
       <div className="pt-6 pb-4 editor-header">
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 2rem', width: '100%' }}>

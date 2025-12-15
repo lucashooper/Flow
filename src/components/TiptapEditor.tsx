@@ -678,7 +678,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, []);
 
   return (
-    <div className={`h-full flex flex-col bg-[#0a0a0a] relative editor-bullets-${bulletStyle}`}>
+    <div className={`h-full flex flex-col editor-root relative editor-bullets-${bulletStyle}`}>
       {/* Persistent Drawing Layer */}
       <PersistentDrawingLayer
         isDrawingMode={isDrawingMode}

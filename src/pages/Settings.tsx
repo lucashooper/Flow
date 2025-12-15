@@ -306,14 +306,23 @@ export const Settings = () => {
                     <select
                       value={theme}
                       onChange={(e) => {
-                        setTheme(e.target.value);
-                        localStorage.setItem('theme', e.target.value);
-                        window.location.reload();
+                        const value = e.target.value;
+                        setTheme(value);
+                        localStorage.setItem('theme', value);
+                        // Apply theme class to <html> immediately without full refresh
+                        const root = document.documentElement;
+                        // remove previous theme-* classes
+                        Array.from(root.classList).forEach((cls) => {
+                          if (cls.startsWith('theme-')) root.classList.remove(cls);
+                        });
+                        root.classList.add(`theme-${value}`);
                       }}
                       className="w-full px-4 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#e5e5e5] focus:outline-none focus:border-[#A0522D] transition-colors"
                     >
                       <option value="default">Default (Dark)</option>
                       <option value="crimson">Crimson</option>
+                      <option value="modern-gray">Modern Gray</option>
+                      <option value="coffee">Coffee</option>
                     </select>
                   </div>
                 </div>

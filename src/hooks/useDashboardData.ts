@@ -229,16 +229,15 @@ export const useDashboardData = () => {
           parent_id: parentId || null,
           dashboard_id: activeDashboard?.id || null,
         }])
-        .select('id')
+        .select('*')
         .single();
 
       if (error) throw error;
 
-      // Refresh folders list
-      await fetchData();
-
-      // Notify UI to auto-enter rename mode for this folder
-      if (data?.id) {
+      if (data) {
+        // Optimistically update local state to avoid janky loading
+        setFolders(prev => [...prev, data]);
+        // Notify UI to auto-enter rename mode for this folder
         window.dispatchEvent(new CustomEvent('folderCreated', { detail: { id: data.id } }));
       }
     } catch (error) {

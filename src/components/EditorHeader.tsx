@@ -75,7 +75,7 @@ export const EditorHeader = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="tabs top-nav bg-[#151515] border-b border-[#2a2a2a] px-4 py-2 flex items-center gap-4">
+      <div className="tabs top-nav border-b border-theme px-4 py-2 flex items-center gap-4">
 
         {/* Tabs area */}
         {tabsEnabled && openNotes.length > 0 && (
