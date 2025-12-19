@@ -85,62 +85,68 @@
   /* Theme variables and themes */
   :root {
     --accent: #a0522d; /* default accent */
-    --bg-editor: #0a0a0a;
-    --bg-panel: #1a1a1a;
+    --bg-editor: #141414; /* brightest surface */
+    --bg-panel: #0f0f0f;  /* slightly darker than editor */
     --bg-elev: #151515;
     --border: #2a2a2a;
+    --divider: rgba(255,255,255,0.06); /* subtle divider for calmer hierarchy */
     --text: #e5e5e5;
     --muted: #888888;
   }
 
   .theme-default {
     --accent: #a0522d;
-    --bg-editor: #0a0a0a;
-    --bg-panel: #1a1a1a;
+    --bg-editor: #141414; /* brightest */
+    --bg-panel: #0f0f0f;  /* slightly darker */
     --bg-elev: #151515;
     --border: #2a2a2a;
+    --divider: rgba(255,255,255,0.06);
     --text: #e5e5e5;
     --muted: #888888;
   }
 
   .theme-crimson {
     --accent: #dc143c;
-    --bg-editor: #0b0a0a;
-    --bg-panel: #151112;
-    --bg-elev: #1b1416;
+    --bg-editor: #121011; /* brighter editor */
+    --bg-panel: #0f0d0e;  /* slightly darker panel */
+    --bg-elev: #191214;
     --border: #3a2226;
+    --divider: rgba(220,20,60,0.12);
     --text: #f0eaea;
     --muted: #b89a9f;
   }
 
   .theme-modern-gray {
     --accent: #7aa2ff;
-    --bg-editor: #111315;  /* main note area */
-    --bg-panel:  #171a1d;  /* sidebar/top */
+    --bg-editor: #15181b;  /* brightest */
+    --bg-panel:  #121416;  /* slightly darker */
     --bg-elev:   #1e2226;  /* popovers/cards */
     --border:    #30353a;
+    --divider:   rgba(255,255,255,0.07);
     --text:      #e6e9ec;
     --muted:     #9aa3ab;
   }
 
   .theme-coffee {
     --accent: #c08a4d;      /* warm coffee */
-    --bg-editor: #1a120b;   /* main note area */
-    --bg-panel:  #21160e;   /* sidebar/top */
+    --bg-editor: #20170f;   /* brightest */
+    --bg-panel:  #1b130d;   /* slightly darker */
     --bg-elev:   #2a1c12;   /* popovers/cards */
     --border:    #4a3426;
+    --divider:   rgba(192,138,77,0.16);
     --text:      #efe6dc;
     --muted:     #b9a99a;
   }
 
   /* Apply variables to key surfaces */
   .top-nav, .sidebar { background-color: var(--bg-panel); color: var(--text); }
-  .top-nav, .sidebar { border-color: var(--border); }
+  .top-nav, .sidebar { border-color: var(--divider); }
   .editor-root, .editor-header, .editor-content { background-color: var(--bg-editor); color: var(--text); }
   .panel, .card { background-color: var(--bg-elev); color: var(--text); border-color: var(--border); }
   .btn-accent { background-color: var(--accent); color: #fff; }
   .text-accent { color: var(--accent); }
   .border-theme { border-color: var(--border); }
+  .border-subtle { border-color: var(--divider); }
   
   /* Make headings/links reflect accent subtly */
   .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { color: var(--text); }

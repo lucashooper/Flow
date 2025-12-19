@@ -286,7 +286,7 @@ export const Sidebar = ({
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
       >
         {/* Header */}
-        <div className="p-4 border-b border-theme">
+        <div className="p-3 border-b border-subtle">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
@@ -392,18 +392,25 @@ export const Sidebar = ({
       </div>
 
       <style>{`
+        /* Slim, quiet scrollbar like ChatGPT */
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #111111;
+          background: transparent; /* reduce visual weight */
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #2a2a2a;
-          border-radius: 4px;
+          background: rgba(255,255,255,0.08); /* neutral grey at low opacity */
+          border-radius: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #3a3a3a;
+          background: rgba(255,255,255,0.18);
+        }
+
+        /* Firefox */
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.18) transparent;
         }
 
         /* Faded notes in sidebar */
