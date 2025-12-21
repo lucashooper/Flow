@@ -1,13 +1,5 @@
 import { FileText, Minimize2, Pencil, Timer } from 'lucide-react';
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  type DragEndEvent,
-} from '@dnd-kit/core';
+import { DragOverlay } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState } from 'react';
 import type { Note } from '../types';
@@ -35,46 +27,12 @@ export const EditorHeader = ({
   isTimerVisible,
   setIsTimerVisible,
 }: EditorHeaderProps) => {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId] = useState<string | null>(null);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // Require 8px movement before drag starts
-      },
-    })
-  );
-
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = openNotes.findIndex(note => note.id === active.id);
-    const newIndex = openNotes.findIndex(note => note.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const reordered = [...openNotes];
-      const [movedNote] = reordered.splice(oldIndex, 1);
-      reordered.splice(newIndex, 0, movedNote);
-      onTabReorder(reordered);
-    }
-  };
 
   const activeNote = openNotes.find(note => note.id === activeId);
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
+    <>
       <div className="tabs top-nav border-b border-subtle px-3 py-1.5 flex items-center gap-3">
 
         {/* Tabs area */}
@@ -147,10 +105,10 @@ export const EditorHeader = ({
       <DragOverlay>
         {activeId && activeNote ? (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1a1a1a] text-[#e5e5e5] min-w-[120px] max-w-[200px] shadow-2xl opacity-90">
-            <span className="text-sm truncate flex-1">{activeNote.title || 'Untitled'}</span>
+            <span className="text-sm truncate flex-1">{activeNote?.title || 'Untitled'}</span>
           </div>
         ) : null}
       </DragOverlay>
-    </DndContext>
+    </>
   );
 };

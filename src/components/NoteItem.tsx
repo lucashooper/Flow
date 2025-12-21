@@ -86,12 +86,30 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
     setShowContextMenu(false);
   };
 
-  const contentPreview = note.content
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/[#*`]/g, '') // Remove markdown characters
-    .split('\n')
-    .find(line => line.trim())
-    ?.substring(0, 60) || 'Empty note';
+  // Generate content preview - use title as fallback if extraction fails
+  const contentPreview = (() => {
+    try {
+      // Remove HTML tags and get text content
+      const stripped = note.content
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ') // Replace HTML spaces  
+        .replace(/&[a-z]+;/gi, ' ') // Replace other HTML entities
+        .replace(/[#*`]/g, '') // Remove markdown characters
+        .trim(); // Remove leading/trailing whitespace
+      
+      if (stripped && stripped.length > 0) {
+        // Find first non-empty line
+        const firstLine = stripped.split('\n').find(line => line.trim());
+        return firstLine?.trim().substring(0, 60) || stripped.substring(0, 60);
+      }
+      
+      // Fallback: use note title or "Empty note"
+      return note.title || 'Empty note';
+    } catch (error) {
+      console.error('[NoteItem] Error generating preview:', error);
+      return note.title || 'Empty note';
+    }
+  })();
 
   return (
     <>
@@ -104,6 +122,17 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={onSelect}
         onContextMenu={handleContextMenu}
+        data-noteid={note.id}
+        data-title={note.title}
+        onPointerDown={() => {
+          if (import.meta.env.DEV) {
+            console.log('[NoteItem] pointerDown:', {
+              title: note.title,
+              hasContent: !!note.content,
+              previewLength: contentPreview?.length,
+            });
+          }
+        }}
       >
         <div className="flex items-start gap-2">
           {note.emoji && (
@@ -133,17 +162,17 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
-                  <div className="text-sm text-[#e5e5e5] truncate font-medium">
+                  <div className="text-sm text-[#e5e5e5] truncate font-medium" data-debug="title">
                     {note.title}
                   </div>
                   {(note.is_starred ?? false) && (
                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
                   )}
                 </div>
-                <div className="text-xs text-[#888888] truncate">
+                <div className="text-xs text-[#888888] truncate" data-debug="preview">
                   {contentPreview}
                 </div>
-                <div className="text-xs text-[#666666] mt-0.5">
+                <div className="text-xs text-[#666666] mt-0.5" data-debug="timestamp">
                   {formatDistanceToNow(note.updated_at)}
                 </div>
               </>

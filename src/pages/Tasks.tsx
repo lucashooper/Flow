@@ -45,6 +45,8 @@ export const Tasks = () => {
     loading,
     sidebarWidth,
     setSidebarWidth,
+    openNotes,
+    tabsEnabled,
     handleNoteSelect: dashboardHandleNoteSelect,
     handleNoteCreate,
     handleNoteUpdate,
@@ -54,6 +56,8 @@ export const Tasks = () => {
     handleFolderDelete,
     handleDashboardChange,
     handleDashboardsUpdate,
+    handleTabClose,
+    handleTabReorder,
   } = useDashboardData();
   
   // Composer state - ALWAYS expanded on Tasks page
@@ -323,6 +327,7 @@ export const Tasks = () => {
 
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
 
+
   return (
     <AppLayout
       notes={notes || []}
@@ -341,7 +346,12 @@ export const Tasks = () => {
       onDashboardChange={handleDashboardChange}
       onDashboardsUpdate={handleDashboardsUpdate}
       loading={loading}
-      showHeader={false}
+      showHeader={true}
+      openNotes={openNotes}
+      tabsEnabled={tabsEnabled}
+      onTabClick={handleNoteSelect}
+      onTabClose={handleTabClose}
+      onTabReorder={handleTabReorder}
     >
       <div className="max-w-4xl mx-auto px-8 py-12 select-none">
         {/* Header - No subtitle */}

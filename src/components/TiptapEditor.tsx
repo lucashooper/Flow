@@ -19,7 +19,7 @@ import { DrawingNode } from '../extensions/DrawingNode';
 import { EmojiIconDecorator } from '../extensions/EmojiIconDecorator';
 // import { SpellCheck } from '../extensions/SpellCheck'; // Disabled - using browser native
 import 'prosemirror-view/style/prosemirror.css';
-import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical } from 'lucide-react';
+import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical, Quote } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { applyFormattingAction, STARRED_FORMATTING_KEY } from '../utils/applyFormattingAction';
 import type { StarredFormattingAction } from '../utils/applyFormattingAction';
@@ -27,6 +27,7 @@ import { ContextMenu } from './ContextMenu';
 import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { WordCount } from './WordCount';
 import { supabase } from '../lib/supabase';
+import { AutoItalicQuotes } from '../extensions/AutoItalicQuotes';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -54,9 +55,23 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   //   }).catch((err) => {
   //     console.error('❌ Spell checker failed to load:', err);
   //   });
+  
+  // Default auto-italicize quotes to ON if not set
+  useEffect(() => {
+    const raw = localStorage.getItem('autoItalicQuotesEnabled');
+    if (raw === null) {
+      localStorage.setItem('autoItalicQuotesEnabled', 'true');
+      setAutoItalicEnabled(true);
+    } else {
+      setAutoItalicEnabled(raw === 'true');
+    }
+  }, []);
   // }, []);
   const [bulletStyle, setBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
+  });
+  const [autoItalicEnabled, setAutoItalicEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('autoItalicQuotesEnabled') === 'true';
   });
   // Deduplicate starred actions by (type, value) pair
   const dedupeStarred = (list: StarredFormattingAction[]): StarredFormattingAction[] => {
@@ -147,6 +162,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         link: false, // Disable built-in link to avoid duplicates
       }),
       ColoredBold,
+      AutoItalicQuotes,
       // QuoteMark, // ❌ DISABLED - causing glitching bug when pressing Enter inside quotes
       // SpellCheck, // ❌ DISABLED - causing 6+ second delays, using browser native instead
       DrawingNode,
@@ -722,6 +738,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
           <div className="w-px h-6 bg-[#2a2a2a] mx-1" />
 
+          {/* Auto-italicize quotes toggle */}
+          <button
+            onClick={() => {
+              const next = !autoItalicEnabled;
+              setAutoItalicEnabled(next);
+              localStorage.setItem('autoItalicQuotesEnabled', String(next));
+            }}
+            className={`p-2 rounded transition-colors ${
+              autoItalicEnabled ? 'bg-[#A0522D] text-white' : 'text-[#e5e5e5] hover:bg-[#252525]'
+            }`}
+            title="Auto-italicize quotes"
+          >
+            <Quote className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => {
               const wasBold = editor.isActive('bold');
@@ -908,7 +939,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       {/* Editor */}
       <EditorContent 
         editor={editor} 
-        className="h-full overflow-y-auto prose prose-invert max-w-none editor-scrollbar"
+        className="min-h-full prose prose-invert max-w-none editor-scrollbar"
         style={{ 
           maxWidth: '800px', 
           margin: '0 auto',
@@ -931,7 +962,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           }
         }
         
-        /* Hide scrollbar but keep functionality */
+        /* Hide scrollbar on editor content itself */
         .editor-scrollbar::-webkit-scrollbar {
           width: 0px;
           background: transparent;
@@ -939,20 +970,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         .editor-scrollbar {
           scrollbar-width: none; /* Firefox */
           -ms-overflow-style: none; /* IE/Edge */
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #0a0a0a;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #2a2a2a;
-          border-radius: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #3a3a3a;
         }
         
         /* Remove blue border from images */

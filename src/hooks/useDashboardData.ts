@@ -15,15 +15,28 @@ export const useDashboardData = () => {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
     searchParams.get('note')
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [openNotes, setOpenNotes] = useState<Note[]>([]);
+  const [openNotes, setOpenNotes] = useState<Note[]>(() => {
+    // Restore open notes from localStorage
+    try {
+      const saved = localStorage.getItem('openNotes');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   
   const hasLoadedDashboards = useRef(false);
   const tabsEnabled = (() => {
     const saved = localStorage.getItem('tabsEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   })();
+
+  // Persist open notes to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('openNotes', JSON.stringify(openNotes));
+  }, [openNotes]);
 
   useEffect(() => {
     // Only fetch dashboards once when user is available

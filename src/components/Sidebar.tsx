@@ -2,12 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, FolderPlus, Search, Star, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
-  DndContext,
   DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core';
@@ -76,14 +71,6 @@ export const Sidebar = ({
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [autoRenameFolderId, setAutoRenameFolderId] = useState<string | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
-
   // Listen for folderCreated event to enter rename mode automatically
   useEffect(() => {
     const handler = (e: Event) => {
@@ -94,39 +81,6 @@ export const Sidebar = ({
     return () => window.removeEventListener('folderCreated', handler as EventListener);
   }, []);
 
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { over } = event;
-    setOverId(over?.id as string || null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    setActiveId(null);
-    setOverId(null);
-
-    if (!over || active.id === over.id) return;
-
-    const activeData = active.data.current;
-    const overData = over.data.current;
-
-    // Moving note into a folder
-    if (activeData?.type === 'note' && overData?.type === 'folder') {
-      const note = activeData.note as Note;
-      const folderId = over.id as string;
-      onNoteUpdate(note.id, { folder_id: folderId });
-    }
-
-    // Moving note to root (no folder)
-    if (activeData?.type === 'note' && !overData) {
-      const note = activeData.note as Note;
-      onNoteUpdate(note.id, { folder_id: null });
-    }
-  };
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {
@@ -274,13 +228,7 @@ export const Sidebar = ({
   const allItems = [...folders.map(f => f.id), ...notes.map(n => n.id)];
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
+    <>
       <div
         className="sidebar relative border-r border-theme flex flex-col"
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
@@ -430,15 +378,19 @@ export const Sidebar = ({
       {/* Drag Overlay */}
       <DragOverlay>
         {activeId ? (
-          <div className="opacity-50">
+          <div className="opacity-70 shadow-2xl">
             {notes.find(n => n.id === activeId) ? (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded">Dragging note...</div>
+              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
+                {notes.find(n => n.id === activeId)?.title || 'Dragging note...'}
+              </div>
             ) : (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded">Dragging folder...</div>
+              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
+                Dragging folder...
+              </div>
             )}
           </div>
         ) : null}
       </DragOverlay>
-    </DndContext>
+    </>
   );
 };

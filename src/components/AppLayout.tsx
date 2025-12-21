@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { EditorHeader } from './EditorHeader';
 import type { Note, Folder, Dashboard } from '../types';
 import FocusFloat from '../../landing/components/FocusFloat';
+import { FocusModeContext } from '../contexts/FocusModeContext';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -57,8 +59,12 @@ export const AppLayout = ({
   onTabClose,
   onTabReorder,
 }: AppLayoutProps) => {
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const toggleFocusMode = () => setIsFocusMode(prev => !prev);
+
   return (
     <>
+      <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
       <div className="flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden select-none">
         {/* Sidebar */}
         <Sidebar
@@ -106,6 +112,7 @@ export const AppLayout = ({
 
       {/* Floating focus timer toggle */}
       <FocusFloat />
+      </FocusModeContext.Provider>
     </>
   );
 };

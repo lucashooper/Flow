@@ -60,9 +60,9 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden editor-background editor-root">
+    <div className="flex-1 min-h-0 flex flex-col editor-background editor-root overflow-hidden">
       {/* Editor Header */}
-      <div className="pt-6 pb-4 editor-header">
+      <div className="pt-6 pb-4 editor-header flex-shrink-0">
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 2rem', width: '100%' }}>
         <input
           type="text"
@@ -84,8 +84,8 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
         </div>
       </div>
 
-      {/* Editor Content */}
-      <div className="flex-1 overflow-hidden editor-content">
+      {/* Editor Content - scroll container starts here */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         <TiptapEditor
           content={content}
           onChange={setContent}
