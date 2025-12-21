@@ -3,8 +3,6 @@ import { Plus, FolderPlus, Search, Star, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   DragOverlay,
-  type DragEndEvent,
-  type DragOverEvent,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Note, Folder, Dashboard } from '../types';
@@ -66,8 +64,8 @@ export const Sidebar = ({
     }
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
+  const [activeId] = useState<string | null>(null);
+  const [overId] = useState<string | null>(null);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [autoRenameFolderId, setAutoRenameFolderId] = useState<string | null>(null);
 

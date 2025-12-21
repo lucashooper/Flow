@@ -96,7 +96,7 @@ function regionFromXY(xy: {x:number;y:number}, el: HTMLElement): DropRegion {
 }
 
 function PaneView({ node, notes, onNoteUpdate }: { node: PaneNode; notes: Note[]; onNoteUpdate: EditorWorkspaceProps['onNoteUpdate'] }) {
-  const { splitInto, replaceIn, closePane, activeLeafId, setActiveLeafId } = useWorkspace();
+  const { splitInto, replaceIn, closePane, setActiveLeafId } = useWorkspace();
 
   if (node.type === 'split') {
     return (

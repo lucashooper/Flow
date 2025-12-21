@@ -30,7 +30,6 @@ interface AppLayoutProps {
   tabsEnabled?: boolean;
   onTabClick?: (noteId: string) => void;
   onTabClose?: (noteId: string) => void;
-  onTabReorder?: (notes: Note[]) => void;
 }
 
 export const AppLayout = ({
@@ -57,7 +56,6 @@ export const AppLayout = ({
   tabsEnabled = false,
   onTabClick,
   onTabClose,
-  onTabReorder,
 }: AppLayoutProps) => {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const toggleFocusMode = () => setIsFocusMode(prev => !prev);
@@ -97,7 +95,6 @@ export const AppLayout = ({
             tabsEnabled={tabsEnabled}
             onTabClick={onTabClick || (() => {})}
             onTabClose={onTabClose || (() => {})}
-            onTabReorder={onTabReorder || (() => {})}
             isTimerVisible={false}
             setIsTimerVisible={() => {}}
           />

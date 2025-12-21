@@ -12,18 +12,16 @@ interface EditorHeaderProps {
   tabsEnabled: boolean;
   onTabClick: (noteId: string) => void;
   onTabClose: (noteId: string) => void;
-  onTabReorder: (reorderedNotes: Note[]) => void;
   isTimerVisible: boolean;
   setIsTimerVisible: (value: boolean) => void;
 }
 
 export const EditorHeader = ({ 
-  openNotes, 
-  activeNoteId, 
+  openNotes,
+  activeNoteId,
   tabsEnabled,
-  onTabClick, 
+  onTabClick,
   onTabClose,
-  onTabReorder,
   isTimerVisible,
   setIsTimerVisible,
 }: EditorHeaderProps) => {

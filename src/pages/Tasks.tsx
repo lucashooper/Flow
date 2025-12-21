@@ -57,7 +57,6 @@ export const Tasks = () => {
     handleDashboardChange,
     handleDashboardsUpdate,
     handleTabClose,
-    handleTabReorder,
   } = useDashboardData();
   
   // Composer state - ALWAYS expanded on Tasks page
@@ -351,7 +350,6 @@ export const Tasks = () => {
       tabsEnabled={tabsEnabled}
       onTabClick={handleNoteSelect}
       onTabClose={handleTabClose}
-      onTabReorder={handleTabReorder}
     >
       <div className="max-w-4xl mx-auto px-8 py-12 select-none">
         {/* Header - No subtitle */}

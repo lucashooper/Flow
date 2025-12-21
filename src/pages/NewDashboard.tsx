@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from '../components/Sidebar';
-import { EditorPanel } from '../components/EditorPanel';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
 import { EditorWorkspace } from '../components/EditorWorkspace';
 import { EditorHeader } from '../components/EditorHeader';
@@ -30,7 +29,6 @@ export const NewDashboard = () => {
     tabsEnabled,
     handleNoteSelect,
     handleTabClose,
-    handleTabReorder,
     handleNoteCreate,
     handleNoteUpdate,
     handleNoteDelete,
@@ -221,7 +219,6 @@ export const NewDashboard = () => {
             tabsEnabled={tabsEnabled}
             onTabClick={handleNoteSelect}
             onTabClose={handleTabClose}
-            onTabReorder={handleTabReorder}
             isTimerVisible={isTimerVisible}
             setIsTimerVisible={setIsTimerVisible}
           />
