@@ -134,7 +134,10 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
     onDragMove(event) {
       const { active } = event;
       const isNote = active?.data?.current?.type === 'note' || active?.data?.current?.type === 'tab';
-      if (!isNote) return;
+      if (!isNote) {
+        if (import.meta.env.DEV) console.debug('[Workspace] dragMove - not a note/tab, ignoring');
+        return;
+      }
       if (!ref.current || !active?.rect?.current) return;
       const initial = (active as any).rect.current.initial;
       const translated = (active as any).rect.current.translated;
@@ -149,11 +152,15 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
       const inside = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
       if (inside) {
         const region = regionFromXY({ x: clientX, y: clientY }, ref.current);
-        if (import.meta.env.DEV) console.debug('[Workspace] dragMove over leaf', leaf.id, 'region', region);
+        if (import.meta.env.DEV) console.debug('📍 [Workspace] dragMove over leaf', leaf.id, 'region:', region);
         setIsOver(true);
         setOver(region);
       } else {
-        if (isOver) { setIsOver(false); setOver(null); }
+        if (isOver) { 
+          if (import.meta.env.DEV) console.debug('📍 [Workspace] dragMove left leaf', leaf.id);
+          setIsOver(false); 
+          setOver(null); 
+        }
       }
     },
     onDragOver(event) {
@@ -194,7 +201,14 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
       const inside = pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom;
       if (!inside) { setIsOver(false); setOver(null); return; }
       const region = over || regionFromXY(pointer, ref.current) || 'center';
-      if (import.meta.env.DEV) console.debug('[Workspace] drop on leaf', leaf.id, 'region', region, 'noteId', noteId);
+      
+      console.log('🎯 [DRAG END]', {
+        leafId: leaf.id,
+        region,
+        noteId,
+        action: region === 'center' ? 'replace' : 'split'
+      });
+      
       if (region === 'center') replaceIn(leaf.id, noteId);
       else splitInto(leaf.id, region, noteId);
       setIsOver(false);

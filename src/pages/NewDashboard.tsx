@@ -68,14 +68,29 @@ export const NewDashboard = () => {
   }, []);
 
   const handleDragStart = (event: any) => {
-    console.log('[NewDashboard] DRAG START:', event.active.id);
-    setActiveId(event.active.id);
-    
-    // Determine what's being dragged and store it
+    const activeId = event.active.id;
     const data = event.active.data.current;
+    
+    console.log('🎬 [DRAG START]', {
+      activeId,
+      dataType: data?.type,
+      hasNote: !!data?.note,
+      noteTitle: data?.note?.title
+    });
+    
+    setActiveId(activeId);
+    
+    // Extract note data - handle both 'note' and 'tab' types
     if (data?.type === 'note' || data?.type === 'tab') {
-      const note = data.type === 'note' ? data.note : data.note;
-      setDraggedItem({ type: data.type, note });
+      const note = data.note;
+      if (note) {
+        setDraggedItem({ type: data.type, note });
+        console.log('✅ [DRAG START] DraggedItem set:', note.title);
+      } else {
+        console.warn('⚠️ [DRAG START] No note data found in drag event');
+      }
+    } else {
+      console.warn('⚠️ [DRAG START] Unknown drag type:', data?.type);
     }
   };
 

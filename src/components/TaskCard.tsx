@@ -27,11 +27,13 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
     listeners,
     setNodeRef,
     transform,
+    transition,
     isDragging,
   } = useSortable({ id: task.id });
 
   const cardStyle = {
     transform: CSS.Transform.toString(transform),
+    transition,
     background: isDragging 
       ? 'rgba(26, 26, 26, 0.6)' 
       : isAttached 
@@ -63,7 +65,6 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
     <motion.div
       ref={setNodeRef}
       style={cardStyle}
-      layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ 
         opacity: isCompleting ? 0 : 1, 
@@ -71,15 +72,6 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
         scale: isCompleting ? 0.98 : 1
       }}
       exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.22 } }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 400, 
-        damping: 32, 
-        mass: 0.6,
-        opacity: { duration: 0.22 },
-        y: { duration: 0.22 },
-        scale: { duration: 0.22 }
-      }}
       whileHover={{ y: shouldDim ? 0 : -1, background: shouldDim ? undefined : 'rgba(255, 255, 255, 0.07)' }}
       className="group relative rounded-xl p-4"
     >
