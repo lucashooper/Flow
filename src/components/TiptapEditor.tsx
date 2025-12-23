@@ -20,7 +20,7 @@ import { EmojiIconDecorator } from '../extensions/EmojiIconDecorator';
 // import { SpellCheck } from '../extensions/SpellCheck'; // Disabled - using browser native
 import 'prosemirror-view/style/prosemirror.css';
 import { Bold, Italic, Code, Link as LinkIcon, Minus, Plus, Pencil, List, MoreVertical, Quote } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { applyFormattingAction, STARRED_FORMATTING_KEY } from '../utils/applyFormattingAction';
 import type { StarredFormattingAction } from '../utils/applyFormattingAction';
 import { ContextMenu } from './ContextMenu';
@@ -36,9 +36,10 @@ interface TiptapEditorProps {
   drawingData?: string;
   onDrawingChange?: (data: string) => void;
   placeholder?: string;
+  searchQuery?: string;
 }
 
-export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder }: TiptapEditorProps) => {
+export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
@@ -448,6 +449,110 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       }
     }
   }, [content, editor]);
+
+  // Store search query in a ref to use in editor update callback
+  const searchQueryRef = useRef(searchQuery);
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
+  // Perform search when editor content updates
+  const performSearch = useCallback((editorInstance: any) => {
+    const query = searchQueryRef.current;
+    
+    if (!query) {
+      console.log('ℹ️ [TiptapEditor] No search query');
+      return;
+    }
+    
+    console.log('✅ [TiptapEditor] Performing search for:', query);
+    
+    const { state } = editorInstance;
+    const { doc } = state;
+    const searchLower = query.toLowerCase();
+    
+    let firstMatchPos: number | null = null;
+    let matchCount = 0;
+    
+    doc.descendants((node: any, pos: number) => {
+      if (node.isText && node.text) {
+        const text = node.text.toLowerCase();
+        const index = text.indexOf(searchLower);
+        if (index !== -1) {
+          matchCount++;
+          if (firstMatchPos === null) {
+            firstMatchPos = pos + index;
+            console.log('🎯 [TiptapEditor] First match found at position:', firstMatchPos, 'in text:', node.text.substring(index, index + 20));
+          }
+        }
+      }
+    });
+    
+    console.log(`📊 [TiptapEditor] Found ${matchCount} match(es) for "${query}"`);
+    
+    if (firstMatchPos !== null) {
+      const matchPos = firstMatchPos;
+      console.log('🎯 [TiptapEditor] Highlighting match at position:', matchPos);
+      
+      setTimeout(() => {
+        // Select the text
+        editorInstance.commands.setTextSelection({
+          from: matchPos,
+          to: matchPos + query.length
+        });
+        
+        // Apply orange highlight with good contrast against white text
+        editorInstance.commands.setMark('highlight', { color: '#fb923c' });
+        
+        // Scroll to the match - use the ProseMirror position to find the DOM node
+        const editorElement = editorInstance.view.dom;
+        const { from } = editorInstance.state.selection;
+        const domNode = editorInstance.view.domAtPos(from);
+        
+        if (domNode && domNode.node) {
+          // Find the closest element we can scroll to
+          let targetElement = domNode.node.nodeType === Node.TEXT_NODE 
+            ? domNode.node.parentElement 
+            : domNode.node as HTMLElement;
+          
+          if (targetElement) {
+            // Find the scroll container
+            const scrollContainer = editorElement.closest('.custom-scrollbar') as HTMLElement;
+            
+            if (scrollContainer) {
+              const targetRect = targetElement.getBoundingClientRect();
+              const containerRect = scrollContainer.getBoundingClientRect();
+              
+              // Calculate scroll position to center the match
+              const scrollTop = targetRect.top - containerRect.top + scrollContainer.scrollTop - 150;
+              
+              console.log('📜 [TiptapEditor] Scrolling to:', { 
+                targetTop: targetRect.top, 
+                containerTop: containerRect.top,
+                scrollTop,
+                currentScroll: scrollContainer.scrollTop
+              });
+              
+              scrollContainer.scrollTop = scrollTop;
+            }
+          }
+        }
+        
+        console.log('✨ [TiptapEditor] Highlight and scroll applied');
+      }, 100);
+    } else {
+      console.log('❌ [TiptapEditor] No matches found in document');
+    }
+  }, []);
+
+  // Trigger search when content loads
+  useEffect(() => {
+    if (editor && searchQuery && content) {
+      console.log('🔍 [TiptapEditor] Content loaded, triggering search');
+      const timeout = setTimeout(() => performSearch(editor), 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [editor, searchQuery, content, performSearch]);
 
   // Add keyboard shortcuts
   useEffect(() => {

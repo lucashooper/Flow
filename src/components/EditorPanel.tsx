@@ -5,14 +5,17 @@ import { TiptapEditor } from './TiptapEditor';
 interface EditorPanelProps {
   note: Note | undefined;
   onNoteUpdate: (noteId: string, updates: Partial<Note>) => void;
+  searchQuery?: string;
 }
 
-export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
+export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
   const saveTimeoutRef = useRef<number | undefined>(undefined);
   const currentNoteIdRef = useRef<string | undefined>(undefined);
+  
+  console.log('📝 [EditorPanel] Received searchQuery:', searchQuery, 'for note:', note?.title);
 
   useEffect(() => {
     // Only update state if the note ID actually changed (switching notes)
@@ -92,6 +95,7 @@ export const EditorPanel = ({ note, onNoteUpdate }: EditorPanelProps) => {
           drawingData={drawingData}
           onDrawingChange={setDrawingData}
           placeholder="Start writing..."
+          searchQuery={searchQuery}
         />
       </div>
     </div>

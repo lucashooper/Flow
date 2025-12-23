@@ -18,7 +18,7 @@ interface SidebarProps {
   selectedNoteId: string | null;
   sidebarWidth: number;
   setSidebarWidth: (width: number) => void;
-  onNoteSelect: (noteId: string) => void;
+  onNoteSelect: (noteId: string, searchQuery?: string) => void;
   onNoteCreate: (folderId?: string) => void;
   onNoteUpdate: (noteId: string, updates: Partial<Note>) => void;
   onNoteDelete: (noteId: string) => void;
@@ -140,12 +140,17 @@ export const Sidebar = ({
     }
   }, [isResizing]);
 
+  // Check if a note matches the search query
+  const noteMatchesSearch = (note: Note) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return note.title.toLowerCase().includes(query) || 
+           note.content.toLowerCase().includes(query);
+  };
+
   // Filter and sort notes based on search and starred-only toggle, with starred notes at the top
   const filteredNotes = notes
-    .filter(note =>
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(noteMatchesSearch)
     .filter(note => !showStarredOnly || (note.is_starred ?? false))
     .sort((a, b) => {
       // Starred notes come first (handle undefined as false)
@@ -156,6 +161,40 @@ export const Sidebar = ({
       // Then sort by updated_at
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
+
+  // Check if a folder or its descendants contain matching notes
+  const folderHasMatches = (folderId: string): boolean => {
+    // Check direct notes in this folder
+    const directNotes = notes.filter(n => n.folder_id === folderId);
+    if (directNotes.some(noteMatchesSearch)) return true;
+    
+    // Check subfolders recursively
+    const subfolders = folders.filter(f => f.parent_id === folderId);
+    return subfolders.some(sf => folderHasMatches(sf.id));
+  };
+
+  // Auto-expand folders containing search matches
+  useEffect(() => {
+    if (!searchQuery) return;
+    
+    const foldersToExpand = new Set<string>();
+    
+    // Find all folders that contain matching notes (directly or in descendants)
+    folders.forEach(folder => {
+      if (folderHasMatches(folder.id)) {
+        foldersToExpand.add(folder.id);
+        
+        // Also expand all parent folders
+        let currentFolder = folder;
+        while (currentFolder.parent_id) {
+          foldersToExpand.add(currentFolder.parent_id);
+          currentFolder = folders.find(f => f.id === currentFolder.parent_id)!;
+        }
+      }
+    });
+    
+    setExpandedFolders(foldersToExpand);
+  }, [searchQuery, notes, folders]);
 
   // Get root folders (no parent)
   const rootFolders = folders.filter(f => !f.parent_id);
@@ -179,9 +218,10 @@ export const Sidebar = ({
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
     const isOver = overId === folder.id;
+    const hasMatches = searchQuery && folderHasMatches(folder.id);
 
     return (
-      <div key={folder.id}>
+      <div key={folder.id} className={searchQuery && !hasMatches ? 'opacity-40' : ''}>
         <DraggableFolderItem
           folder={folder}
           depth={depth}
@@ -204,19 +244,26 @@ export const Sidebar = ({
             {subfolders.map(subfolder => renderFolder(subfolder, depth + 1))}
             
             {/* Notes in this folder */}
-            {folderNotes.map(note => (
-              <DraggableNoteItem
-                key={note.id}
-                note={note}
-                depth={depth + 1}
-                isSelected={note.id === selectedNoteId}
-                isBlurred={blurredNotes.has(note.id)}
-                onSelect={() => onNoteSelect(note.id)}
-                onUpdate={onNoteUpdate}
-                onDelete={onNoteDelete}
-                onToggleBlur={() => toggleNoteBlur(note.id)}
-              />
-            ))}
+            {folderNotes.map(note => {
+              const isMatch = searchQuery && noteMatchesSearch(note);
+              return (
+                <div 
+                  key={note.id}
+                  className={`${isMatch ? 'bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]' : ''} ${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                >
+                  <DraggableNoteItem
+                    note={note}
+                    depth={depth + 1}
+                    isSelected={note.id === selectedNoteId}
+                    isBlurred={blurredNotes.has(note.id)}
+                    onSelect={() => onNoteSelect(note.id, searchQuery)}
+                    onUpdate={onNoteUpdate}
+                    onDelete={onNoteDelete}
+                    onToggleBlur={() => toggleNoteBlur(note.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -295,19 +342,26 @@ export const Sidebar = ({
               {rootFolders.map(folder => renderFolder(folder, 0))}
 
               {/* Root notes (no folder) */}
-              {rootNotes.map(note => (
-                <DraggableNoteItem
-                  key={note.id}
-                  note={note}
-                  depth={0}
-                  isSelected={note.id === selectedNoteId}
-                  isBlurred={blurredNotes.has(note.id)}
-                  onSelect={() => onNoteSelect(note.id)}
-                  onUpdate={onNoteUpdate}
-                  onDelete={onNoteDelete}
-                  onToggleBlur={() => toggleNoteBlur(note.id)}
-                />
-              ))}
+              {rootNotes.map(note => {
+                const isMatch = searchQuery && noteMatchesSearch(note);
+                return (
+                  <div 
+                    key={note.id}
+                    className={`${isMatch ? 'bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]' : ''} ${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                  >
+                    <DraggableNoteItem
+                      note={note}
+                      depth={0}
+                      isSelected={note.id === selectedNoteId}
+                      isBlurred={blurredNotes.has(note.id)}
+                      onSelect={() => onNoteSelect(note.id, searchQuery)}
+                      onUpdate={onNoteUpdate}
+                      onDelete={onNoteDelete}
+                      onToggleBlur={() => toggleNoteBlur(note.id)}
+                    />
+                  </div>
+                );
+              })}
 
               {notes.length === 0 && folders.length === 0 && (
                 <div className="p-4 text-center text-[#888888] text-sm">

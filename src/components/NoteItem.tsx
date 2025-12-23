@@ -116,7 +116,7 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
       <div
         className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all border-l-2 ${
           isSelected
-            ? 'bg-[#1a1a1a] border-[#A0522D]'
+            ? 'bg-[#1a1a1a] border-transparent'
             : 'border-transparent hover:bg-[#252525]'
         } ${isBlurred ? 'note-faded' : ''}`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}

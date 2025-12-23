@@ -51,8 +51,6 @@ export const DraggableNoteItem = (props: DraggableNoteItemProps) => {
     transform: CSS.Transform.toString(transform),
     transition,
   };
-  
-  console.log('[DraggableNoteItem] RENDER, noteId:', props.note.id, 'isDragging:', isDragging);
 
   return (
     <div

@@ -109,9 +109,13 @@ export const useDashboardData = () => {
     }
   };
 
-  const handleNoteSelect = (noteId: string) => {
+  const handleNoteSelect = (noteId: string, searchQuery?: string) => {
     setSelectedNoteId(noteId);
-    setSearchParams({ note: noteId });
+    const params: Record<string, string> = { note: noteId };
+    if (searchQuery) {
+      params.search = searchQuery;
+    }
+    setSearchParams(params);
     
     // Add to open tabs if tabs are enabled
     if (tabsEnabled && notes) {

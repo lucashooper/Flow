@@ -26,8 +26,6 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.8 : 1,
-    scale: isDragging ? 0.98 : 1,
   };
 
   return (
@@ -36,14 +34,14 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
       style={style}
       {...attributes}
       {...listeners}
-      className={`group tab flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
+      className={`force-visible group tab flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
         isActive
           ? 'active bg-[#1a1a1a] text-[#e5e5e5]'
           : 'bg-[#151515] text-[#888888] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]'
       } ${isDragging ? 'z-50 shadow-lg' : ''}`}
       onClick={() => onTabClick(note.id)}
     >
-      <span className="text-sm truncate flex-1">{note.title || 'Untitled'}</span>
+      <span className="text-sm truncate flex-1 select-none">{note.title || 'Untitled'}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();

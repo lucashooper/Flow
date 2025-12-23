@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
 import { EditorWorkspace } from '../components/EditorWorkspace';
@@ -8,12 +9,19 @@ import { WelcomeModal } from '../components/WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
 import FloatingTimer from '../components/FloatingTimer';
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core';
+import type { Note } from '../types';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(false);
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') || '';
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [draggedItem, setDraggedItem] = useState<{ type: 'note' | 'tab'; note: Note } | null>(null);
+  
+  console.log('🔍 [NewDashboard] searchQuery from URL:', searchQuery);
   
   // Use shared dashboard data hook
   const {
@@ -61,6 +69,14 @@ export const NewDashboard = () => {
 
   const handleDragStart = (event: any) => {
     console.log('[NewDashboard] DRAG START:', event.active.id);
+    setActiveId(event.active.id);
+    
+    // Determine what's being dragged and store it
+    const data = event.active.data.current;
+    if (data?.type === 'note' || data?.type === 'tab') {
+      const note = data.type === 'note' ? data.note : data.note;
+      setDraggedItem({ type: data.type, note });
+    }
   };
 
   const handleDragEnd = (event: any) => {
@@ -167,10 +183,16 @@ export const NewDashboard = () => {
       
       console.log('🔍 [POST-DRAG COMPREHENSIVE DUMP] END');
     });
+    
+    // Clear drag state
+    setActiveId(null);
+    setDraggedItem(null);
   };
 
   const handleDragCancel = () => {
     console.log('[NewDashboard] DRAG CANCEL');
+    setActiveId(null);
+    setDraggedItem(null);
   };
 
   return (
@@ -186,6 +208,21 @@ export const NewDashboard = () => {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
+        {/* Drag Overlay - shows what's being dragged */}
+        <DragOverlay>
+          {activeId && draggedItem ? (
+            <div className="bg-[#1a1a1a] text-[#e5e5e5] px-3 py-2 rounded-md shadow-2xl border border-[#333] opacity-90 scale-95 cursor-grabbing">
+              <div className="flex items-center gap-2">
+                {draggedItem.note.emoji && (
+                  <span className="text-sm">{draggedItem.note.emoji}</span>
+                )}
+                <span className="text-sm font-medium truncate max-w-[200px]">
+                  {draggedItem.note.title || 'Untitled'}
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
       <div className={`flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`}>
       {/* Sidebar */}
       <Sidebar
@@ -225,6 +262,7 @@ export const NewDashboard = () => {
           <EditorWorkspace
             notes={notes || []}
             onNoteUpdate={handleNoteUpdate}
+            searchQuery={searchQuery}
           />
         </WorkspaceProvider>
       </div>

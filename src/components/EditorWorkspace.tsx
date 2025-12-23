@@ -14,6 +14,7 @@ import { X } from 'lucide-react';
 interface EditorWorkspaceProps {
   notes: Note[];
   onNoteUpdate: (noteId: string, updates: Partial<Note>) => void;
+  searchQuery?: string;
 }
 
 function useNoteById(notes: Note[], id: string | null): Note | undefined {
@@ -95,7 +96,7 @@ function regionFromXY(xy: {x:number;y:number}, el: HTMLElement): DropRegion {
   return 'center';
 }
 
-function PaneView({ node, notes, onNoteUpdate }: { node: PaneNode; notes: Note[]; onNoteUpdate: EditorWorkspaceProps['onNoteUpdate'] }) {
+function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; notes: Note[]; onNoteUpdate: EditorWorkspaceProps['onNoteUpdate']; searchQuery?: string }) {
   const { splitInto, replaceIn, closePane, setActiveLeafId } = useWorkspace();
 
   if (node.type === 'split') {
@@ -110,7 +111,7 @@ function PaneView({ node, notes, onNoteUpdate }: { node: PaneNode; notes: Note[]
               style={{ flex: `0 0 ${node.sizes[i] * 100}%` }}
               className="relative min-w-[120px] min-h-0 flex flex-col"
             >
-              <PaneView node={child} notes={notes} onNoteUpdate={onNoteUpdate} />
+              <PaneView node={child} notes={notes} onNoteUpdate={onNoteUpdate} searchQuery={searchQuery} />
             </div>
             {i < node.children.length - 1 && <Resizer split={node} index={i} />}
           </React.Fragment>
@@ -223,20 +224,42 @@ function PaneView({ node, notes, onNoteUpdate }: { node: PaneNode; notes: Note[]
         <X className="w-3.5 h-3.5 text-[#666666] hover:text-[#e5e5e5]" />
       </button>
 
-      {/* Drop indicators */}
+      {/* Drop indicators - enhanced visibility */}
       {isOver && over && (
         <div className="absolute inset-0 pointer-events-none z-20">
-          {over === 'left' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[color:var(--divider)]" />}
-          {over === 'right' && <div className="absolute right-0 top-0 bottom-0 w-1 bg-[color:var(--divider)]" />}
-          {over === 'top' && <div className="absolute left-0 right-0 top-0 h-1 bg-[color:var(--divider)]" />}
-          {over === 'bottom' && <div className="absolute left-0 right-0 bottom-0 h-1 bg-[color:var(--divider)]" />}
-          {over === 'center' && <div className="absolute inset-2 rounded border border-[color:var(--divider)]" />}
+          {over === 'left' && (
+            <>
+              <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-[#ff7a18]/10 border-r-2 border-[#ff7a18]" />
+              <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#ff7a18]" />
+            </>
+          )}
+          {over === 'right' && (
+            <>
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]" />
+              <div className="absolute right-0 top-0 bottom-0 w-2 bg-[#ff7a18]" />
+            </>
+          )}
+          {over === 'top' && (
+            <>
+              <div className="absolute left-0 right-0 top-0 h-1/2 bg-[#ff7a18]/10 border-b-2 border-[#ff7a18]" />
+              <div className="absolute left-0 right-0 top-0 h-2 bg-[#ff7a18]" />
+            </>
+          )}
+          {over === 'bottom' && (
+            <>
+              <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-[#ff7a18]/10 border-t-2 border-[#ff7a18]" />
+              <div className="absolute left-0 right-0 bottom-0 h-2 bg-[#ff7a18]" />
+            </>
+          )}
+          {over === 'center' && (
+            <div className="absolute inset-2 rounded bg-[#ff7a18]/10 border-2 border-[#ff7a18] border-dashed" />
+          )}
         </div>
       )}
 
       {/* Editor */}
       {note ? (
-        <EditorPanel note={note} onNoteUpdate={onNoteUpdate} />
+        <EditorPanel note={note} onNoteUpdate={onNoteUpdate} searchQuery={searchQuery} />
       ) : (
         <div className="h-full w-full flex items-center justify-center text-[color:var(--muted)]">Drop a note here</div>
       )}
@@ -244,11 +267,11 @@ function PaneView({ node, notes, onNoteUpdate }: { node: PaneNode; notes: Note[]
   );
 }
 
-export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({ notes, onNoteUpdate }) => {
+export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({ notes, onNoteUpdate, searchQuery }) => {
   const { root } = useWorkspace();
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <PaneView node={root} notes={notes} onNoteUpdate={onNoteUpdate} />
+    <div className="flex-1 min-h-0 h-full w-full">
+      <PaneView node={root} notes={notes} onNoteUpdate={onNoteUpdate} searchQuery={searchQuery} />
     </div>
   );
 };
