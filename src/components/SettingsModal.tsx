@@ -18,8 +18,25 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'default');
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
   const [tabsEnabled, setTabsEnabled] = useState(() => {
     const saved = localStorage.getItem('tabsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [focusModeEnabled, setFocusModeEnabled] = useState(() => {
+    const saved = localStorage.getItem('focusModeEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [pomodoroEnabled, setPomodoroEnabled] = useState(() => {
+    const saved = localStorage.getItem('pomodoroEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [wordCountEnabled, setWordCountEnabled] = useState(() => {
+    const saved = localStorage.getItem('wordCountEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [drawingModeEnabled, setDrawingModeEnabled] = useState(() => {
+    const saved = localStorage.getItem('drawingModeEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
@@ -223,8 +240,37 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Appearance</h2>
                 
                 <div className="space-y-6">
+                  {/* Theme Mode Selector */}
                   <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Theme</label>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Theme Mode</label>
+                    <select
+                      value={themeMode}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setThemeMode(value);
+                        localStorage.setItem('themeMode', value);
+                        // TODO: Implement light mode and system adaptation
+                        if (value === 'light') {
+                          alert('Light mode coming soon!');
+                        } else if (value === 'system') {
+                          alert('System adaptation coming soon!');
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors mb-6"
+                      style={{
+                        backgroundColor: 'var(--bg-elev)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                      <option value="system">Adapt to System</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Color Theme</label>
                     <select
                       value={theme}
                       onChange={(e) => {
@@ -426,6 +472,40 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     {loading ? 'Saving...' : 'Save'}
                   </button>
                 </form>
+
+                {/* Account Actions */}
+                <div className="mt-8 pt-8 border-t space-y-4" style={{ borderColor: 'var(--divider)' }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await signOut();
+                        window.location.href = '/login';
+                      } catch (error) {
+                        console.error('Logout error:', error);
+                      }
+                    }}
+                    className="w-full bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
+                  >
+                    Logout
+                  </button>
+
+                  <div className="pt-4">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
+                      <AlertTriangle className="w-5 h-5 text-red-400" />
+                      Danger Zone
+                    </h3>
+                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                      Once you delete your account, there is no going back. All your notes and data will be permanently deleted.
+                    </p>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -453,12 +533,93 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   <div>
                     <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text)' }}>Core Plugins</h3>
                     <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                      Essential plugins built and maintained by the Flow team.
+                      Essential plugins built and maintained by the Flow team. Toggle them on/off to customize your toolbar.
                     </p>
-                    <div className="p-6 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>
-                        Core plugins coming in future updates
-                      </p>
+                    
+                    <div className="space-y-3">
+                      {/* Focus Mode Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Focus Mode</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Minimize distractions by dimming the sidebar and inactive tabs
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !focusModeEnabled;
+                            setFocusModeEnabled(newValue);
+                            localStorage.setItem('focusModeEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: focusModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Pomodoro Timer Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Pomodoro Timer</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Built-in timer for the Pomodoro Technique productivity method
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !pomodoroEnabled;
+                            setPomodoroEnabled(newValue);
+                            localStorage.setItem('pomodoroEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: pomodoroEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: pomodoroEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Word Count Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Word Count</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Display word and character count for your notes
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !wordCountEnabled;
+                            setWordCountEnabled(newValue);
+                            localStorage.setItem('wordCountEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: wordCountEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: wordCountEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Drawing Mode Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Drawing Mode</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Sketch and draw directly in your notes with canvas tools
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !drawingModeEnabled;
+                            setDrawingModeEnabled(newValue);
+                            localStorage.setItem('drawingModeEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: drawingModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: drawingModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -521,39 +682,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           transform: tabsEnabled ? 'translateX(24px)' : 'translateX(4px)',
                         }}
                       />
-                    </button>
-                  </div>
-
-                  <div className="pt-8 mt-8 border-t" style={{ borderColor: 'var(--divider)' }}>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await signOut();
-                          window.location.href = '/login';
-                        } catch (error) {
-                          console.error('Logout error:', error);
-                        }
-                      }}
-                      className="w-full bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
-                    >
-                      Logout
-                    </button>
-                  </div>
-
-                  <div className="pt-8 mt-8 border-t" style={{ borderColor: 'var(--divider)' }}>
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                      <AlertTriangle className="w-5 h-5 text-red-400" />
-                      Danger Zone
-                    </h3>
-                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                      Once you delete your account, there is no going back. All your notes and data will be permanently deleted.
-                    </p>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Account
                     </button>
                   </div>
                 </div>

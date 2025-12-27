@@ -156,14 +156,14 @@ html.theme-default {
 }
 
 html.theme-crimson {
-  --accent: #dc143c;
-  --bg-editor: #121011;
-  --bg-panel: #0f0d0e;
-  --bg-elev: #191214;
-  --border: #3a2226;
-  --divider: rgba(220,20,60,0.12);
-  --text: #f0eaea;
-  --muted: #b89a9f;
+  --accent: #ff4757;
+  --bg-editor: #1a0f11;
+  --bg-panel: #150c0e;
+  --bg-elev: #2a1418;
+  --border: #4a2228;
+  --divider: rgba(255,71,87,0.15);
+  --text: #ffeef0;
+  --muted: #d4a4aa;
 }
 
 html.theme-modern-gray {

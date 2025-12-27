@@ -31,64 +31,72 @@ export const Login = () => {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none"
-      style={{ backgroundColor: '#0d0d0d', cursor: 'default' }}
+      style={{ 
+        background: 'linear-gradient(135deg, #0a1628 0%, #0d1b2a 50%, #1b2838 100%)',
+        cursor: 'default' 
+      }}
     >
-      {/* Warm ambient glow - subtle and premium */}
+      {/* Flowing water effect with depth */}
       <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] pointer-events-none"
+        className="absolute inset-0 opacity-30 pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 40%, #ff9a3c 60%, transparent 80%)'
+          background: `
+            radial-gradient(ellipse at 20% 30%, rgba(79, 195, 247, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 70%, rgba(79, 195, 247, 0.1) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, rgba(79, 195, 247, 0.08) 0%, transparent 60%)
+          `
         }}
       />
 
-      {/* Noise texture overlay */}
+      {/* Subtle grain texture */}
       <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute inset-0 opacity-[0.015] pointer-events-none"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
         }}
       />
+
+      {/* Wave pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 30, 50 50 T 100 50' stroke='%234fc3f7' fill='none' stroke-width='0.5'/%3E%3C/svg%3E")`,
+          backgroundSize: '200px 100px'
+        }}
+      />
       
-      {/* Premium card with depth */}
+      {/* Clean card without box */}
       <div className="w-full max-w-md relative z-10 animate-cardFadeIn">
+        {/* Flow Logo - larger, no box */}
+        <div className="flex flex-col items-center mb-12 select-none" style={{ cursor: 'default' }}>
+          <img 
+            src="/FlowIcon-Main.png" 
+            alt="Flow" 
+            className="w-32 h-32 mb-6 select-none"
+            style={{
+              filter: 'drop-shadow(0 8px 32px rgba(79, 195, 247, 0.3))',
+              cursor: 'default',
+              userSelect: 'none'
+            }}
+            draggable={false}
+          />
+          <h1 className="text-4xl font-light mb-3" style={{ color: '#e3f2fd', letterSpacing: '-0.02em' }}>
+            Sign in to Flow
+          </h1>
+          <p className="text-base" style={{ color: '#90a4ae' }}>
+            Welcome back to your notes
+          </p>
+        </div>
+
         <div 
-          className="rounded-2xl p-10 shadow-2xl"
+          className="rounded-2xl p-8 shadow-2xl"
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'rgba(13, 27, 42, 0.6)',
+            border: '1px solid rgba(79, 195, 247, 0.15)',
             backdropFilter: 'blur(20px)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1) inset',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 1px rgba(79, 195, 247, 0.2) inset',
           }}
         >
-          {/* Flow Logo and Branding */}
-          <div className="flex flex-col items-center mb-8 select-none" style={{ cursor: 'default' }}>
-            <div className="relative mb-6">
-              {/* Warm glow behind logo */}
-              <div 
-                className="absolute inset-0 rounded-3xl blur-xl opacity-40"
-                style={{
-                  background: 'radial-gradient(circle, rgba(255, 122, 24, 0.4) 0%, rgba(255, 179, 71, 0.2) 50%, transparent 70%)'
-                }}
-              />
-              <img 
-                src="/FlowIcon-Main.png" 
-                alt="Flow" 
-                className="w-20 h-20 rounded-3xl select-none relative"
-                style={{
-                  boxShadow: '0 0 40px rgba(255, 122, 24, 0.25), 0 4px 20px rgba(0, 0, 0, 0.4)',
-                  cursor: 'default',
-                  userSelect: 'none'
-                }}
-                draggable={false}
-              />
-            </div>
-            <h1 className="text-3xl font-bold mb-2" style={{ color: '#e5e5e5' }}>
-              Sign in to Flow
-            </h1>
-            <p className="text-sm" style={{ color: '#888888' }}>
-              Welcome back to your notes
-            </p>
-          </div>
 
           {error && (
             <div 
@@ -122,20 +130,20 @@ export const Login = () => {
             disabled={loading}
             className="w-full mt-6 py-4 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: 'linear-gradient(90deg, #ff7a18, #ffb347)',
-              boxShadow: '0 10px 30px rgba(255, 122, 24, 0.3)'
+              background: 'linear-gradient(90deg, #4fc3f7, #29b6f6)',
+              boxShadow: '0 10px 30px rgba(79, 195, 247, 0.3)'
             }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-          <p className="mt-6 text-center" style={{ color: '#888888' }}>
+          <p className="mt-6 text-center" style={{ color: '#90a4ae' }}>
             Don't have an account?{' '}
             <Link 
               to="/signup" 
               className="hover:underline transition-colors"
-              style={{ color: '#ff7a18' }}
+              style={{ color: '#4fc3f7' }}
             >
               Sign up
             </Link>

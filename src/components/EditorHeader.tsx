@@ -27,6 +27,17 @@ export const EditorHeader = ({
 }: EditorHeaderProps) => {
   const [activeId] = useState<string | null>(null);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
+  
+  // Check plugin states from localStorage
+  const focusModeEnabled = (() => {
+    const saved = localStorage.getItem('focusModeEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
+  
+  const pomodoroEnabled = (() => {
+    const saved = localStorage.getItem('pomodoroEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
 
   const activeNote = openNotes.find(note => note.id === activeId);
   return (
@@ -70,32 +81,36 @@ export const EditorHeader = ({
             <Pencil className="w-4 h-4" />
           </button>
 
-          {/* Focus Mode toggle */}
-          <button
-            onClick={toggleFocusMode}
-            className="nav-item focus-toggle p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
-            title="Toggle Focus Mode"
-          >
-            <Minimize2 className={`w-4 h-4 ${isFocusMode ? 'text-[#e5e5e5]' : ''}`} />
-          </button>
+          {/* Focus Mode toggle - only show if enabled */}
+          {focusModeEnabled && (
+            <button
+              onClick={toggleFocusMode}
+              className="nav-item focus-toggle p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
+              title="Toggle Focus Mode"
+            >
+              <Minimize2 className={`w-4 h-4 ${isFocusMode ? 'text-[#e5e5e5]' : ''}`} />
+            </button>
+          )}
 
-          {/* Floating Focus Timer toggle */}
-          <button
-            type="button"
-            onClick={() => setIsTimerVisible(!isTimerVisible)}
-            title={isTimerVisible ? 'Hide timer' : 'Show timer'}
-            className={
-              'nav-item p-1.5 rounded hover:bg-[#222222] transition-colors ' +
-              (isTimerVisible ? 'text-[#e5e5e5]' : 'text-[#888888] hover:text-[#e5e5e5]')
-            }
-          >
-            <Timer
-              className="w-4 h-4"
-              style={{
-                filter: isTimerVisible ? 'drop-shadow(0 0 6px rgba(168,85,247,0.65))' : 'none',
-              }}
-            />
-          </button>
+          {/* Floating Focus Timer toggle - only show if enabled */}
+          {pomodoroEnabled && (
+            <button
+              type="button"
+              onClick={() => setIsTimerVisible(!isTimerVisible)}
+              title={isTimerVisible ? 'Hide timer' : 'Show timer'}
+              className={
+                'nav-item p-1.5 rounded hover:bg-[#222222] transition-colors ' +
+                (isTimerVisible ? 'text-[#e5e5e5]' : 'text-[#888888] hover:text-[#e5e5e5]')
+              }
+            >
+              <Timer
+                className="w-4 h-4"
+                style={{
+                  filter: isTimerVisible ? 'drop-shadow(0 0 6px rgba(168,85,247,0.65))' : 'none',
+                }}
+              />
+            </button>
+          )}
         </div>
       </div>
 

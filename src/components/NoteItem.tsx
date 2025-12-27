@@ -114,14 +114,24 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   return (
     <>
       <div
-        className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all border-l-2 ${
-          isSelected
-            ? 'bg-[#1a1a1a]'
-            : 'border-transparent hover:bg-[#252525]'
-        } ${isBlurred ? 'note-faded' : ''}`}
+        className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all ${
+          isBlurred ? 'note-faded' : ''
+        }`}
         style={{
-          ...{ paddingLeft: `${depth * 16 + 8}px` },
-          ...(isSelected ? { borderLeftColor: 'var(--accent)' } : {})
+          paddingLeft: `${depth * 16 + 8}px`,
+          backgroundColor: isSelected ? 'var(--bg-elev)' : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = 'var(--bg-elev)';
+            e.currentTarget.style.opacity = '0.6';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.opacity = '1';
+          }
         }}
         onClick={onSelect}
         onContextMenu={handleContextMenu}
@@ -166,17 +176,17 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
-                  <div className="text-sm text-[#e5e5e5] truncate font-medium" data-debug="title">
+                  <div className="text-sm truncate font-medium" style={{ color: 'var(--text)' }} data-debug="title">
                     {note.title}
                   </div>
                   {(note.is_starred ?? false) && (
                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
                   )}
                 </div>
-                <div className="text-xs text-[#888888] truncate" data-debug="preview">
+                <div className="text-xs truncate" style={{ color: 'var(--muted)' }} data-debug="preview">
                   {contentPreview}
                 </div>
-                <div className="text-xs text-[#666666] mt-0.5" data-debug="timestamp">
+                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)', opacity: 0.7 }} data-debug="timestamp">
                   {formatDistanceToNow(note.updated_at)}
                 </div>
               </>
