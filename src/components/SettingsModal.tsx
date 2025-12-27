@@ -237,8 +237,9 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         console.log('📋 [Settings] Current root classes:', Array.from(root.classList));
                         console.log('🏷️ [Settings] Root element tag:', root.tagName);
                         
+                        // Remove ALL classes that might interfere
                         Array.from(root.classList).forEach((cls) => {
-                          if (cls.startsWith('theme-')) {
+                          if (cls.startsWith('theme-') || ['light', 'dark', 'default', 'crimson', 'coffee', 'modern-gray'].includes(cls)) {
                             console.log('🗑️ [Settings] Removing class:', cls);
                             root.classList.remove(cls);
                           }
@@ -252,6 +253,30 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         // Check if CSS rule exists
                         const testSelector = `html.${newClass}`;
                         console.log('🔍 [Settings] Looking for selector:', testSelector);
+                        
+                        // Check all stylesheets for theme rules
+                        let foundRule = false;
+                        try {
+                          Array.from(document.styleSheets).forEach((sheet) => {
+                            try {
+                              Array.from(sheet.cssRules || []).forEach((rule) => {
+                                if (rule instanceof CSSStyleRule && rule.selectorText?.includes(newClass)) {
+                                  console.log('✅ [Settings] Found CSS rule:', rule.selectorText);
+                                  console.log('📜 [Settings] Rule text:', rule.cssText.substring(0, 200));
+                                  foundRule = true;
+                                }
+                              });
+                            } catch (e) {
+                              // CORS error for external stylesheets
+                            }
+                          });
+                        } catch (e) {
+                          console.error('❌ [Settings] Error checking stylesheets:', e);
+                        }
+                        
+                        if (!foundRule) {
+                          console.error('❌ [Settings] No CSS rule found for:', testSelector);
+                        }
                         
                         // Force style recalculation
                         setTimeout(() => {
