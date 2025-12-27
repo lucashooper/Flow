@@ -20,23 +20,26 @@
     scrollbar-width: none;  /* Firefox */
   }
 
-  /* Consistent custom scrollbar styling */
+  /* Consistent custom scrollbar styling - thin, minimal, professional */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08);
-    border-radius: 8px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 3px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.22);
+  }
+  .custom-scrollbar::-webkit-scrollbar-button {
+    display: none;
   }
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.18) transparent;
+    scrollbar-color: rgba(255,255,255,0.22) transparent;
   }
 
   /* Force opacity for draggable items - override dnd-kit inline styles */
@@ -44,11 +47,11 @@
     opacity: 1 !important;
   }
 
-  /* Editor base background (title + body) - same in all modes */
+  /* Editor base background - uses theme variable */
   .editor-root,
   .editor-header,
   .editor-content {
-    background-color: #0a0a0a;
+    background-color: var(--bg-editor);
   }
 
   /* Dark, subtle scrollbar for editor content (matches sidebar style) */
@@ -128,21 +131,11 @@
   }
 
   /* Theme variables and themes */
-  :root {
-    --accent: #a0522d; /* default accent */
-    --bg-editor: #141414; /* brightest surface */
-    --bg-panel: #0f0f0f;  /* slightly darker than editor */
-    --bg-elev: #151515;
-    --border: #2a2a2a;
-    --divider: rgba(255,255,255,0.06); /* subtle divider for calmer hierarchy */
-    --text: #e5e5e5;
-    --muted: #888888;
-  }
-
-  .theme-default {
+  :root,
+  html {
     --accent: #a0522d;
-    --bg-editor: #141414; /* brightest */
-    --bg-panel: #0f0f0f;  /* slightly darker */
+    --bg-editor: #141414;
+    --bg-panel: #0f0f0f;
     --bg-elev: #151515;
     --border: #2a2a2a;
     --divider: rgba(255,255,255,0.06);
@@ -150,10 +143,21 @@
     --muted: #888888;
   }
 
-  .theme-crimson {
+  html.theme-default {
+    --accent: #a0522d;
+    --bg-editor: #141414;
+    --bg-panel: #0f0f0f;
+    --bg-elev: #151515;
+    --border: #2a2a2a;
+    --divider: rgba(255,255,255,0.06);
+    --text: #e5e5e5;
+    --muted: #888888;
+  }
+
+  html.theme-crimson {
     --accent: #dc143c;
-    --bg-editor: #121011; /* brighter editor */
-    --bg-panel: #0f0d0e;  /* slightly darker panel */
+    --bg-editor: #121011;
+    --bg-panel: #0f0d0e;
     --bg-elev: #191214;
     --border: #3a2226;
     --divider: rgba(220,20,60,0.12);
@@ -161,37 +165,41 @@
     --muted: #b89a9f;
   }
 
-  .theme-modern-gray {
+  html.theme-modern-gray {
     --accent: #7aa2ff;
-    --bg-editor: #15181b;  /* brightest */
-    --bg-panel:  #121416;  /* slightly darker */
-    --bg-elev:   #1e2226;  /* popovers/cards */
-    --border:    #30353a;
-    --divider:   rgba(255,255,255,0.07);
-    --text:      #e6e9ec;
-    --muted:     #9aa3ab;
+    --bg-editor: #15181b;
+    --bg-panel: #121416;
+    --bg-elev: #1e2226;
+    --border: #30353a;
+    --divider: rgba(255,255,255,0.07);
+    --text: #e6e9ec;
+    --muted: #9aa3ab;
   }
 
-  .theme-coffee {
-    --accent: #c08a4d;      /* warm coffee */
-    --bg-editor: #20170f;   /* brightest */
-    --bg-panel:  #1b130d;   /* slightly darker */
-    --bg-elev:   #2a1c12;   /* popovers/cards */
-    --border:    #4a3426;
-    --divider:   rgba(192,138,77,0.16);
-    --text:      #efe6dc;
-    --muted:     #b9a99a;
+  html.theme-coffee {
+    --accent: #d4a574;
+    --bg-editor: #1a1410;
+    --bg-panel: #120e0a;
+    --bg-elev: #221a14;
+    --border: #3a2f26;
+    --divider: rgba(212,165,116,0.12);
+    --text: #e8dfd5;
+    --muted: #a89888;
   }
 
   /* Apply variables to key surfaces */
-  .top-nav, .sidebar { background-color: var(--bg-panel); color: var(--text); }
-  .top-nav, .sidebar { border-color: var(--divider); }
-  .editor-root, .editor-header, .editor-content { background-color: var(--bg-editor); color: var(--text); }
-  .panel, .card { background-color: var(--bg-elev); color: var(--text); border-color: var(--border); }
-  .btn-accent { background-color: var(--accent); color: #fff; }
-  .text-accent { color: var(--accent); }
-  .border-theme { border-color: var(--border); }
-  .border-subtle { border-color: var(--divider); }
+  body { background-color: var(--bg-panel) !important; }
+  .top-nav, .sidebar { background-color: var(--bg-panel) !important; color: var(--text) !important; }
+  .top-nav, .sidebar { border-color: var(--divider) !important; }
+  .editor-root, .editor-header, .editor-content, .editor-background { background-color: var(--bg-editor) !important; color: var(--text) !important; }
+  .panel, .card { background-color: var(--bg-elev) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .btn-accent { background-color: var(--accent) !important; color: #fff !important; }
+  .text-accent { color: var(--accent) !important; }
+  .border-theme { border-color: var(--border) !important; }
+  .border-subtle { border-color: var(--divider) !important; }
+  
+  /* Active tab uses theme background */
+  .tab.active { background-color: var(--bg-editor); }
   
   /* Make headings/links reflect accent subtly */
   .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { color: var(--text); }

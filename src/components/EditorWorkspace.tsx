@@ -74,13 +74,11 @@ function Resizer({ split, index }: { split: PaneSplit; index: number }) {
       onPointerDown={onPointerDown}
       className={
         split.direction === 'vertical'
-          ? 'w-[8px] cursor-col-resize hover:bg-[rgba(255,255,255,0.03)] transition-colors relative flex items-center justify-center'
-          : 'h-[8px] cursor-row-resize hover:bg-[rgba(255,255,255,0.03)] transition-colors relative flex items-center justify-center'
+          ? 'w-[1px] cursor-col-resize hover:bg-[rgba(255,255,255,0.08)] transition-colors relative'
+          : 'h-[1px] cursor-row-resize hover:bg-[rgba(255,255,255,0.08)] transition-colors relative'
       }
-      style={{ flexShrink: 0, zIndex: 100, pointerEvents: 'auto', backgroundColor: 'transparent' }}
-    >
-      <div className={split.direction === 'vertical' ? 'w-[1px] h-full bg-[var(--divider)]' : 'h-[1px] w-full bg-[var(--divider)]'} />
-    </div>
+      style={{ flexShrink: 0, zIndex: 100, pointerEvents: 'auto', backgroundColor: 'var(--divider)' }}
+    />
   );
 }
 
@@ -103,7 +101,6 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
     return (
       <div
         className={`flex ${node.direction === 'vertical' ? 'flex-row' : 'flex-col'} h-full w-full min-h-0`}
-        style={{ gap: '0px' }}
       >
         {node.children.map((child, i) => (
           <React.Fragment key={child.id}>
@@ -227,12 +224,12 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
       ref={(el) => { ref.current = el; setNodeRef(el as HTMLElement | null); }}
       onClick={onFocusPane}
       onFocusCapture={onFocusPane}
-      className={`h-full w-full min-h-0 editor-root relative flex flex-col overflow-hidden ring-1 ring-[var(--divider)]`}
+      className={`h-full w-full min-h-0 editor-root relative flex flex-col ring-1 ring-[var(--divider)]`}
     >
       {/* Close button */}
       <button
         onClick={() => closePane(leaf.id)}
-        className="absolute top-2 right-2 opacity-0 hover:opacity-100 transition-opacity text-xs p-1.5 rounded hover:bg-[color:var(--bg-panel)]/40"
+        className="absolute top-2 right-2 opacity-0 hover:opacity-100 transition-opacity text-xs p-1.5 rounded hover:bg-[color:var(--bg-panel)]/40 z-30"
         title="Close pane"
       >
         <X className="w-3.5 h-3.5 text-[#666666] hover:text-[#e5e5e5]" />
@@ -271,11 +268,11 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
         </div>
       )}
 
-      {/* Editor */}
+      {/* Editor - direct scroll container at pane level */}
       {note ? (
         <EditorPanel note={note} onNoteUpdate={onNoteUpdate} searchQuery={searchQuery} />
       ) : (
-        <div className="h-full w-full flex items-center justify-center text-[color:var(--muted)]">Drop a note here</div>
+        <div className="flex-1 min-h-0 flex items-center justify-center text-[color:var(--muted)]">Drop a note here</div>
       )}
     </div>
   );

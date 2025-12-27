@@ -6,6 +6,7 @@ import { EditorWorkspace } from '../components/EditorWorkspace';
 import { EditorHeader } from '../components/EditorHeader';
 import { FocusModeContext } from '../contexts/FocusModeContext';
 import { WelcomeModal } from '../components/WelcomeModal';
+import { SettingsModal } from '../components/SettingsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
 import FloatingTimer from '../components/FloatingTimer';
@@ -16,12 +17,23 @@ export const NewDashboard = () => {
   const { user } = useAuth();
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedItem, setDraggedItem] = useState<{ type: 'note' | 'tab'; note: Note } | null>(null);
   
   console.log('🔍 [NewDashboard] searchQuery from URL:', searchQuery);
+
+  // Listen for openSettings event from DashboardSwitcher
+  useEffect(() => {
+    const handleOpenSettings = () => {
+      console.log('⚙️ Opening settings modal');
+      setIsSettingsOpen(true);
+    };
+    window.addEventListener('openSettings', handleOpenSettings);
+    return () => window.removeEventListener('openSettings', handleOpenSettings);
+  }, []);
   
   // Use shared dashboard data hook
   const {
@@ -238,7 +250,7 @@ export const NewDashboard = () => {
             </div>
           ) : null}
         </DragOverlay>
-      <div className={`flex h-screen bg-[#0a0a0a] text-[#e5e5e5] overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`}>
+      <div className={`flex h-screen overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`} style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}>
       {/* Sidebar */}
       <Sidebar
         notes={notes || []}
@@ -289,6 +301,12 @@ export const NewDashboard = () => {
     <FloatingTimer
       isVisible={isTimerVisible}
       onClose={() => setIsTimerVisible(false)}
+    />
+
+    {/* Settings Modal Overlay */}
+    <SettingsModal
+      isOpen={isSettingsOpen}
+      onClose={() => setIsSettingsOpen(false)}
     />
     </>
   );

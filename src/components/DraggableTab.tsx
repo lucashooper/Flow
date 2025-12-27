@@ -26,6 +26,10 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    borderBottom: isActive ? 'none' : '1px solid #1a1a1a',
+    marginBottom: isActive ? '-1px' : '0',
+    zIndex: isActive ? 10 : 1,
+    borderRadius: isActive ? '8px 8px 0 0' : '6px 6px 0 0',
   };
 
   return (
@@ -34,10 +38,10 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
       style={style}
       {...attributes}
       {...listeners}
-      className={`force-visible group tab flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
+      className={`force-visible group tab flex items-center gap-2 px-3 py-2 transition-all cursor-pointer min-w-[120px] max-w-[200px] ${
         isActive
-          ? 'active bg-[#1a1a1a] text-[#e5e5e5]'
-          : 'bg-[#151515] text-[#888888] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]'
+          ? 'active text-[#e5e5e5]'
+          : 'text-[#888888] hover:bg-[#151515] hover:text-[#e5e5e5] border-r border-[#1a1a1a]'
       } ${isDragging ? 'z-50 shadow-lg' : ''}`}
       onClick={() => onTabClick(note.id)}
     >

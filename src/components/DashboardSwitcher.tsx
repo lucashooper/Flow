@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronUp, Plus, Trash2, Image, Edit2, Settings as SettingsIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
+import { ChevronUp, Plus, Settings as SettingsIcon, Trash2, Edit2, Image } from 'lucide-react';
 import type { Dashboard } from '../types';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 interface DashboardSwitcherProps {
   dashboards: Dashboard[];
@@ -34,7 +32,6 @@ export const DashboardSwitcher = ({
   const [editEmoji, setEditEmoji] = useState('');
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const { user } = useAuth();
-  const navigate = useNavigate();
   const switcherRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
@@ -96,10 +93,6 @@ export const DashboardSwitcher = ({
     }
   };
 
-  const handleEmojiSelect = (emojiData: EmojiClickData) => {
-    setNewDashboardEmoji(emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
 
   const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -219,7 +212,7 @@ export const DashboardSwitcher = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            navigate('/settings');
+            window.dispatchEvent(new Event('openSettings'));
           }}
           className="p-1.5 rounded hover:bg-[#1f1f1f] text-[#888888] hover:text-[#e5e5e5] transition-colors flex-shrink-0"
           title="Settings"
@@ -316,26 +309,13 @@ export const DashboardSwitcher = ({
                   )}
                   
                   <div className="flex items-center gap-2">
-                    <div className="relative">
-                      {showEmojiPicker && (
-                        <div className="absolute bottom-full left-0 mb-2 z-50">
-                          <EmojiPicker
-                            onEmojiClick={handleEmojiSelect}
-                            width={450}
-                            height={550}
-                            searchPlaceHolder="Search emojis..."
-                            previewConfig={{ showPreview: false }}
-                          />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-2xl hover:bg-[#1a1a1a] transition-colors"
-                      >
-                        {newDashboardEmoji}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-2xl hover:bg-[#1a1a1a] transition-colors"
+                    >
+                      {newDashboardEmoji}
+                    </button>
                     
                     {/* Cover Photo Upload Button */}
                     <div className="relative">
@@ -496,18 +476,6 @@ export const DashboardSwitcher = ({
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    {showEditEmojiPicker && (
-                      <div className="absolute bottom-full left-0 mb-2 z-50">
-                        <EmojiPicker
-                          onEmojiClick={(emojiData) => {
-                            setEditEmoji(emojiData.emoji);
-                            setShowEditEmojiPicker(false);
-                          }}
-                          width={350}
-                          height={400}
-                        />
-                      </div>
-                    )}
                     <button
                       type="button"
                       onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}

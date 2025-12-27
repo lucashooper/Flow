@@ -31,12 +31,12 @@ export const EditorHeader = ({
   const activeNote = openNotes.find(note => note.id === activeId);
   return (
     <>
-      <div className="tabs top-nav border-b border-subtle px-3 py-1.5 flex items-center gap-3">
+      <div className="tabs top-nav border-b border-subtle px-3 flex items-center">
 
-        {/* Tabs area */}
+        {/* Tabs area - flush contiguous tabs like Chrome/Obsidian */}
         {tabsEnabled && openNotes.length > 0 && (
           <SortableContext items={openNotes.map(n => n.id)} strategy={horizontalListSortingStrategy}>
-            <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
+            <div className="flex items-end flex-1 overflow-x-auto scrollbar-hide">
               {openNotes.map((note) => (
                 <DraggableTab
                   key={note.id}

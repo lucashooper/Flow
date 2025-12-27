@@ -9,6 +9,10 @@ interface FloatingTimerProps {
 export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    const saved = localStorage.getItem('timerExpanded');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
 
   useEffect(() => {
     if (!isRunning) return;
@@ -35,10 +39,16 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
   const strokeDasharray = 100;
   const strokeDashoffset = strokeDasharray * (1 - progress);
 
+  const toggleExpanded = () => {
+    const newValue = !isExpanded;
+    setIsExpanded(newValue);
+    localStorage.setItem('timerExpanded', JSON.stringify(newValue));
+  };
+
   return (
     <div className="fixed bottom-6 right-6 z-[9999]">
       <div
-        className="relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-white shadow-2xl"
+        className="relative flex items-center gap-3 rounded-2xl text-sm text-white shadow-2xl cursor-pointer transition-all"
         style={{
           backdropFilter: 'blur(16px)',
           background:
@@ -46,10 +56,12 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
           border: '1px solid rgba(248, 250, 252, 0.12)',
           boxShadow:
             '0 18px 45px rgba(0,0,0,0.85), 0 0 0 1px rgba(248,250,252,0.04)',
+          padding: isExpanded ? '12px 16px' : '8px 12px',
         }}
+        onClick={toggleExpanded}
       >
         {/* Circular progress */}
-        <div className="relative w-10 h-10 flex items-center justify-center">
+        <div className="relative w-10 h-10 flex items-center justify-center flex-shrink-0">
           <svg
             className="w-10 h-10 -rotate-90"
             viewBox="0 0 36 36"
@@ -90,42 +102,51 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
         </div>
 
         {/* Time + controls */}
-        <div className="flex flex-col min-w-[120px]">
+        <div className="flex flex-col" style={{ minWidth: isExpanded ? '120px' : 'auto' }}>
           <div className="flex items-baseline gap-1 leading-none">
             <span className="font-mono text-lg tracking-tight">
               {minutes}:{seconds}
             </span>
-            <span className="text-[10px] uppercase text-gray-400">
-              Focus
-            </span>
+            {isExpanded && (
+              <span className="text-[10px] uppercase text-gray-400">
+                Focus
+              </span>
+            )}
           </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <button
-              className="px-2.5 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-[11px] font-semibold text-black shadow-md hover:brightness-110 active:scale-[0.97] transition"
-              onClick={() => setIsRunning(!isRunning)}
-            >
-              {isRunning ? 'Pause' : 'Start'}
-            </button>
-            <button
-              className="px-2.5 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
-              onClick={() => {
-                setSecondsLeft(25 * 60);
-                setIsRunning(false);
-              }}
-            >
-              Reset
-            </button>
-            <button
-              className="ml-0.5 px-1.5 py-1 rounded-full text-[11px] text-gray-400 hover:text-gray-100 hover:bg-white/5 active:scale-[0.97] transition"
-              onClick={() => {
-                setIsRunning(false);
-                onClose();
-              }}
-              aria-label="Close timer"
-            >
-              ×
-            </button>
-          </div>
+          {isExpanded && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <button
+                className="px-2.5 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-[11px] font-semibold text-black shadow-md hover:brightness-110 active:scale-[0.97] transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRunning(!isRunning);
+                }}
+              >
+                {isRunning ? 'Pause' : 'Start'}
+              </button>
+              <button
+                className="px-2.5 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSecondsLeft(25 * 60);
+                  setIsRunning(false);
+                }}
+              >
+                Reset
+              </button>
+              <button
+                className="ml-0.5 px-1.5 py-1 rounded-full text-[11px] text-gray-400 hover:text-gray-100 hover:bg-white/5 active:scale-[0.97] transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRunning(false);
+                  onClose();
+                }}
+                aria-label="Close timer"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
