@@ -33,11 +33,11 @@ export const Login = () => {
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none"
       style={{ backgroundColor: '#0d0d0d', cursor: 'default' }}
     >
-      {/* Blurred orange orb background */}
+      {/* Warm ambient glow - subtle and premium */}
       <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-30 blur-[100px] pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 50%, transparent 70%)'
+          background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 40%, #ff9a3c 60%, transparent 80%)'
         }}
       />
 
@@ -62,18 +62,26 @@ export const Login = () => {
         >
           {/* Flow Logo and Branding */}
           <div className="flex flex-col items-center mb-8 select-none" style={{ cursor: 'default' }}>
-            <img 
-              src="/Flow-icon.webp" 
-              alt="Flow" 
-              className="w-20 h-20 rounded-3xl mb-6 select-none"
-              style={{
-                boxShadow: '0 0 60px rgba(255, 122, 24, 0.3), 0 0 30px rgba(255, 179, 71, 0.2), 0 4px 20px rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 122, 24, 0.15)',
-                cursor: 'default',
-                userSelect: 'none'
-              }}
-              draggable={false}
-            />
+            <div className="relative mb-6">
+              {/* Warm glow behind logo */}
+              <div 
+                className="absolute inset-0 rounded-3xl blur-xl opacity-40"
+                style={{
+                  background: 'radial-gradient(circle, rgba(255, 122, 24, 0.4) 0%, rgba(255, 179, 71, 0.2) 50%, transparent 70%)'
+                }}
+              />
+              <img 
+                src="/FlowIcon-Main.png" 
+                alt="Flow" 
+                className="w-20 h-20 rounded-3xl select-none relative"
+                style={{
+                  boxShadow: '0 0 40px rgba(255, 122, 24, 0.25), 0 4px 20px rgba(0, 0, 0, 0.4)',
+                  cursor: 'default',
+                  userSelect: 'none'
+                }}
+                draggable={false}
+              />
+            </div>
             <h1 className="text-3xl font-bold mb-2" style={{ color: '#e5e5e5' }}>
               Sign in to Flow
             </h1>

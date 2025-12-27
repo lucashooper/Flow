@@ -40,7 +40,7 @@ export const Landing = () => {
           {/* Flow Logo */}
           <div className="flex justify-center mb-8">
             <img 
-              src="/Flow-icon.webp" 
+              src="/FlowIcon-Main.png" 
               alt="Flow" 
               className="w-24 h-24 rounded-3xl"
               style={{

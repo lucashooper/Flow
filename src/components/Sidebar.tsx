@@ -282,7 +282,7 @@ export const Sidebar = ({
         <div className="p-3 border-b border-subtle">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <img src="/Flow-icon.webp" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
+            <img src="/FlowIcon-Main.png" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
             <button
               onClick={() => navigate('/tasks')}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors group"

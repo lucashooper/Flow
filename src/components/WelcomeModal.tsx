@@ -71,7 +71,7 @@ export const WelcomeModal = ({ userConfirmed }: WelcomeModalProps) => {
         {/* Flow Logo with animation */}
         <div className="flex justify-center mb-6">
           <img 
-            src="/Flow-icon.webp" 
+            src="/FlowIcon-Main.png" 
             alt="Flow" 
             className="w-20 h-20 rounded-2xl"
             style={{
