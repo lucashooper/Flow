@@ -116,10 +116,13 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
       <div
         className={`group relative px-2 py-1.5 rounded cursor-pointer transition-all border-l-2 ${
           isSelected
-            ? 'bg-[#1a1a1a] border-transparent'
+            ? 'bg-[#1a1a1a]'
             : 'border-transparent hover:bg-[#252525]'
         } ${isBlurred ? 'note-faded' : ''}`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        style={{
+          ...{ paddingLeft: `${depth * 16 + 8}px` },
+          ...(isSelected ? { borderLeftColor: 'var(--accent)' } : {})
+        }}
         onClick={onSelect}
         onContextMenu={handleContextMenu}
         data-noteid={note.id}
@@ -156,7 +159,8 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
                     setIsRenaming(false);
                   }
                 }}
-                className="w-full px-1 py-0.5 bg-[#0a0a0a] border border-[#A0522D] rounded text-sm text-[#e5e5e5] focus:outline-none"
+                className="w-full px-1 py-0.5 bg-[#0a0a0a] rounded text-sm text-[#e5e5e5] focus:outline-none"
+                style={{ borderColor: 'var(--accent)', borderWidth: '1px' }}
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (

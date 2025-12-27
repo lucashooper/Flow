@@ -3,7 +3,7 @@ import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle } from 'l
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-type SettingsSection = 'profile' | 'appearance' | 'editor' | 'features';
+type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -157,6 +157,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
     { id: 'profile' as SettingsSection, label: 'Profile', icon: User },
     { id: 'editor' as SettingsSection, label: 'Editor', icon: Type },
+    { id: 'plugins' as SettingsSection, label: 'Plugins', icon: Layers },
     { id: 'features' as SettingsSection, label: 'Features', icon: Layers },
   ];
 
@@ -239,7 +240,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         
                         // Remove ALL classes that might interfere
                         Array.from(root.classList).forEach((cls) => {
-                          if (cls.startsWith('theme-') || ['light', 'dark', 'default', 'crimson', 'coffee', 'modern-gray'].includes(cls)) {
+                          if (cls.startsWith('theme-') || ['light', 'dark', 'default', 'crimson', 'coffee', 'ocean', 'modern-gray'].includes(cls)) {
                             console.log('🗑️ [Settings] Removing class:', cls);
                             root.classList.remove(cls);
                           }
@@ -301,8 +302,9 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     >
                       <option value="default">Default (Dark)</option>
                       <option value="crimson">Crimson</option>
-                      <option value="modern-gray">Modern Gray</option>
                       <option value="coffee">Coffee</option>
+                      <option value="ocean">Ocean</option>
+                      <option value="modern-gray">Modern Gray</option>
                     </select>
                   </div>
                 </div>
@@ -434,6 +436,56 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <p className="mb-6" style={{ color: 'var(--muted)' }}>Customize your text editing experience.</p>
                 <div className="text-sm" style={{ color: 'var(--muted)' }}>
                   More editor customization options coming soon...
+                </div>
+              </div>
+            )}
+
+            {/* Plugins Section */}
+            {activeSection === 'plugins' && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Plugins</h2>
+                <p className="mb-6" style={{ color: 'var(--muted)' }}>
+                  Extend Flow's functionality with plugins. More plugin options coming soon.
+                </p>
+
+                <div className="space-y-6">
+                  {/* Core Plugins Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text)' }}>Core Plugins</h3>
+                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                      Essential plugins built and maintained by the Flow team.
+                    </p>
+                    <div className="p-6 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                        Core plugins coming in future updates
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Community Plugins Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text)' }}>Community Plugins</h3>
+                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                      Plugins created by the Flow community. Browse and install community-made extensions.
+                    </p>
+                    <div className="p-6 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                      <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                        Community plugin marketplace coming soon
+                      </p>
+                      <button
+                        className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        style={{
+                          backgroundColor: 'var(--accent)',
+                          color: '#fff',
+                        }}
+                        onClick={() => {
+                          window.open('https://github.com/jonnyedwards888/Flow/discussions', '_blank');
+                        }}
+                      >
+                        Request a Plugin
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -129,79 +129,90 @@
     background: rgba(56, 97, 251, 0.25);
     color: inherit;
   }
-
-  /* Theme variables and themes */
-  :root,
-  html {
-    --accent: #a0522d;
-    --bg-editor: #141414;
-    --bg-panel: #0f0f0f;
-    --bg-elev: #151515;
-    --border: #2a2a2a;
-    --divider: rgba(255,255,255,0.06);
-    --text: #e5e5e5;
-    --muted: #888888;
-  }
-
-  html.theme-default {
-    --accent: #a0522d;
-    --bg-editor: #141414;
-    --bg-panel: #0f0f0f;
-    --bg-elev: #151515;
-    --border: #2a2a2a;
-    --divider: rgba(255,255,255,0.06);
-    --text: #e5e5e5;
-    --muted: #888888;
-  }
-
-  html.theme-crimson {
-    --accent: #dc143c;
-    --bg-editor: #121011;
-    --bg-panel: #0f0d0e;
-    --bg-elev: #191214;
-    --border: #3a2226;
-    --divider: rgba(220,20,60,0.12);
-    --text: #f0eaea;
-    --muted: #b89a9f;
-  }
-
-  html.theme-modern-gray {
-    --accent: #7aa2ff;
-    --bg-editor: #15181b;
-    --bg-panel: #121416;
-    --bg-elev: #1e2226;
-    --border: #30353a;
-    --divider: rgba(255,255,255,0.07);
-    --text: #e6e9ec;
-    --muted: #9aa3ab;
-  }
-
-  html.theme-coffee {
-    --accent: #d4a574;
-    --bg-editor: #1a1410;
-    --bg-panel: #120e0a;
-    --bg-elev: #221a14;
-    --border: #3a2f26;
-    --divider: rgba(212,165,116,0.12);
-    --text: #e8dfd5;
-    --muted: #a89888;
-  }
-
-  /* Apply variables to key surfaces */
-  body { background-color: var(--bg-panel) !important; }
-  .top-nav, .sidebar { background-color: var(--bg-panel) !important; color: var(--text) !important; }
-  .top-nav, .sidebar { border-color: var(--divider) !important; }
-  .editor-root, .editor-header, .editor-content, .editor-background { background-color: var(--bg-editor) !important; color: var(--text) !important; }
-  .panel, .card { background-color: var(--bg-elev) !important; color: var(--text) !important; border-color: var(--border) !important; }
-  .btn-accent { background-color: var(--accent) !important; color: #fff !important; }
-  .text-accent { color: var(--accent) !important; }
-  .border-theme { border-color: var(--border) !important; }
-  .border-subtle { border-color: var(--divider) !important; }
-  
-  /* Active tab uses theme background */
-  .tab.active { background-color: var(--bg-editor); }
-  
-  /* Make headings/links reflect accent subtly */
-  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { color: var(--text); }
-  .ProseMirror a { color: var(--accent); text-decoration-color: var(--accent); }
 }
+
+/* Theme variables and themes - OUTSIDE @layer to ensure they're included */
+:root,
+html {
+  --accent: #a0522d;
+  --bg-editor: #141414;
+  --bg-panel: #0f0f0f;
+  --bg-elev: #151515;
+  --border: #2a2a2a;
+  --divider: rgba(255,255,255,0.06);
+  --text: #e5e5e5;
+  --muted: #888888;
+}
+
+html.theme-default {
+  --accent: #a0522d;
+  --bg-editor: #141414;
+  --bg-panel: #0f0f0f;
+  --bg-elev: #151515;
+  --border: #2a2a2a;
+  --divider: rgba(255,255,255,0.06);
+  --text: #e5e5e5;
+  --muted: #888888;
+}
+
+html.theme-crimson {
+  --accent: #dc143c;
+  --bg-editor: #121011;
+  --bg-panel: #0f0d0e;
+  --bg-elev: #191214;
+  --border: #3a2226;
+  --divider: rgba(220,20,60,0.12);
+  --text: #f0eaea;
+  --muted: #b89a9f;
+}
+
+html.theme-modern-gray {
+  --accent: #7aa2ff;
+  --bg-editor: #15181b;
+  --bg-panel: #121416;
+  --bg-elev: #1e2226;
+  --border: #30353a;
+  --divider: rgba(255,255,255,0.07);
+  --text: #e6e9ec;
+  --muted: #9aa3ab;
+}
+
+html.theme-coffee {
+  --accent: #d4a574;
+  --bg-editor: #1a1410;
+  --bg-panel: #120e0a;
+  --bg-elev: #221a14;
+  --border: #3a2f26;
+  --divider: rgba(212,165,116,0.12);
+  --text: #e8dfd5;
+  --muted: #a89888;
+}
+
+html.theme-ocean {
+  --accent: #4fc3f7;
+  --bg-editor: #0d1b2a;
+  --bg-panel: #0a1420;
+  --bg-elev: #1b2838;
+  --border: #2d3e50;
+  --divider: rgba(79,195,247,0.12);
+  --text: #e3f2fd;
+  --muted: #90a4ae;
+}
+
+/* Apply variables to key surfaces */
+body { background-color: var(--bg-panel) !important; }
+.top-nav, .sidebar { background-color: var(--bg-panel) !important; color: var(--text) !important; }
+.top-nav, .sidebar { border-color: var(--divider) !important; }
+.editor-root, .editor-header, .editor-content, .editor-background { background-color: var(--bg-editor) !important; color: var(--text) !important; }
+.panel, .card { background-color: var(--bg-elev) !important; color: var(--text) !important; border-color: var(--border) !important; }
+.btn-accent { background-color: var(--accent) !important; color: #fff !important; }
+.text-accent { color: var(--accent) !important; }
+.border-theme { border-color: var(--border) !important; }
+.border-subtle { border-color: var(--divider) !important; }
+
+/* Active tab uses theme background */
+.tab.active { background-color: var(--bg-editor); }
+
+/* Make headings/links reflect accent subtly */
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { color: var(--text); }
+.ProseMirror a { color: var(--accent); text-decoration-color: var(--accent); }
