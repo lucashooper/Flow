@@ -74,26 +74,26 @@ export const Landing = () => {
             A premium space for thinking, writing & deep focus.
           </p>
 
-          {/* CTA Buttons - blue theme */}
+          {/* CTA Buttons - refined sizing and rounding */}
           <div className="flex gap-4 justify-center mb-20">
             <button
               onClick={() => navigate('/signup')}
-              className="px-8 py-4 rounded-2xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+              className="px-7 py-3 rounded-xl font-medium text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
               style={{
-                background: 'linear-gradient(90deg, #4fc3f7, #29b6f6)',
-                boxShadow: '0 10px 40px rgba(79, 195, 247, 0.3)'
+                background: 'linear-gradient(135deg, #4fc3f7, #29b6f6)',
+                boxShadow: '0 8px 32px rgba(79, 195, 247, 0.3)',
               }}
             >
               Get Started
             </button>
             <button
               onClick={() => navigate('/login')}
-              className="px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105"
+              className="px-7 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-[1.02]"
               style={{
-                backgroundColor: 'rgba(79, 195, 247, 0.1)',
+                backgroundColor: 'rgba(79, 195, 247, 0.08)',
                 border: '1px solid rgba(79, 195, 247, 0.2)',
                 color: '#e3f2fd',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
               }}
             >
               Sign In
@@ -101,17 +101,23 @@ export const Landing = () => {
           </div>
         </div>
 
-        {/* Feature Cards */}
+        {/* Feature Cards - Premium depth like Potion */}
         <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
           <div 
-            className="p-8 rounded-2xl transition-all duration-300 hover:scale-105"
+            className="p-8 rounded-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden group"
             style={{
-              backgroundColor: 'rgba(79, 195, 247, 0.08)',
-              border: '1px solid rgba(79, 195, 247, 0.15)',
-              backdropFilter: 'blur(10px)'
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.08) 0%, rgba(79, 195, 247, 0.04) 100%)',
+              border: '1px solid rgba(79, 195, 247, 0.2)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 1px 0 0 rgba(79, 195, 247, 0.1), 0 4px 16px rgba(0, 0, 0, 0.3)',
             }}
           >
-            <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: '#4fc3f7' }} />
+            <div className="relative mb-4 mx-auto w-12 h-12 flex items-center justify-center rounded-full" style={{
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.2), rgba(41, 182, 246, 0.15))',
+              boxShadow: '0 4px 12px rgba(79, 195, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }}>
+              <FileText className="w-6 h-6" style={{ color: '#4fc3f7' }} />
+            </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: '#e3f2fd' }}>
               Markdown Support
             </h3>
@@ -121,14 +127,20 @@ export const Landing = () => {
           </div>
           
           <div 
-            className="p-8 rounded-2xl transition-all duration-300 hover:scale-105"
+            className="p-8 rounded-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden group"
             style={{
-              backgroundColor: 'rgba(79, 195, 247, 0.08)',
-              border: '1px solid rgba(79, 195, 247, 0.15)',
-              backdropFilter: 'blur(10px)'
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.08) 0%, rgba(79, 195, 247, 0.04) 100%)',
+              border: '1px solid rgba(79, 195, 247, 0.2)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 1px 0 0 rgba(79, 195, 247, 0.1), 0 4px 16px rgba(0, 0, 0, 0.3)',
             }}
           >
-            <Lock className="w-12 h-12 mx-auto mb-4" style={{ color: '#29b6f6' }} />
+            <div className="relative mb-4 mx-auto w-12 h-12 flex items-center justify-center rounded-full" style={{
+              background: 'linear-gradient(135deg, rgba(41, 182, 246, 0.2), rgba(79, 195, 247, 0.15))',
+              boxShadow: '0 4px 12px rgba(41, 182, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }}>
+              <Lock className="w-6 h-6" style={{ color: '#29b6f6' }} />
+            </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: '#e3f2fd' }}>
               Private & Secure
             </h3>
@@ -138,14 +150,20 @@ export const Landing = () => {
           </div>
           
           <div 
-            className="p-8 rounded-2xl transition-all duration-300 hover:scale-105"
+            className="p-8 rounded-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden group"
             style={{
-              backgroundColor: 'rgba(79, 195, 247, 0.08)',
-              border: '1px solid rgba(79, 195, 247, 0.15)',
-              backdropFilter: 'blur(10px)'
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.08) 0%, rgba(79, 195, 247, 0.04) 100%)',
+              border: '1px solid rgba(79, 195, 247, 0.2)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 1px 0 0 rgba(79, 195, 247, 0.1), 0 4px 16px rgba(0, 0, 0, 0.3)',
             }}
           >
-            <Zap className="w-12 h-12 mx-auto mb-4" style={{ color: '#4fc3f7' }} />
+            <div className="relative mb-4 mx-auto w-12 h-12 flex items-center justify-center rounded-full" style={{
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.2), rgba(41, 182, 246, 0.15))',
+              boxShadow: '0 4px 12px rgba(79, 195, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }}>
+              <Zap className="w-6 h-6" style={{ color: '#4fc3f7' }} />
+            </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: '#e3f2fd' }}>
               Fast & Lightweight
             </h3>
@@ -155,14 +173,20 @@ export const Landing = () => {
           </div>
           
           <div 
-            className="p-8 rounded-2xl transition-all duration-300 hover:scale-105"
+            className="p-8 rounded-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden group"
             style={{
-              backgroundColor: 'rgba(79, 195, 247, 0.08)',
-              border: '1px solid rgba(79, 195, 247, 0.15)',
-              backdropFilter: 'blur(10px)'
+              background: 'linear-gradient(135deg, rgba(79, 195, 247, 0.08) 0%, rgba(79, 195, 247, 0.04) 100%)',
+              border: '1px solid rgba(79, 195, 247, 0.2)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 1px 0 0 rgba(79, 195, 247, 0.1), 0 4px 16px rgba(0, 0, 0, 0.3)',
             }}
           >
-            <Focus className="w-12 h-12 mx-auto mb-4" style={{ color: '#29b6f6' }} />
+            <div className="relative mb-4 mx-auto w-12 h-12 flex items-center justify-center rounded-full" style={{
+              background: 'linear-gradient(135deg, rgba(41, 182, 246, 0.2), rgba(79, 195, 247, 0.15))',
+              boxShadow: '0 4px 12px rgba(41, 182, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }}>
+              <Focus className="w-6 h-6" style={{ color: '#29b6f6' }} />
+            </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: '#e3f2fd' }}>
               Distraction-Free
             </h3>

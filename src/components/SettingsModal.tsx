@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { FeedbackModal } from './FeedbackModal';
 
 type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features';
 
@@ -44,6 +45,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -639,9 +641,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           backgroundColor: 'var(--accent)',
                           color: '#fff',
                         }}
-                        onClick={() => {
-                          window.open('https://github.com/jonnyedwards888/Flow/discussions', '_blank');
-                        }}
+                        onClick={() => setShowFeedbackModal(true)}
                       >
                         Request a Plugin
                       </button>
@@ -788,6 +788,9 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           </div>
         </div>
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal isOpen={showFeedbackModal} onClose={() => setShowFeedbackModal(false)} />
     </div>
   );
 };
