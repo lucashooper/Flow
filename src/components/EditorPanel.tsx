@@ -67,13 +67,10 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
       {/* Editor Header - fixed at top, scrolls with content */}
       <div className="pt-6 pb-4 editor-header flex-shrink-0 px-8">
         <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-        <div
-          contentEditable
-          suppressContentEditableWarning
-          onInput={(e) => {
-            const text = e.currentTarget.textContent || '';
-            setTitle(text);
-          }}
+        <input
+          type="text"
+          value={title || ''}
+          onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -84,16 +81,13 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
               }
             }
           }}
-          className="w-full bg-transparent text-3xl font-bold focus:outline-none"
+          placeholder="Untitled"
+          className="w-full bg-transparent text-3xl font-bold focus:outline-none border-none"
           style={{
             color: 'var(--text)',
             lineHeight: '1.2',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word',
-            minHeight: '1.2em',
+            padding: 0,
           }}
-          dangerouslySetInnerHTML={{ __html: title || '<span style="color: #666666;">Untitled</span>' }}
         />
         </div>
       </div>
