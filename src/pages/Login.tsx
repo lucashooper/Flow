@@ -32,69 +32,40 @@ export const Login = () => {
     <div 
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none"
       style={{ 
-        background: 'linear-gradient(135deg, #0a1628 0%, #0d1b2a 50%, #1b2838 100%)',
+        backgroundColor: '#0a0a0a',
         cursor: 'default' 
       }}
     >
-      {/* Flowing water effect with depth */}
-      <div 
-        className="absolute inset-0 opacity-30 pointer-events-none"
-        style={{
-          background: `
-            radial-gradient(ellipse at 20% 30%, rgba(79, 195, 247, 0.15) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 70%, rgba(79, 195, 247, 0.1) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 50%, rgba(79, 195, 247, 0.08) 0%, transparent 60%)
-          `
-        }}
-      />
-
-      {/* Subtle grain texture */}
-      <div 
-        className="absolute inset-0 opacity-[0.015] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
-      {/* Wave pattern */}
-      <div 
-        className="absolute inset-0 opacity-[0.02] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 30, 50 50 T 100 50' stroke='%234fc3f7' fill='none' stroke-width='0.5'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px 100px'
-        }}
-      />
       
-      {/* Clean card without box */}
+      {/* Clean card */}
       <div className="w-full max-w-md relative z-10 animate-cardFadeIn">
-        {/* Flow Logo - larger, no box */}
-        <div className="flex flex-col items-center mb-12 select-none" style={{ cursor: 'default' }}>
+        {/* Flow Logo */}
+        <div className="flex flex-col items-center mb-10 select-none" style={{ cursor: 'default' }}>
           <img 
             src="/FlowIcon-Main.png" 
             alt="Flow" 
-            className="w-32 h-32 mb-6 select-none"
+            className="w-16 h-16 mb-6 select-none"
             style={{
-              filter: 'drop-shadow(0 8px 32px rgba(79, 195, 247, 0.3))',
+              filter: 'drop-shadow(0 4px 12px rgba(79, 195, 247, 0.3))',
               cursor: 'default',
               userSelect: 'none'
             }}
             draggable={false}
           />
-          <h1 className="text-4xl font-light mb-3" style={{ color: '#e3f2fd', letterSpacing: '-0.02em' }}>
+          <h1 className="text-3xl font-light mb-2" style={{ color: '#e5e5e5', letterSpacing: '-0.02em' }}>
             Sign in to Flow
           </h1>
-          <p className="text-base" style={{ color: '#90a4ae' }}>
+          <p className="text-sm" style={{ color: '#888888' }}>
             Welcome back to your notes
           </p>
         </div>
 
         <div 
-          className="rounded-2xl p-8 shadow-2xl"
+          className="rounded-xl p-8"
           style={{
-            backgroundColor: 'rgba(13, 27, 42, 0.6)',
-            border: '1px solid rgba(79, 195, 247, 0.15)',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 1px rgba(79, 195, 247, 0.2) inset',
+            backgroundColor: '#0f0f0f',
+            border: '1px solid #1a1a1a',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
           }}
         >
 
@@ -128,17 +99,17 @@ export const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 py-4 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mt-6 py-3 rounded-lg font-medium text-white transition-all duration-300 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: 'linear-gradient(90deg, #4fc3f7, #29b6f6)',
-              boxShadow: '0 10px 30px rgba(79, 195, 247, 0.3)'
+              background: 'linear-gradient(135deg, #4fc3f7, #29b6f6)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 12px rgba(79, 195, 247, 0.25)'
             }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-          <p className="mt-6 text-center" style={{ color: '#90a4ae' }}>
+          <p className="mt-6 text-center text-sm" style={{ color: '#888888' }}>
             Don't have an account?{' '}
             <Link 
               to="/signup" 

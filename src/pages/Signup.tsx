@@ -54,24 +54,18 @@ export const Signup = () => {
 
   if (success) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-6 overflow-hidden" style={{ backgroundColor: '#0d0d0d', minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-        {/* Warm ambient glow - subtle and premium */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] pointer-events-none" style={{ background: 'radial-gradient(circle, #ff7a18 0%, #ffb347 40%, #ff9a3c 60%, transparent 80%)' }} />
-        
-        {/* Noise texture overlay */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
-        
-        <div className="w-full max-w-md rounded-2xl px-10 py-12 text-center relative z-10" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1) inset', animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg, rgba(255, 122, 24, 0.2), rgba(255, 179, 71, 0.2))', border: '2px solid rgba(255, 122, 24, 0.4)', boxShadow: '0 0 40px rgba(255, 122, 24, 0.4), 0 0 20px rgba(255, 179, 71, 0.3)' }}>
-            <CheckCircle className="h-10 w-10" style={{ color: '#ff7a18' }} />
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-6 overflow-hidden" style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <div className="w-full max-w-md rounded-xl px-10 py-12 text-center relative z-10" style={{ backgroundColor: '#0f0f0f', border: '1px solid #1a1a1a', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03)', animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(79, 195, 247, 0.1)', border: '1px solid rgba(79, 195, 247, 0.2)' }}>
+            <CheckCircle className="h-8 w-8" style={{ color: '#4fc3f7' }} />
           </div>
-          <h2 className="text-4xl font-bold mb-4" style={{ color: '#e5e5e5' }}>Account Created!</h2>
-          <p className="text-base mb-8 leading-relaxed" style={{ color: '#a0a0a0' }}>Check your inbox to verify your email and finish setting up Flow.</p>
-          <button onClick={handleResendEmail} disabled={resendingEmail} className="w-full mb-4 py-3.5 rounded-xl font-medium transition-all hover:scale-[1.02]" style={{ background: resendingEmail ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 122, 24, 0.15)', border: '1px solid rgba(255, 122, 24, 0.4)', color: resendingEmail ? '#888888' : '#ff7a18', boxShadow: '0 4px 12px rgba(255, 122, 24, 0.2)' }}>
+          <h2 className="text-3xl font-light mb-4" style={{ color: '#e5e5e5' }}>Account Created!</h2>
+          <p className="text-base mb-8 leading-relaxed" style={{ color: '#888888' }}>Check your inbox to verify your email and finish setting up Flow.</p>
+          <button onClick={handleResendEmail} disabled={resendingEmail} className="w-full mb-4 py-3 rounded-lg font-medium transition-all hover:scale-[1.01]" style={{ background: resendingEmail ? '#1a1a1a' : 'rgba(79, 195, 247, 0.1)', border: '1px solid rgba(79, 195, 247, 0.2)', color: resendingEmail ? '#666666' : '#4fc3f7', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
             {resendingEmail ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Sending...</span> : "Didn't receive it? Resend verification email"}
           </button>
-          {resendSuccess && <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)', color: '#22c55e' }}>✓ Verification email sent!</div>}
-          <p className="text-xs mt-6" style={{ color: '#666666' }}>After verifying, you can <Link to="/login" className="underline hover:text-[#ff7a18] transition-colors" style={{ color: '#888888' }}>sign in here</Link>.</p>
+          {resendSuccess && <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', color: '#22c55e' }}>✓ Verification email sent!</div>}
+          <p className="text-xs mt-6" style={{ color: '#666666' }}>After verifying, you can <Link to="/login" className="underline hover:text-[#4fc3f7] transition-colors" style={{ color: '#888888' }}>sign in here</Link>.</p>
         </div>
         <style>{`@keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }`}</style>
       </div>
@@ -82,68 +76,40 @@ export const Signup = () => {
     <div 
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden select-none" 
       style={{ 
-        background: 'linear-gradient(135deg, #0a1628 0%, #0d1b2a 50%, #1b2838 100%)',
+        backgroundColor: '#0a0a0a',
         cursor: 'default' 
       }}
     >
-      {/* Flowing water effect with depth */}
-      <div 
-        className="absolute inset-0 opacity-30 pointer-events-none"
-        style={{
-          background: `
-            radial-gradient(ellipse at 20% 30%, rgba(79, 195, 247, 0.15) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 70%, rgba(79, 195, 247, 0.1) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 50%, rgba(79, 195, 247, 0.08) 0%, transparent 60%)
-          `
-        }}
-      />
 
-      {/* Subtle grain texture */}
-      <div 
-        className="absolute inset-0 opacity-[0.015] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
-      {/* Wave pattern */}
-      <div 
-        className="absolute inset-0 opacity-[0.02] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 30, 50 50 T 100 50' stroke='%234fc3f7' fill='none' stroke-width='0.5'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px 100px'
-        }}
-      />
-
-      <div className="w-full max-w-md relative z-10" style={{ animation: 'cardFadeIn 0.6s ease-out' }}>
-        {/* Logo - larger, no box */}
-        <div className="flex flex-col items-center mb-12 select-none" style={{ cursor: 'default' }}>
+      {/* Clean card */}
+      <div className="w-full max-w-md relative z-10 animate-cardFadeIn">
+        {/* Flow Logo */}
+        <div className="flex flex-col items-center mb-10 select-none" style={{ cursor: 'default' }}>
           <img 
             src="/FlowIcon-Main.png" 
             alt="Flow" 
-            className="w-32 h-32 mb-6 select-none"
+            className="w-16 h-16 mb-6 select-none"
             style={{
-              filter: 'drop-shadow(0 8px 32px rgba(79, 195, 247, 0.3))',
+              filter: 'drop-shadow(0 4px 12px rgba(79, 195, 247, 0.3))',
               cursor: 'default',
               userSelect: 'none'
             }}
             draggable={false}
           />
-          <h1 className="text-4xl font-light mb-3" style={{ color: '#e3f2fd', letterSpacing: '-0.02em' }}>
+          <h1 className="text-3xl font-light mb-2" style={{ color: '#e5e5e5', letterSpacing: '-0.02em' }}>
             Create your Flow account
           </h1>
-          <p className="text-base" style={{ color: '#90a4ae' }}>
-            Write, think and focus in one calm space
+          <p className="text-sm" style={{ color: '#888888' }}>
+            Start writing in seconds
           </p>
         </div>
 
         <div 
-          className="rounded-2xl p-8 shadow-2xl" 
+          className="rounded-xl p-8"
           style={{
-            backgroundColor: 'rgba(13, 27, 42, 0.6)',
-            border: '1px solid rgba(79, 195, 247, 0.15)',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 1px rgba(79, 195, 247, 0.2) inset',
+            backgroundColor: '#0f0f0f',
+            border: '1px solid #1a1a1a',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
           }}
         >
           {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg mb-6 text-sm" style={{ backdropFilter: 'blur(10px)' }}>{error}</div>}
@@ -152,14 +118,31 @@ export const Signup = () => {
             <Input type="email" label="Email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
             <PasswordInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
             <PasswordInput label="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
-            <button type="submit" disabled={loading} className="w-full mt-6 py-4 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(90deg, #4fc3f7, #29b6f6)', boxShadow: '0 10px 30px rgba(79, 195, 247, 0.3)' }}>
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </button>
+            <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-6 py-3 rounded-lg font-medium text-white transition-all duration-300 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'linear-gradient(135deg, #4fc3f7, #29b6f6)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 12px rgba(79, 195, 247, 0.25)'
+            }}
+          >
+            {loading ? 'Creating account...' : 'Create Account'}
+          </button>
           </form>
-          <p className="mt-6 text-center" style={{ color: '#90a4ae' }}>Already have an account? <Link to="/login" className="hover:underline transition-colors" style={{ color: '#4fc3f7' }}>Sign in</Link></p>
+          <p className="mt-6 text-center text-sm" style={{ color: '#888888' }}>
+            Already have an account?{' '}
+            <Link 
+              to="/login" 
+              className="hover:underline transition-colors"
+              style={{ color: '#4fc3f7' }}
+            >
+              Sign in
+            </Link>
+          </p>
         </div>
+        <style>{`@keyframes cardFadeIn { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
       </div>
-      <style>{`@keyframes cardFadeIn { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
     </div>
   );
 };
