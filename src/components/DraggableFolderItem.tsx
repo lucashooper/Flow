@@ -30,15 +30,22 @@ export const DraggableFolderItem = ({ isOver, ...props }: DraggableFolderItemPro
     data: { type: 'folder', folder: props.folder } 
   });
 
-  const style = {
+  const baseStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
     backgroundColor: isOver ? '#A0522D22' : undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div 
+      ref={setNodeRef} 
+      style={baseStyle} 
+      className="force-visible"
+      data-folder-id={props.folder.id}
+      data-is-dragging={isDragging ? 'true' : 'false'}
+      {...attributes} 
+      {...listeners}
+    >
       <FolderItem {...props} />
     </div>
   );

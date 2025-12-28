@@ -102,12 +102,15 @@ export const FolderItem = ({
   };
 
   return (
-    <>
+    <div
+      className="group relative"
+      onContextMenu={handleContextMenu}
+      style={{ paddingLeft: `${depth * 16}px` }}
+      data-folder-id={folder.id}
+    >
       <div
-        className="group relative px-2 py-1.5 rounded cursor-pointer hover:bg-[#252525] transition-colors"
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        className="px-2 py-1.5 rounded cursor-pointer hover:bg-[#252525] transition-colors"
         onClick={onToggle}
-        onContextMenu={handleContextMenu}
       >
         <div className="flex items-center gap-2">
           <div className="flex-shrink-0">
@@ -239,6 +242,6 @@ export const FolderItem = ({
           onClose={() => setShowEmojiPicker(false)}
         />
       )}
-    </>
+    </div>
   );
 };

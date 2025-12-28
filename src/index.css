@@ -78,7 +78,6 @@
   /* Focus Mode */
   .focus-mode .sidebar {
     opacity: 0.15;
-    pointer-events: none;
     transition: 0.25s ease;
   }
 

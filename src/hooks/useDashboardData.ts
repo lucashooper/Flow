@@ -165,8 +165,10 @@ export const useDashboardData = () => {
 
       if (error) throw error;
 
-      // Refresh notes list
-      await fetchData();
+      // Optimistically add the new note to state without refetching
+      if (data && notes) {
+        setNotes(prev => prev ? [data, ...prev] : [data]);
+      }
       
       // Select the new note
       if (data) {
@@ -206,8 +208,6 @@ export const useDashboardData = () => {
   };
 
   const handleNoteDelete = async (noteId: string) => {
-    if (!confirm('Are you sure you want to delete this note?')) return;
-
     try {
       const { error } = await supabase
         .from('notes')

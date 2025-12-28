@@ -57,9 +57,11 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
     setIsRenaming(true);
   };
 
-  const handleRenameSubmit = () => {
-    if (newTitle.trim()) {
-      onUpdate(note.id, { title: newTitle.trim() });
+  const handleRenameSubmit = async () => {
+    if (newTitle.trim() && newTitle.trim() !== note.title) {
+      await onUpdate(note.id, { title: newTitle.trim() });
+    } else {
+      setNewTitle(note.title);
     }
     setIsRenaming(false);
   };

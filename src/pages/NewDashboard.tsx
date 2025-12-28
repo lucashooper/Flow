@@ -107,113 +107,20 @@ export const NewDashboard = () => {
   };
 
   const handleDragEnd = (event: any) => {
-    console.log('🔍 [POST-DRAG COMPREHENSIVE DUMP] START');
     console.log('[NewDashboard] DRAG END:', event.active.id, 'over:', event.over?.id);
     
-    // Check DragOverlay state
-    const dragOverlays = document.querySelectorAll('[data-dnd-kit-drag-overlay]');
-    console.log('🔍 DragOverlay count:', dragOverlays.length);
-    dragOverlays.forEach((overlay, i) => {
-      const overlayStyle = getComputedStyle(overlay as Element);
-      console.log(`🔍 DragOverlay[${i}]:`, {
-        display: overlayStyle.display,
-        pointerEvents: overlayStyle.pointerEvents,
-        zIndex: overlayStyle.zIndex,
-      });
-    });
-    
-    // Comprehensive DOM/style/overlay detection after drag ends
-    requestAnimationFrame(() => {
-      const itemEl = document.querySelector(`[data-noteid="${event.active.id}"]`) as HTMLElement | null;
-      const titleEl = itemEl?.querySelector('[data-debug="title"]') as HTMLElement | null;
-      const previewEl = itemEl?.querySelector('[data-debug="preview"]') as HTMLElement | null;
-      
-      if (!itemEl || !titleEl) {
-        console.error('🔴 POST-DRAG: Item or title element not found!');
-        console.log('🔍 [POST-DRAG COMPREHENSIVE DUMP] END (early - no element)');
-        return;
-      }
-
-      // Get computed styles for all elements
-      const itemStyle = getComputedStyle(itemEl);
-      const titleStyle = getComputedStyle(titleEl);
-      const previewStyle = previewEl ? getComputedStyle(previewEl) : null;
-
-      // Get geometry
-      const itemRect = itemEl.getBoundingClientRect();
-      const titleRect = titleEl.getBoundingClientRect();
-      
-      // Check what element is actually on top at the center of the row
-      const centerX = itemRect.left + itemRect.width / 2;
-      const centerY = itemRect.top + itemRect.height / 2;
-      const topElement = document.elementFromPoint(centerX, centerY);
-
-      console.log('🔍 [POST-DRAG COMPREHENSIVE DUMP] DATA:', {
-        noteId: event.active.id,
-        
-        // Row container
-        rowContainer: {
-          classes: itemEl.className,
-          dataAttrs: Array.from(itemEl.attributes)
-            .filter(a => a.name.startsWith('data-'))
-            .map(a => `${a.name}=${a.value}`),
-          color: itemStyle.color,
-          opacity: itemStyle.opacity,
-          visibility: itemStyle.visibility,
-          display: itemStyle.display,
-          filter: itemStyle.filter,
-          mixBlendMode: itemStyle.mixBlendMode,
-          pointerEvents: itemStyle.pointerEvents,
-          height: itemStyle.height,
-          maxHeight: itemStyle.maxHeight,
-          overflow: itemStyle.overflow,
-          rect: { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height },
-          innerHTML: itemEl.innerHTML.substring(0, 200), // First 200 chars of HTML
-        },
-        
-        // Title element
-        title: {
-          text: titleEl.textContent,
-          color: titleStyle.color,
-          opacity: titleStyle.opacity,
-          visibility: titleStyle.visibility,
-          display: titleStyle.display,
-          filter: titleStyle.filter,
-          mixBlendMode: titleStyle.mixBlendMode,
-          webkitTextFillColor: titleStyle.webkitTextFillColor,
-          pointerEvents: titleStyle.pointerEvents,
-          rect: { x: titleRect.x, y: titleRect.y, width: titleRect.width, height: titleRect.height },
-        },
-        
-        // Preview element
-        preview: previewEl ? {
-          text: previewEl.textContent,
-          color: previewStyle?.color,
-          opacity: previewStyle?.opacity,
-          visibility: previewStyle?.visibility,
-          display: previewStyle?.display,
-          filter: previewStyle?.filter,
-          mixBlendMode: previewStyle?.mixBlendMode,
-          webkitTextFillColor: previewStyle?.webkitTextFillColor,
-          pointerEvents: previewStyle?.pointerEvents,
-        } : 'N/A',
-        
-        // Overlay detection
-        overlayCheck: {
-          centerPoint: { x: centerX, y: centerY },
-          topElementTag: topElement?.tagName,
-          topElementClass: topElement?.className,
-          topElementId: topElement?.id,
-          isRowOnTop: topElement === itemEl || itemEl.contains(topElement),
-        },
-      });
-      
-      console.log('🔍 [POST-DRAG COMPREHENSIVE DUMP] END');
-    });
-    
-    // Clear drag state
+    // Clear drag state immediately
     setActiveId(null);
     setDraggedItem(null);
+    
+    // Force re-render of dragged items after a short delay
+    setTimeout(() => {
+      const draggedElement = document.querySelector(`[data-folder-id="${event.active.id}"]`);
+      if (draggedElement) {
+        (draggedElement as HTMLElement).style.visibility = 'visible';
+        (draggedElement as HTMLElement).style.opacity = '1';
+      }
+    }, 0);
   };
 
   const handleDragCancel = () => {
