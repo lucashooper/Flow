@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Sidebar } from '../components/Sidebar';
+import { AppLayout } from '../components/AppLayout';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
 import { EditorWorkspace } from '../components/EditorWorkspace';
-import { EditorHeader } from '../components/EditorHeader';
-import { FocusModeContext } from '../contexts/FocusModeContext';
 import { WelcomeModal } from '../components/WelcomeModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +13,6 @@ import type { Note } from '../types';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchParams] = useSearchParams();
@@ -60,10 +57,6 @@ export const NewDashboard = () => {
   } = useDashboardData();
 
   // const selectedNote = notes?.find(note => note.id === selectedNoteId);
-
-  const toggleFocusMode = () => {
-    setIsFocusMode(prev => !prev);
-  };
 
   // Global dnd-kit context (shared by sidebar, tabs, and editor workspace)
   const sensors = useSensors(
@@ -134,7 +127,6 @@ export const NewDashboard = () => {
       {/* Welcome Modal - shows once after email verification */}
       <WelcomeModal userConfirmed={!!(user as any)?.email_confirmed_at} />
       
-      <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
       <DndContext 
         sensors={sensors} 
         collisionDetection={closestCenter}
@@ -157,52 +149,43 @@ export const NewDashboard = () => {
             </div>
           ) : null}
         </DragOverlay>
-      <div className={`flex h-screen overflow-hidden ${isFocusMode ? 'focus-mode' : ''}`} style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}>
-      {/* Sidebar */}
-      <Sidebar
-        notes={notes || []}
-        folders={folders}
-        dashboards={dashboards}
-        activeDashboard={activeDashboard}
-        selectedNoteId={selectedNoteId}
-        sidebarWidth={sidebarWidth}
-        setSidebarWidth={setSidebarWidth}
-        onNoteSelect={handleNoteSelect}
-        onNoteCreate={handleNoteCreate}
-        onNoteUpdate={handleNoteUpdate}
-        onNoteDelete={handleNoteDelete}
-        onFolderCreate={handleFolderCreate}
-        onFolderUpdate={handleFolderUpdate}
-        onFolderDelete={handleFolderDelete}
-        onDashboardChange={handleDashboardChange}
-        onDashboardsUpdate={handleDashboardsUpdate}
-        loading={loading}
-      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden editor-container">
-        {/* Workspace (split panes) */}
-        <WorkspaceProvider initialNoteId={selectedNoteId || null} selectedNoteId={selectedNoteId}>
-          {/* Unified Header with Tabs */}
-          <EditorHeader
-            openNotes={openNotes}
-            activeNoteId={selectedNoteId}
-            tabsEnabled={tabsEnabled}
-            onTabClick={handleNoteSelect}
-            onTabClose={handleTabClose}
-            isTimerVisible={isTimerVisible}
-            setIsTimerVisible={setIsTimerVisible}
-          />
-          <EditorWorkspace
-            notes={notes || []}
-            onNoteUpdate={handleNoteUpdate}
-            searchQuery={searchQuery}
-          />
-        </WorkspaceProvider>
-      </div>
-    </div>
-    </DndContext>
-    </FocusModeContext.Provider>
+        <AppLayout
+          notes={notes || []}
+          folders={folders}
+          dashboards={dashboards}
+          activeDashboard={activeDashboard}
+          selectedNoteId={selectedNoteId}
+          sidebarWidth={sidebarWidth}
+          setSidebarWidth={setSidebarWidth}
+          onNoteSelect={handleNoteSelect}
+          onNoteCreate={handleNoteCreate}
+          onNoteUpdate={handleNoteUpdate}
+          onNoteDelete={handleNoteDelete}
+          onFolderCreate={handleFolderCreate}
+          onFolderUpdate={handleFolderUpdate}
+          onFolderDelete={handleFolderDelete}
+          onDashboardChange={handleDashboardChange}
+          onDashboardsUpdate={handleDashboardsUpdate}
+          loading={loading}
+          showHeader={true}
+          openNotes={openNotes}
+          tabsEnabled={tabsEnabled}
+          onTabClick={handleNoteSelect}
+          onTabClose={handleTabClose}
+          isTimerVisible={isTimerVisible}
+          setIsTimerVisible={setIsTimerVisible}
+        >
+          {/* Workspace (split panes) */}
+          <WorkspaceProvider initialNoteId={selectedNoteId || null} selectedNoteId={selectedNoteId}>
+            <EditorWorkspace
+              notes={notes || []}
+              onNoteUpdate={handleNoteUpdate}
+              searchQuery={searchQuery}
+            />
+          </WorkspaceProvider>
+        </AppLayout>
+      </DndContext>
 
     {/* Simple floating timer for dashboard */}
     <FloatingTimer

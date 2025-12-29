@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, Star, CheckCircle } from 'lucide-react';
+import { Plus, FolderPlus, Search, Star, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import {
   DragOverlay,
 } from '@dnd-kit/core';
@@ -28,6 +29,7 @@ interface SidebarProps {
   onDashboardChange: (dashboard: Dashboard) => void;
   onDashboardsUpdate: () => void;
   loading: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar = ({
@@ -48,6 +50,7 @@ export const Sidebar = ({
   onDashboardChange,
   onDashboardsUpdate,
   loading,
+  onCloseMobile,
 }: SidebarProps) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +95,10 @@ export const Sidebar = ({
     });
   };
 
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isMobile) return; // Disable resize on mobile
     e.preventDefault();
     setIsResizing(true);
   };
@@ -275,7 +281,7 @@ export const Sidebar = ({
   return (
     <>
       <div
-        className="sidebar relative border-r border-theme flex flex-col"
+        className="sidebar relative border-r border-theme flex flex-col h-full"
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
       >
         {/* Header */}
@@ -292,6 +298,15 @@ export const Sidebar = ({
             </button>
           </div>
           <div className="flex items-center gap-1">
+            {isMobile && onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                className="p-1.5 hover:bg-[#252525] rounded transition-colors"
+                title="Close sidebar"
+              >
+                <X className="w-4 h-4 text-[#888888]" />
+              </button>
+            )}
             <button
               onClick={() => setShowStarredOnly(prev => !prev)}
               className={`p-1.5 rounded transition-colors ${
@@ -373,13 +388,15 @@ export const Sidebar = ({
         )}
       </div>
 
-      {/* Resize Handle */}
-      <div
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#A0522D] transition-colors group"
-        onMouseDown={handleMouseDown}
-      >
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-[#A0522D] opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+      {/* Resize Handle - Desktop Only */}
+      {!isMobile && (
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#A0522D] transition-colors group"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-[#A0522D] opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      )}
 
       {/* Dashboard Switcher footer */}
       <div className="mt-1 px-3 py-2.5 border-t border-[#181818]">

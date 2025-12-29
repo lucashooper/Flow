@@ -24,6 +24,7 @@ import type { Task } from '../types';
 import { AppLayout } from '../components/AppLayout';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { TaskCard } from '../components/TaskCard';
+import { SettingsModal } from '../components/SettingsModal';
 
 type TaskPriority = 1 | 2 | 3;
 
@@ -35,6 +36,16 @@ export const Tasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Listen for openSettings event from DashboardSwitcher
+  useEffect(() => {
+    const handleOpenSettings = () => {
+      setIsSettingsOpen(true);
+    };
+    window.addEventListener('openSettings', handleOpenSettings);
+    return () => window.removeEventListener('openSettings', handleOpenSettings);
+  }, []);
   
   // Use shared dashboard data hook
   const {
@@ -328,6 +339,7 @@ export const Tasks = () => {
 
 
   return (
+    <>
     <AppLayout
       notes={notes || []}
       folders={folders}
@@ -351,7 +363,7 @@ export const Tasks = () => {
       onTabClick={handleNoteSelect}
       onTabClose={handleTabClose}
     >
-      <div className="max-w-4xl mx-auto px-8 py-12 select-none" style={{ backgroundColor: 'var(--bg-editor)', color: 'var(--text)' }}>
+      <div className="w-full h-full px-8 py-12 select-none" style={{ backgroundColor: 'var(--bg-editor)', color: 'var(--text)' }}><div className="max-w-4xl mx-auto">
         {/* Header - No subtitle */}
         <div className="mb-8">
           <div className="flex items-center gap-3">
@@ -649,7 +661,15 @@ export const Tasks = () => {
             <p className="text-lg" style={{ color: 'var(--muted)' }}>No tasks yet. Add one above to get started!</p>
           </div>
         )}
+        </div>
       </div>
     </AppLayout>
+
+    {/* Settings Modal Overlay */}
+    <SettingsModal
+      isOpen={isSettingsOpen}
+      onClose={() => setIsSettingsOpen(false)}
+    />
+    </>
   );
 };

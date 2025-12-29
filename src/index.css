@@ -128,6 +128,24 @@
     background: rgba(56, 97, 251, 0.25);
     color: inherit;
   }
+
+  /* Ensure text wraps properly in editor, especially on mobile */
+  .ProseMirror {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .ProseMirror p,
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3,
+  .ProseMirror h4,
+  .ProseMirror h5,
+  .ProseMirror h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
 }
 
 /* Theme variables and themes - OUTSIDE @layer to ensure they're included */

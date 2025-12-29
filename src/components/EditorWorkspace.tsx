@@ -100,7 +100,7 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
   if (node.type === 'split') {
     return (
       <div
-        className={`flex ${node.direction === 'vertical' ? 'flex-row' : 'flex-col'} h-full w-full min-h-0`}
+        className={`flex ${node.direction === 'vertical' ? 'flex-row' : 'flex-col'} h-full w-full min-h-0 overflow-hidden`}
       >
         {node.children.map((child, i) => (
           <React.Fragment key={child.id}>

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { EditorHeader } from './EditorHeader';
 import type { Note, Folder, Dashboard } from '../types';
@@ -31,6 +30,8 @@ interface AppLayoutProps {
   tabsEnabled?: boolean;
   onTabClick?: (noteId: string) => void;
   onTabClose?: (noteId: string) => void;
+  isTimerVisible?: boolean;
+  setIsTimerVisible?: (value: boolean) => void;
 }
 
 export const AppLayout = ({
@@ -57,6 +58,8 @@ export const AppLayout = ({
   tabsEnabled = false,
   onTabClick,
   onTabClose,
+  isTimerVisible = false,
+  setIsTimerVisible = () => {},
 }: AppLayoutProps) => {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const toggleFocusMode = () => setIsFocusMode(prev => !prev);
@@ -89,10 +92,58 @@ export const AppLayout = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobile, isSidebarOpen]);
 
+  // Close sidebar on ESC key
+  useEffect(() => {
+    if (!isMobile || !isSidebarOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isMobile, isSidebarOpen]);
+
+  // Swipe gesture to close sidebar
+  useEffect(() => {
+    if (!isMobile || !isSidebarOpen) return;
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.changedTouches[0].screenX;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    };
+
+    const handleSwipe = () => {
+      // Swipe left to close (at least 50px swipe)
+      if (touchStartX - touchEndX > 50) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    const sidebar = document.getElementById('mobile-sidebar');
+    if (sidebar) {
+      sidebar.addEventListener('touchstart', handleTouchStart);
+      sidebar.addEventListener('touchend', handleTouchEnd);
+      return () => {
+        sidebar.removeEventListener('touchstart', handleTouchStart);
+        sidebar.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isMobile, isSidebarOpen]);
+
   return (
     <>
       <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
-      <div className="flex h-screen overflow-hidden select-none" style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}>
+      <div className={`flex h-screen overflow-hidden select-none ${isFocusMode ? 'focus-mode' : ''}`} style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}>
         {/* Mobile Backdrop Overlay */}
         {isMobile && isSidebarOpen && (
           <div 
@@ -109,25 +160,10 @@ export const AppLayout = ({
               ? `fixed top-0 left-0 h-full z-50 transition-transform duration-300 ease-in-out ${
                   isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
                 }`
-              : 'relative'
+              : 'relative h-full'
           }`}
-          style={isMobile ? { width: '280px' } : undefined}
+          style={isMobile ? { width: '85vw', maxWidth: '400px' } : undefined}
         >
-          {/* Mobile Sidebar Header */}
-          {isMobile && isSidebarOpen && (
-            <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--divider)' }}>
-              <span className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Flow</span>
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-2 rounded-lg transition-colors"
-                style={{ color: 'var(--muted)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          )}
           
           <Sidebar
             notes={notes}
@@ -135,7 +171,7 @@ export const AppLayout = ({
             dashboards={dashboards}
             activeDashboard={activeDashboard}
             selectedNoteId={selectedNoteId || null}
-            sidebarWidth={isMobile ? 280 : sidebarWidth}
+            sidebarWidth={isMobile ? Math.min(window.innerWidth * 0.85, 400) : sidebarWidth}
             setSidebarWidth={isMobile ? () => {} : setSidebarWidth}
             onNoteSelect={(noteId) => {
               onNoteSelect?.(noteId);
@@ -150,38 +186,24 @@ export const AppLayout = ({
             onDashboardChange={onDashboardChange}
             onDashboardsUpdate={onDashboardsUpdate}
             loading={loading}
+            onCloseMobile={isMobile ? () => setIsSidebarOpen(false) : undefined}
           />
         </div>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mobile Hamburger Button */}
-          {isMobile && (
-            <div className="flex items-center p-4 border-b" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--divider)' }}>
-              <button
-                id="hamburger-button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 rounded-lg transition-colors"
-                style={{ color: 'var(--text)', minWidth: '44px', minHeight: '44px' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-              <span className="ml-3 text-lg font-semibold" style={{ color: 'var(--text)' }}>Flow</span>
-            </div>
-          )}
-
           {/* Header with Tabs (optional) */}
-          {showHeader && tabsEnabled && !isMobile && (
+          {showHeader && tabsEnabled && (
             <EditorHeader
               openNotes={openNotes}
               activeNoteId={selectedNoteId || null}
               tabsEnabled={tabsEnabled}
               onTabClick={onTabClick || (() => {})}
               onTabClose={onTabClose || (() => {})}
-              isTimerVisible={false}
-              setIsTimerVisible={() => {}}
+              isTimerVisible={isTimerVisible}
+              setIsTimerVisible={setIsTimerVisible}
+              isMobile={isMobile}
+              onOpenSidebar={() => setIsSidebarOpen(true)}
             />
           )}
         

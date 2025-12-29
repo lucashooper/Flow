@@ -1,4 +1,4 @@
-import { FileText, Minimize2, Pencil, Timer } from 'lucide-react';
+import { Minimize2, Pencil, Timer, Menu, MoreVertical } from 'lucide-react';
 import { DragOverlay } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState } from 'react';
@@ -14,6 +14,8 @@ interface EditorHeaderProps {
   onTabClose: (noteId: string) => void;
   isTimerVisible: boolean;
   setIsTimerVisible: (value: boolean) => void;
+  isMobile?: boolean;
+  onOpenSidebar?: () => void;
 }
 
 export const EditorHeader = ({ 
@@ -24,8 +26,11 @@ export const EditorHeader = ({
   onTabClose,
   isTimerVisible,
   setIsTimerVisible,
+  isMobile = false,
+  onOpenSidebar,
 }: EditorHeaderProps) => {
   const [activeId] = useState<string | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
   
   // Check plugin states from localStorage
@@ -43,6 +48,18 @@ export const EditorHeader = ({
   return (
     <>
       <div className="tabs top-nav border-b border-subtle px-3 flex items-center">
+        {/* Mobile Hamburger */}
+        {isMobile && onOpenSidebar && (
+          <button
+            onClick={onOpenSidebar}
+            className="p-2 mr-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text)', minWidth: '44px', minHeight: '44px' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Tabs area - flush contiguous tabs like Chrome/Obsidian */}
         {tabsEnabled && openNotes.length > 0 && (
@@ -63,53 +80,101 @@ export const EditorHeader = ({
 
         {/* Right-side actions */}
         <div className="ml-auto nav-actions flex items-center gap-1.5">
-          {/* Word count toggle */}
-          <button
-            onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}
-            className="nav-item p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
-            title="Toggle word count"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-
-          {/* Drawing toggle */}
-          <button
-            onClick={() => window.dispatchEvent(new Event('toggleDrawingMode'))}
-            className="nav-item p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
-            title="Toggle drawing mode"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
-
-          {/* Focus Mode toggle - only show if enabled */}
-          {focusModeEnabled && (
-            <button
-              onClick={toggleFocusMode}
-              className="nav-item focus-toggle p-1.5 rounded hover:bg-[#222222] text-[#888888] hover:text-[#e5e5e5] transition-colors"
-              title="Toggle Focus Mode"
-            >
-              <Minimize2 className={`w-4 h-4 ${isFocusMode ? 'text-[#e5e5e5]' : ''}`} />
-            </button>
-          )}
-
-          {/* Floating Focus Timer toggle - only show if enabled */}
-          {pomodoroEnabled && (
-            <button
-              type="button"
-              onClick={() => setIsTimerVisible(!isTimerVisible)}
-              title={isTimerVisible ? 'Hide timer' : 'Show timer'}
-              className={
-                'nav-item p-1.5 rounded hover:bg-[#222222] transition-colors ' +
-                (isTimerVisible ? 'text-[#e5e5e5]' : 'text-[#888888] hover:text-[#e5e5e5]')
-              }
-            >
-              <Timer
-                className="w-4 h-4"
-                style={{
-                  filter: isTimerVisible ? 'drop-shadow(0 0 6px rgba(168,85,247,0.65))' : 'none',
-                }}
-              />
-            </button>
+          {!isMobile ? (
+            // Desktop: Show all icons
+            <>
+              {focusModeEnabled && (
+                <button
+                  onClick={toggleFocusMode}
+                  className={`nav-item p-2 rounded transition-colors ${
+                    isFocusMode ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
+                  }`}
+                  style={{ color: isFocusMode ? 'var(--accent)' : 'var(--muted)' }}
+                  title="Toggle Focus Mode"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => window.dispatchEvent(new Event('toggleDrawingMode'))}
+                className="nav-item p-2 rounded hover:bg-[#1a1a1a] transition-colors"
+                style={{ color: 'var(--muted)' }}
+                title="Draw Mode (Coming Soon)"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              {pomodoroEnabled && (
+                <button
+                  onClick={() => setIsTimerVisible(!isTimerVisible)}
+                  className={`nav-item p-2 rounded transition-colors ${
+                    isTimerVisible ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
+                  }`}
+                  style={{ color: isTimerVisible ? 'var(--accent)' : 'var(--muted)' }}
+                  title="Pomodoro Timer"
+                >
+                  <Timer className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          ) : (
+            // Mobile: Show more menu
+            <div className="relative">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="nav-item p-2 rounded hover:bg-[#1a1a1a] text-[#888888] transition-colors"
+                title="More options"
+                style={{ minWidth: '44px', minHeight: '44px' }}
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              {showMobileMenu && (
+                <div 
+                  className="absolute right-0 top-full mt-2 rounded-lg shadow-2xl py-1 z-50 min-w-[160px]"
+                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}
+                >
+                  {focusModeEnabled && (
+                    <button
+                      onClick={() => {
+                        toggleFocusMode();
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
+                      style={{ color: 'var(--text)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Minimize2 className="w-5 h-5" />
+                      <span>Focus Mode</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowMobileMenu(false)}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
+                    style={{ color: 'var(--text)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Pencil className="w-5 h-5" />
+                    <span>Draw Mode</span>
+                  </button>
+                  {pomodoroEnabled && (
+                    <button
+                      onClick={() => {
+                        setIsTimerVisible(!isTimerVisible);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
+                      style={{ color: 'var(--text)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Timer className="w-5 h-5" />
+                      <span>Pomodoro Timer</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
