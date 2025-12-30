@@ -18,9 +18,10 @@ export const useDashboardData = () => {
   const [loading, setLoading] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [openNotes, setOpenNotes] = useState<Note[]>(() => {
-    // Restore open notes from localStorage
+    // Restore open notes from localStorage with user-specific key
+    if (!user?.id) return [];
     try {
-      const saved = localStorage.getItem('openNotes');
+      const saved = localStorage.getItem(`openNotes_${user.id}`);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -33,10 +34,26 @@ export const useDashboardData = () => {
     return saved !== null ? JSON.parse(saved) : true;
   })();
 
-  // Persist open notes to localStorage whenever they change
+  // Persist open notes to localStorage with user-specific key whenever they change
   useEffect(() => {
-    localStorage.setItem('openNotes', JSON.stringify(openNotes));
-  }, [openNotes]);
+    if (user?.id) {
+      localStorage.setItem(`openNotes_${user.id}`, JSON.stringify(openNotes));
+    }
+  }, [openNotes, user?.id]);
+
+  // Clear open notes when user changes
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        const saved = localStorage.getItem(`openNotes_${user.id}`);
+        setOpenNotes(saved ? JSON.parse(saved) : []);
+      } catch {
+        setOpenNotes([]);
+      }
+    } else {
+      setOpenNotes([]);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     // Only fetch dashboards once when user is available

@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
@@ -133,13 +133,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user) throw new Error('No user logged in');
     
     const { error } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: user.id, 
+      .from('user_profiles')
+      .update({ 
         username: username,
-        email: user.email,
         updated_at: new Date().toISOString()
-      });
+      })
+      .eq('id', user.id);
     
     if (error) throw error;
     await fetchUserProfile(user.id);
