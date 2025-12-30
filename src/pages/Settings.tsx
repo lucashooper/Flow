@@ -378,10 +378,17 @@ export const Settings = () => {
                     <button
                       onClick={async () => {
                         try {
+                          console.log('Logging out...');
                           await signOut();
-                          navigate('/login');
+                          // Clear all localStorage
+                          localStorage.clear();
+                          // Force navigation to login
+                          window.location.href = '/login';
                         } catch (error) {
                           console.error('Logout error:', error);
+                          // Force logout even if error occurs
+                          localStorage.clear();
+                          window.location.href = '/login';
                         }
                       }}
                       className="w-full bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
