@@ -197,9 +197,9 @@ export const DashboardSwitcher = ({
     }
   };
 
-  const handleEditCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>, dashboardId: string) => {
+  const handleEditCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user || !contextMenuDashboard) return;
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -220,7 +220,7 @@ export const DashboardSwitcher = ({
       const { error } = await supabase
         .from('dashboards')
         .update({ cover_image: data.publicUrl })
-        .eq('id', dashboardId);
+        .eq('id', contextMenuDashboard.id);
 
       if (error) throw error;
       

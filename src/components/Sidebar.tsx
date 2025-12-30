@@ -224,7 +224,6 @@ export const Sidebar = ({
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
     const isOver = overId === folder.id;
-    const hasMatches = searchQuery && folderHasMatches(folder.id);
 
     return (
       <div key={folder.id}>
@@ -238,11 +237,11 @@ export const Sidebar = ({
           onCreateNote={() => onNoteCreate(folder.id)}
           onCreateSubfolder={() => onFolderCreate(folder.id)}
           isOver={isOver}
-          autoRenameId={autoRenameFolderId}
+          autoRenameId={autoRenameFolderId ?? undefined}
           onRenameStarted={(id: string) => {
             if (autoRenameFolderId === id) setAutoRenameFolderId(null);
           }}
-          notes={notes}
+          notes={notes ?? []}
         />
 
         {isExpanded && (

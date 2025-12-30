@@ -12,7 +12,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
-  const saveTimeoutRef = useRef<number | undefined>(undefined);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentNoteIdRef = useRef<string | undefined>(undefined);
   
   console.log('📝 [EditorPanel] Received searchQuery:', searchQuery, 'for note:', note?.title);

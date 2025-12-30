@@ -15,6 +15,7 @@ interface DraggableFolderItemProps {
   isOver?: boolean;
   autoRenameId?: string;
   onRenameStarted?: (folderId: string) => void;
+  notes?: any[];
 }
 
 export const DraggableFolderItem = ({ isOver, ...props }: DraggableFolderItemProps) => {
