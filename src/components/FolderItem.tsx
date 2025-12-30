@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Folder, FolderOpen, ChevronRight, ChevronDown, Trash2, Edit3, Smile, Plus, FolderPlus } from 'lucide-react';
+import { Folder, FolderOpen, ChevronRight, ChevronDown, Trash2, Edit3, Smile, Plus, FolderPlus, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Folder as FolderType } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -15,6 +15,7 @@ interface FolderItemProps {
   onCreateSubfolder: () => void;
   autoRenameId?: string;
   onRenameStarted?: (folderId: string) => void;
+  notes?: any[];
 }
 
 export const FolderItem = ({
@@ -28,6 +29,7 @@ export const FolderItem = ({
   onCreateSubfolder,
   autoRenameId,
   onRenameStarted,
+  notes = [],
 }: FolderItemProps) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -88,6 +90,47 @@ export const FolderItem = ({
   const handleDelete = () => {
     onDelete(folder.id);
     setShowContextMenu(false);
+  };
+
+  const handleExportFolder = () => {
+    setShowContextMenu(false);
+    
+    // Get all notes in this folder
+    const folderNotes = notes.filter(note => note.folder_id === folder.id);
+    
+    if (folderNotes.length === 0) {
+      alert('No notes to export in this folder');
+      return;
+    }
+    
+    // Create export content
+    let exportContent = `# ${folder.name}\n\n`;
+    exportContent += `Exported from Flow on ${new Date().toLocaleDateString()}\n`;
+    exportContent += `Total notes: ${folderNotes.length}\n\n`;
+    exportContent += '='.repeat(80) + '\n\n';
+    
+    folderNotes.forEach((note, index) => {
+      exportContent += `## Note ${index + 1}: ${note.title || 'Untitled'}\n\n`;
+      
+      // Strip HTML tags from content
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = note.content || '';
+      const plainText = tempDiv.textContent || tempDiv.innerText || '';
+      
+      exportContent += plainText + '\n\n';
+      exportContent += '-'.repeat(80) + '\n\n';
+    });
+    
+    // Create and download file
+    const blob = new Blob([exportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${folder.name.replace(/[^a-z0-9]/gi, '_')}_export.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleEmojiSelect = (emoji: string) => {
@@ -224,17 +267,26 @@ export const FolderItem = ({
             <div className="my-1 border-t border-[#2a2a2a]" />
 
             <button
+              onClick={handleExportFolder}
+              className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
+            >
+              <Download className="w-4 h-4" />
+              Export folder
+            </button>
+
+            <div className="my-1 border-t border-[#2a2a2a]" />
+
+            <button
               onClick={handleDelete}
-              className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-[#252525] flex items-center gap-3"
+              className="w-full px-4 py-2 text-left text-sm text-[#ff4444] hover:bg-[#252525] flex items-center gap-3"
             >
               <Trash2 className="w-4 h-4" />
-              Delete
+              Delete folder
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Emoji Picker */}
       {showEmojiPicker && (
         <EmojiPicker
           position={contextMenuPos}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronUp, Plus, Settings as SettingsIcon, Trash2, Edit2, Image } from 'lucide-react';
+import { ChevronUp, Plus, Settings as SettingsIcon, Trash2, Edit2, Image, Download } from 'lucide-react';
+import JSZip from 'jszip';
 import type { Dashboard } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -90,6 +91,80 @@ export const DashboardSwitcher = ({
       onDashboardsUpdate();
     } catch (error) {
       console.error('Error deleting dashboard:', error);
+    }
+  };
+
+  const handleExportDashboard = async (dashboard: Dashboard) => {
+    try {
+      // Fetch all notes and folders for this dashboard
+      const { data: notes, error: notesError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('dashboard_id', dashboard.id);
+
+      const { data: folders, error: foldersError } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('dashboard_id', dashboard.id);
+
+      if (notesError || foldersError) throw notesError || foldersError;
+
+      // Create ZIP file
+      const zip = new JSZip();
+      
+      // Build folder structure
+      const folderMap = new Map<string, any>();
+      (folders || []).forEach(folder => {
+        folderMap.set(folder.id, folder);
+      });
+
+      // Helper to get folder path
+      const getFolderPath = (folderId: string): string => {
+        const folder = folderMap.get(folderId);
+        if (!folder) return '';
+        
+        const parentPath = folder.parent_id ? getFolderPath(folder.parent_id) : '';
+        const folderName = folder.name.replace(/[^a-z0-9]/gi, '_');
+        return parentPath ? `${parentPath}/${folderName}` : folderName;
+      };
+
+      // Add notes to ZIP
+      (notes || []).forEach(note => {
+        // Strip HTML tags from content
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = note.content || '';
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        
+        const fileName = `${note.title || 'Untitled'}.txt`.replace(/[^a-z0-9.]/gi, '_');
+        
+        if (note.folder_id) {
+          const folderPath = getFolderPath(note.folder_id);
+          zip.file(`${folderPath}/${fileName}`, plainText);
+        } else {
+          zip.file(fileName, plainText);
+        }
+      });
+
+      // Add README
+      const readme = `# ${dashboard.name}\n\nExported from Flow on ${new Date().toLocaleDateString()}\n\nTotal notes: ${notes?.length || 0}\nTotal folders: ${folders?.length || 0}\n`;
+      zip.file('README.txt', readme);
+
+      // Generate and download ZIP
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dashboard.name.replace(/[^a-z0-9]/gi, '_')}_export.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setContextMenuPosition(null);
+      setContextMenuDashboard(null);
+    } catch (error) {
+      console.error('Error exporting dashboard:', error);
+      alert('Failed to export dashboard. Please try again.');
     }
   };
 
@@ -412,10 +487,9 @@ export const DashboardSwitcher = ({
             <button
               onClick={() => {
                 setEditingDashboard(contextMenuDashboard);
-                setEditName(contextMenuDashboard.name);
-                setEditEmoji(contextMenuDashboard.emoji);
+                setEditName(contextMenuDashboard?.name || '');
+                setEditEmoji(contextMenuDashboard?.emoji || '📝');
                 setContextMenuPosition(null);
-                setContextMenuDashboard(null);
               }}
               className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
             >
@@ -427,8 +501,8 @@ export const DashboardSwitcher = ({
               ref={editCoverInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => handleEditCoverUpload(e, contextMenuDashboard.id)}
               className="hidden"
+              onChange={handleEditCoverUpload}
             />
             <button
               onClick={() => editCoverInputRef.current?.click()}
@@ -439,10 +513,37 @@ export const DashboardSwitcher = ({
             </button>
             
             <div className="border-t border-[#2a2a2a] my-1" />
+
+            <button
+              onClick={() => {
+                if (contextMenuDashboard) {
+                  handleExportDashboard(contextMenuDashboard);
+                }
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export Dashboard
+            </button>
+            
+            <div className="border-t border-[#2a2a2a] my-1" />
             
             <button
               onClick={() => {
-                handleDeleteDashboard(contextMenuDashboard.id);
+                window.dispatchEvent(new Event('openSettings'));
+                setContextMenuPosition(null);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+            >
+              <SettingsIcon className="w-4 h-4" />
+              Settings
+            </button>
+            
+            <button
+              onClick={() => {
+                if (contextMenuDashboard && window.confirm(`Delete "${contextMenuDashboard.name}"? This will also delete all notes and folders in this dashboard.`)) {
+                  handleDeleteDashboard(contextMenuDashboard.id);
+                }
                 setContextMenuPosition(null);
               }}
               className="w-full px-4 py-2 text-left text-sm text-[#ef4444] hover:bg-[#252525] transition-colors flex items-center gap-2"

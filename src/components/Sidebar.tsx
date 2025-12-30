@@ -227,21 +227,22 @@ export const Sidebar = ({
     const hasMatches = searchQuery && folderHasMatches(folder.id);
 
     return (
-      <div key={folder.id} className={searchQuery && !hasMatches ? 'opacity-40' : ''}>
+      <div key={folder.id}>
         <DraggableFolderItem
           folder={folder}
           depth={depth}
           isExpanded={isExpanded}
-          isOver={isOver}
           onToggle={() => toggleFolder(folder.id)}
           onUpdate={onFolderUpdate}
           onDelete={onFolderDelete}
           onCreateNote={() => onNoteCreate(folder.id)}
           onCreateSubfolder={() => onFolderCreate(folder.id)}
-          autoRenameId={autoRenameFolderId || undefined}
+          isOver={isOver}
+          autoRenameId={autoRenameFolderId}
           onRenameStarted={(id: string) => {
             if (autoRenameFolderId === id) setAutoRenameFolderId(null);
           }}
+          notes={notes}
         />
 
         {isExpanded && (

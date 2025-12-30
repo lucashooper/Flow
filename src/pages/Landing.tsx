@@ -216,27 +216,19 @@ export const Landing = () => {
             </div>
             
             <div 
-              className="p-5 rounded-xl transition-all hover:scale-[1.01]"
-              style={{ 
-                background: 'linear-gradient(135deg, rgba(15, 15, 15, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%)',
-                border: '1px solid #1a1a1a',
-                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 8px rgba(0, 0, 0, 0.3)'
-              }}
+              className="p-6 rounded-xl border transition-all hover:border-[#4fc3f7]/50"
+              style={{ backgroundColor: '#0f0f0f', borderColor: '#1a1a1a' }}
             >
               <div className="flex items-center gap-3 mb-3">
-                <Lock className="w-5 h-5" style={{ color: '#4fc3f7' }} />
-                <h3 className="text-base font-medium" style={{ color: '#e5e5e5' }}>Private</h3>
+                <Download className="w-5 h-5" style={{ color: '#4fc3f7' }} />
+                <h3 className="text-base font-medium" style={{ color: '#e5e5e5' }}>Portable</h3>
               </div>
-              <p className="text-sm" style={{ color: '#666666' }}>Encrypted notes</p>
+              <p className="text-sm" style={{ color: '#666666' }}>Export your notes anytime</p>
             </div>
             
             <div 
-              className="p-5 rounded-xl transition-all hover:scale-[1.01]"
-              style={{ 
-                background: 'linear-gradient(135deg, rgba(15, 15, 15, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%)',
-                border: '1px solid #1a1a1a',
-                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 8px rgba(0, 0, 0, 0.3)'
-              }}
+              className="p-6 rounded-xl border transition-all hover:border-[#4fc3f7]/50"
+              style={{ backgroundColor: '#0f0f0f', borderColor: '#1a1a1a' }}
             >
               <div className="flex items-center gap-3 mb-3">
                 <Zap className="w-5 h-5" style={{ color: '#4fc3f7' }} />
@@ -392,8 +384,8 @@ export const Landing = () => {
               <div className="w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1a1a1a' }}>
                 <Lock className="w-6 h-6" style={{ color: '#4fc3f7' }} />
               </div>
-              <h3 className="text-lg font-medium mb-2" style={{ color: '#e5e5e5' }}>End-to-end encryption</h3>
-              <p className="text-sm" style={{ color: '#666666' }}>Your notes are encrypted at rest</p>
+              <h3 className="text-lg font-medium mb-2" style={{ color: '#e5e5e5' }}>Your data is secure</h3>
+              <p className="text-sm" style={{ color: '#666666' }}>Row-level security and automatic backups</p>
             </div>
             
             <div className="text-center">
@@ -441,7 +433,7 @@ export const Landing = () => {
       {/* Footer */}
       <footer className="py-12 px-6 border-t" style={{ backgroundColor: '#0a0a0a', borderColor: '#1a1a1a' }}>
         <div className="max-w-7xl mx-auto text-center">
-          <p className="text-sm" style={{ color: '#666666' }}>© 2024 Flow. Built for deep work.</p>
+          <p className="text-sm" style={{ color: '#666666' }}>© 2025 Flow. Built for deep work.</p>
         </div>
       </footer>
     </div>
