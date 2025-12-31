@@ -158,7 +158,7 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
                 className="w-full h-full object-cover"
               />
               {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/70" />
+              <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/60" />
               
               {/* Vignette Effect */}
               <div
@@ -181,11 +181,13 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
             <div className="relative h-full flex flex-col justify-between p-8 md:p-12">
               {/* Flow Logo Watermark */}
               <div className="flex justify-between items-start">
-                <div className="text-white/30 text-2xl md:text-3xl font-bold tracking-tight">
-                  Flow
-                </div>
+                <img 
+                  src="/FlowIcon-Main.png" 
+                  alt="Flow" 
+                  className="w-8 h-8 md:w-10 md:h-10 opacity-20"
+                />
                 <div className="text-right">
-                  <div className="text-sm md:text-base text-white/60 mb-1">
+                  <div className="text-xs md:text-sm text-white/40 tracking-wide uppercase font-medium">
                     {new Date(card.createdAt).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -197,39 +199,56 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
 
               {/* Main Content */}
               <div className="space-y-6">
-                <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight tracking-tight">
+                <h1 className="text-4xl md:text-6xl font-semibold text-white leading-[1.1] tracking-[-0.04em]">
                   {card.title}
                 </h1>
 
                 {/* Stats */}
                 <div className="flex items-center gap-8">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                      <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-14 h-14 md:w-18 md:h-18 rounded-full flex items-center justify-center"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(12px)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                      }}
+                    >
+                      <svg className="w-6 h-6 md:w-7 md:h-7 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div>
-                      <div className="text-3xl md:text-5xl font-bold text-white tabular-nums">
+                      <div className="text-5xl md:text-7xl font-black text-white tabular-nums tracking-tight" style={{ letterSpacing: '-0.03em' }}>
                         {card.minutes}
                       </div>
-                      <div className="text-sm md:text-base text-white/60 font-medium">
+                      <div className="text-xs md:text-sm text-white/40 font-medium tracking-wider uppercase mt-1">
                         minutes
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <svg
                         key={star}
-                        className={`w-6 h-6 md:w-8 md:h-8 ${
+                        className={`w-6 h-6 md:w-8 md:h-8 transition-all ${
                           star <= card.rating
-                            ? 'fill-[#A0522D] text-[#A0522D]'
-                            : 'fill-white/20 text-white/20'
+                            ? 'drop-shadow-[0_0_8px_rgba(218,165,32,0.3)]'
+                            : ''
                         }`}
                         viewBox="0 0 24 24"
+                        style={{
+                          fill: star <= card.rating 
+                            ? 'url(#starGradient)'
+                            : 'rgba(255, 255, 255, 0.12)',
+                        }}
                       >
+                        <defs>
+                          <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style={{ stopColor: '#DAA520', stopOpacity: 1 }} />
+                            <stop offset="100%" style={{ stopColor: '#B8860B', stopOpacity: 1 }} />
+                          </linearGradient>
+                        </defs>
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
                     ))}
@@ -242,7 +261,12 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
                     {card.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="px-4 py-2 bg-white/15 backdrop-blur-sm rounded-full text-sm md:text-base text-white font-medium"
+                        className="px-4 py-2 rounded-full text-xs md:text-sm text-white/90 font-medium tracking-wide"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.12)',
+                          backdropFilter: 'blur(12px)',
+                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                        }}
                       >
                         {tag}
                       </span>
@@ -253,7 +277,7 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
                 {/* Reflection */}
                 {card.note && (
                   <div className="max-w-2xl">
-                    <p className="text-base md:text-lg text-white/80 italic leading-relaxed">
+                    <p className="text-sm md:text-base text-white/60 italic leading-relaxed tracking-wide">
                       "{card.note}"
                     </p>
                   </div>

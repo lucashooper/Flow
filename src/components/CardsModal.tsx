@@ -359,8 +359,8 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                       <div className="relative p-6">
                         <div className="flex items-start justify-between mb-4">
                           <div>
-                            <h3 className="text-xl font-semibold text-white mb-1">{card.title}</h3>
-                            <p className="text-sm text-gray-300">
+                            <h3 className="text-xl font-semibold text-white mb-1 tracking-[-0.03em]">{card.title}</h3>
+                            <p className="text-xs text-white/40 tracking-wide uppercase font-medium">
                               {new Date(card.createdAt).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -369,28 +369,60 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                             </p>
                           </div>
                           <button
-                            onClick={() => handleDeleteCard(card.id)}
-                            className="opacity-0 group-hover:opacity-100 p-2 bg-red-600/20 hover:bg-red-600/40 rounded-lg transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCard(card.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all"
+                            style={{
+                              background: 'rgba(220, 38, 38, 0.15)',
+                              backdropFilter: 'blur(8px)'
+                            }}
                           >
                             <X className="w-4 h-4 text-red-400" />
                           </button>
                         </div>
 
                         <div className="flex items-center gap-6 mb-4">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-gray-300" />
-                            <span className="text-lg font-semibold text-white">{card.minutes} min</span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                backdropFilter: 'blur(8px)',
+                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                              }}
+                            >
+                              <Clock className="w-4 h-4 text-white/60" />
+                            </div>
+                            <div>
+                              <span className="text-2xl font-black text-white tabular-nums tracking-tight">{card.minutes}</span>
+                              <span className="text-xs text-white/40 ml-1.5 tracking-wider uppercase">min</span>
+                            </div>
                           </div>
                           <div className="flex gap-1">
                             {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
+                              <svg
                                 key={star}
                                 className={`w-4 h-4 ${
                                   star <= card.rating
-                                    ? 'fill-[#A0522D] text-[#A0522D]'
-                                    : 'text-gray-600'
+                                    ? 'drop-shadow-[0_0_4px_rgba(218,165,32,0.2)]'
+                                    : ''
                                 }`}
-                              />
+                                viewBox="0 0 24 24"
+                                style={{
+                                  fill: star <= card.rating 
+                                    ? 'url(#starGradientSmall)'
+                                    : 'rgba(255, 255, 255, 0.12)',
+                                }}
+                              >
+                                <defs>
+                                  <linearGradient id="starGradientSmall" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style={{ stopColor: '#DAA520', stopOpacity: 1 }} />
+                                    <stop offset="100%" style={{ stopColor: '#B8860B', stopOpacity: 1 }} />
+                                  </linearGradient>
+                                </defs>
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                              </svg>
                             ))}
                           </div>
                         </div>
@@ -400,7 +432,12 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                             {card.tags.map((tag) => (
                               <span
                                 key={tag}
-                                className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-xs text-white"
+                                className="px-3 py-1 rounded-full text-xs text-white/80 font-medium tracking-wide"
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.1)',
+                                  backdropFilter: 'blur(8px)',
+                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                                }}
                               >
                                 {tag}
                               </span>
@@ -409,7 +446,7 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                         )}
 
                         {card.note && (
-                          <p className="text-sm text-gray-300 italic">{card.note}</p>
+                          <p className="text-xs text-white/50 italic tracking-wide leading-relaxed">{card.note}</p>
                         )}
                       </div>
                     </div>
