@@ -25,6 +25,10 @@ function computeTextStats(text: string): TextStats {
 }
 
 export const WordCount = ({ editor }: WordCountProps) => {
+  const [pluginEnabled, setPluginEnabled] = useState(() => {
+    const saved = localStorage.getItem('wordCountEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [isVisible, setIsVisible] = useState(() => {
     return localStorage.getItem('wordCountVisible') === 'true';
   });
@@ -79,11 +83,24 @@ export const WordCount = ({ editor }: WordCountProps) => {
     return () => window.removeEventListener('toggleWordCount', handler as EventListener);
   }, []);
 
+  // Listen for plugin state changes
+  useEffect(() => {
+    const handler = () => {
+      const saved = localStorage.getItem('wordCountEnabled');
+      setPluginEnabled(saved !== null ? JSON.parse(saved) : true);
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
+  // Don't render if plugin is disabled
+  if (!pluginEnabled) return null;
+
   return (
     <>
       {/* Word Count Panel */}
       <AnimatePresence>
-        {isVisible && (
+        {isVisible && pluginEnabled && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}

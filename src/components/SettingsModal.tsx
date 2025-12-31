@@ -40,6 +40,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('drawingModeEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [cardsEnabled, setCardsEnabled] = useState(() => {
+    const saved = localStorage.getItem('cardsEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -620,6 +624,27 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           style={{ backgroundColor: drawingModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: drawingModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Cards Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Cards</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Track focus sessions with shareable stat cards
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !cardsEnabled;
+                            setCardsEnabled(newValue);
+                            localStorage.setItem('cardsEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: cardsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: cardsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
                     </div>

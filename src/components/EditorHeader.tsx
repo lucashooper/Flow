@@ -1,10 +1,11 @@
-import { Minimize2, Pencil, Timer, Menu, MoreVertical } from 'lucide-react';
+import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard } from 'lucide-react';
 import { DragOverlay } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState } from 'react';
 import type { Note } from '../types';
 import { DraggableTab } from './DraggableTab';
 import { useFocusMode } from '../contexts/FocusModeContext';
+import { CardsModal } from './CardsModal';
 
 interface EditorHeaderProps {
   openNotes: Note[];
@@ -43,6 +44,23 @@ export const EditorHeader = ({
     const saved = localStorage.getItem('pomodoroEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   })();
+
+  const wordCountEnabled = (() => {
+    const saved = localStorage.getItem('wordCountEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
+
+  const drawingModeEnabled = (() => {
+    const saved = localStorage.getItem('drawingModeEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
+
+  const cardsEnabled = (() => {
+    const saved = localStorage.getItem('cardsEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  })();
+
+  const [showCardsModal, setShowCardsModal] = useState(false);
 
   const activeNote = openNotes.find(note => note.id === activeId);
   return (
@@ -95,14 +113,16 @@ export const EditorHeader = ({
                   <Minimize2 className="w-4 h-4" />
                 </button>
               )}
-              <button
-                onClick={() => window.dispatchEvent(new Event('toggleDrawingMode'))}
-                className="nav-item p-2 rounded hover:bg-[#1a1a1a] transition-colors"
-                style={{ color: 'var(--muted)' }}
-                title="Draw Mode (Coming Soon)"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
+              {drawingModeEnabled && (
+                <button
+                  onClick={() => window.dispatchEvent(new Event('toggleDrawingMode'))}
+                  className="nav-item p-2 rounded hover:bg-[#1a1a1a] transition-colors"
+                  style={{ color: 'var(--muted)' }}
+                  title="Toggle Drawing Mode"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
               {pomodoroEnabled && (
                 <button
                   onClick={() => setIsTimerVisible(!isTimerVisible)}
@@ -113,6 +133,26 @@ export const EditorHeader = ({
                   title="Pomodoro Timer"
                 >
                   <Timer className="w-4 h-4" />
+                </button>
+              )}
+              {wordCountEnabled && (
+                <button
+                  onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}
+                  className="nav-item p-2 rounded hover:bg-[#1a1a1a] transition-colors"
+                  style={{ color: 'var(--muted)' }}
+                  title="Toggle Word Count"
+                >
+                  <FileText className="w-4 h-4" />
+                </button>
+              )}
+              {cardsEnabled && (
+                <button
+                  onClick={() => setShowCardsModal(true)}
+                  className="nav-item p-2 rounded hover:bg-[#1a1a1a] transition-colors"
+                  style={{ color: 'var(--muted)' }}
+                  title="Focus Cards"
+                >
+                  <CreditCard className="w-4 h-4" />
                 </button>
               )}
             </>
@@ -187,6 +227,9 @@ export const EditorHeader = ({
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Cards Modal */}
+      <CardsModal isOpen={showCardsModal} onClose={() => setShowCardsModal(false)} />
     </>
   );
 };
