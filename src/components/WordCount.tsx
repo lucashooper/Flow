@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface WordCountProps {
   editor: Editor | null;
+  noteTitle?: string;
 }
 
 type TextStats = {
@@ -24,7 +25,7 @@ function computeTextStats(text: string): TextStats {
   return { words, characters, noSpaces };
 }
 
-export const WordCount = ({ editor }: WordCountProps) => {
+export const WordCount = ({ editor, noteTitle }: WordCountProps) => {
   const [pluginEnabled, setPluginEnabled] = useState(() => {
     const saved = localStorage.getItem('wordCountEnabled');
     return saved !== null ? JSON.parse(saved) : true;
@@ -110,7 +111,14 @@ export const WordCount = ({ editor }: WordCountProps) => {
             <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2a]">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#888888]" />
-                <span className="text-sm font-medium text-[#e5e5e5]">Statistics</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-[#e5e5e5]">Statistics</span>
+                  {noteTitle && (
+                    <span className="text-xs text-[#666666] truncate max-w-[150px]" title={noteTitle}>
+                      {noteTitle}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={toggleVisibility}

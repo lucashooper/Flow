@@ -37,9 +37,10 @@ interface TiptapEditorProps {
   onDrawingChange?: (data: string) => void;
   placeholder?: string;
   searchQuery?: string;
+  noteTitle?: string;
 }
 
-export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery }: TiptapEditorProps) => {
+export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle }: TiptapEditorProps) => {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
@@ -1039,7 +1040,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       )}
 
       {/* Word Count */}
-      <WordCount editor={editor} />
+      <WordCount editor={editor} noteTitle={noteTitle} />
 
       {/* Editor */}
       <EditorContent 

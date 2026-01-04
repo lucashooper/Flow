@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Upload, Star, Clock, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardViewer } from './CardViewer';
+import { PomodoroCompletionToast } from './PomodoroCompletionToast';
+import { useTimerStore } from '../stores/timerStore';
 
 interface Card {
   id: string;
@@ -30,6 +32,9 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [showPomodoroToast, setShowPomodoroToast] = useState(false);
+  const [pomodoroMinutes, setPomodoroMinutes] = useState(0);
+  const { getTotalMinutes, resetSession } = useTimerStore();
   
   // Form state
   const [title, setTitle] = useState('Lock-in session');
@@ -51,6 +56,18 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
       }
     }
   }, []);
+
+  // Listen for Pomodoro completion
+  useEffect(() => {
+    const handlePomodoroComplete = () => {
+      const totalMinutes = getTotalMinutes();
+      setPomodoroMinutes(totalMinutes);
+      setShowPomodoroToast(true);
+    };
+
+    window.addEventListener('pomodoroCompleted', handlePomodoroComplete);
+    return () => window.removeEventListener('pomodoroCompleted', handlePomodoroComplete);
+  }, [getTotalMinutes]);
 
   // Save cards to localStorage
   const saveCards = (newCards: Card[]) => {
@@ -90,6 +107,26 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
     setCustomBackground(null);
     
     // Switch to history tab
+    setActiveTab('history');
+  };
+
+  const handleQuickCreateFromPomodoro = (pomodoroRating: number) => {
+    const newCard: Card = {
+      id: Date.now().toString(),
+      title: 'Lock-in session',
+      minutes: pomodoroMinutes,
+      rating: pomodoroRating,
+      tags: [],
+      note: '',
+      background: PRESET_BACKGROUNDS[0],
+      createdAt: new Date().toISOString(),
+    };
+
+    saveCards([newCard, ...cards]);
+    setShowPomodoroToast(false);
+    resetSession();
+    
+    // Optionally switch to history to show the new card
     setActiveTab('history');
   };
 
@@ -464,6 +501,18 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
         isOpen={!!selectedCard}
         onClose={() => setSelectedCard(null)}
       />
+
+      {/* Pomodoro Completion Toast */}
+      {showPomodoroToast && (
+        <PomodoroCompletionToast
+          minutes={pomodoroMinutes}
+          onCreateCard={handleQuickCreateFromPomodoro}
+          onDismiss={() => {
+            setShowPomodoroToast(false);
+            resetSession();
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 };

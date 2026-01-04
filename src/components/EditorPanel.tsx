@@ -98,6 +98,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
           content={content}
           onChange={setContent}
           drawingData={drawingData}
+          noteTitle={title}
           onDrawingChange={setDrawingData}
           placeholder="Start writing..."
           searchQuery={searchQuery}

@@ -8,6 +8,8 @@ interface TimerState {
   mode: TimerMode;
   attachedTaskId: string | null;
   pomodorosCompleted: number;
+  totalMinutesTracked: number; // Track total minutes for Focus Cards
+  sessionStartTime: number | null; // Track when current session started
 
   // UI: global floating timer toggle
   floatingEnabled: boolean;
@@ -21,6 +23,8 @@ interface TimerState {
   attachTask: (taskId: string | null) => void;
   completePomodoro: () => void;
   setFloatingEnabled: (value: boolean) => void;
+  getTotalMinutes: () => number;
+  resetSession: () => void;
 }
 
 const DURATIONS = {
@@ -35,10 +39,18 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   mode: 'work',
   attachedTaskId: null,
   pomodorosCompleted: 0,
+  totalMinutesTracked: 0,
+  sessionStartTime: null,
 
   floatingEnabled: false,
 
-  start: () => set({ isRunning: true }),
+  start: () => {
+    const { sessionStartTime } = get();
+    set({ 
+      isRunning: true,
+      sessionStartTime: sessionStartTime || Date.now()
+    });
+  },
   
   pause: () => set({ isRunning: false }),
   
@@ -51,7 +63,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   },
   
   tick: () => {
-    const { secondsLeft, isRunning, mode, pomodorosCompleted } = get();
+    const { secondsLeft, isRunning, mode, pomodorosCompleted, totalMinutesTracked } = get();
     
     if (!isRunning || secondsLeft <= 0) return;
     
@@ -63,7 +75,17 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       
       // Auto-switch to break or work
       if (mode === 'work') {
+        // Add completed work session to total minutes
+        const minutesCompleted = DURATIONS.work / 60;
+        set({ totalMinutesTracked: totalMinutesTracked + minutesCompleted });
+        
         const newMode = (pomodorosCompleted + 1) % 4 === 0 ? 'longBreak' : 'break';
+        
+        // Dispatch event for Focus Cards integration
+        window.dispatchEvent(new CustomEvent('pomodoroCompleted', {
+          detail: { minutes: minutesCompleted }
+        }));
+        
         setTimeout(() => {
           set({ 
             mode: newMode, 
@@ -104,5 +126,16 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   setFloatingEnabled: (value: boolean) => {
     set({ floatingEnabled: value });
+  },
+
+  getTotalMinutes: () => {
+    return get().totalMinutesTracked;
+  },
+
+  resetSession: () => {
+    set({ 
+      totalMinutesTracked: 0,
+      sessionStartTime: null
+    });
   },
 }));
