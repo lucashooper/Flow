@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { X, Upload, Star, Clock, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardViewer } from './CardViewer';
-import { PomodoroCompletionToast } from './PomodoroCompletionToast';
-import { useTimerStore } from '../stores/timerStore';
 
 interface Card {
   id: string;
@@ -32,12 +30,9 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
-  const [showPomodoroToast, setShowPomodoroToast] = useState(false);
-  const [pomodoroMinutes, setPomodoroMinutes] = useState(0);
-  const { getTotalMinutes, resetSession } = useTimerStore();
   
   // Form state
-  const [title, setTitle] = useState('Lock-in session');
+  const [title, setTitle] = useState('Lock-in Session');
   const [minutes, setMinutes] = useState(0);
   const [rating, setRating] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -57,17 +52,38 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
     }
   }, []);
 
-  // Listen for Pomodoro completion
+  // Reload cards when modal opens to show newly created cards
   useEffect(() => {
-    const handlePomodoroComplete = () => {
-      const totalMinutes = getTotalMinutes();
-      setPomodoroMinutes(totalMinutes);
-      setShowPomodoroToast(true);
+    if (isOpen) {
+      const saved = localStorage.getItem('flowCards');
+      if (saved) {
+        try {
+          setCards(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to reload cards:', e);
+        }
+      }
+      // Switch to History tab when opened from Pomodoro
+      setActiveTab('history');
+    }
+  }, [isOpen]);
+
+  // Listen for Pomodoro card creation to pre-populate form
+  useEffect(() => {
+    const handleCardFromPomodoro = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { minutes: mins, rating: rat } = customEvent.detail;
+      
+      console.log('📝 [CardsModal] Pre-populating form with:', { minutes: mins, rating: rat });
+      
+      // Pre-populate form fields
+      setMinutes(mins);
+      setRating(rat);
     };
 
-    window.addEventListener('pomodoroCompleted', handlePomodoroComplete);
-    return () => window.removeEventListener('pomodoroCompleted', handlePomodoroComplete);
-  }, [getTotalMinutes]);
+    window.addEventListener('cardCreatedFromPomodoro', handleCardFromPomodoro);
+    return () => window.removeEventListener('cardCreatedFromPomodoro', handleCardFromPomodoro);
+  }, []);
 
   // Save cards to localStorage
   const saveCards = (newCards: Card[]) => {
@@ -99,7 +115,7 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
     saveCards([newCard, ...cards]);
     
     // Reset form
-    setTitle('Lock-in session');
+    setTitle('Lock-in Session');
     setMinutes(0);
     setRating(0);
     setSelectedTags([]);
@@ -110,25 +126,6 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
     setActiveTab('history');
   };
 
-  const handleQuickCreateFromPomodoro = (pomodoroRating: number) => {
-    const newCard: Card = {
-      id: Date.now().toString(),
-      title: 'Lock-in session',
-      minutes: pomodoroMinutes,
-      rating: pomodoroRating,
-      tags: [],
-      note: '',
-      background: PRESET_BACKGROUNDS[0],
-      createdAt: new Date().toISOString(),
-    };
-
-    saveCards([newCard, ...cards]);
-    setShowPomodoroToast(false);
-    resetSession();
-    
-    // Optionally switch to history to show the new card
-    setActiveTab('history');
-  };
 
   const handleDeleteCard = (id: string) => {
     saveCards(cards.filter(c => c.id !== id));
@@ -211,9 +208,29 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
           </div>
 
           {/* Content */}
-          <div className="overflow-y-auto px-8 py-6" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+          <div 
+            className="overflow-y-auto px-8 py-6" 
+            style={{ 
+              maxHeight: 'calc(90vh - 180px)'
+            }}
+          >
+            <style>{`
+              .overflow-y-auto::-webkit-scrollbar {
+                width: 6px;
+              }
+              .overflow-y-auto::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              .overflow-y-auto::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 3px;
+              }
+              .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.25);
+              }
+            `}</style>
             {activeTab === 'create' ? (
-              <div className="space-y-8">
+              <div className="space-y-4">
                 {/* Title */}
                 <div>
                   <label className="block text-sm font-medium text-[#e5e5e5] mb-2">
@@ -224,12 +241,12 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full px-4 py-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#e5e5e5] placeholder-[#666666] focus:outline-none focus:border-[#A0522D] transition-colors"
-                    placeholder="Lock-in session"
+                    placeholder="Lock-in Session"
                   />
                 </div>
 
                 {/* Time & Rating */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#e5e5e5] mb-2">
                       <Clock className="w-4 h-4 inline mr-2" />
@@ -271,7 +288,7 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
 
                 {/* Tags */}
                 <div>
-                  <label className="block text-sm font-medium text-[#e5e5e5] mb-3">
+                  <label className="block text-sm font-medium text-[#e5e5e5] mb-2">
                     Quick Tags (optional)
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -299,18 +316,18 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#e5e5e5] placeholder-[#666666] focus:outline-none focus:border-[#A0522D] transition-colors resize-none"
+                    className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#e5e5e5] placeholder-[#666666] focus:outline-none focus:border-[#A0522D] transition-colors resize-none"
                     placeholder="How did this session go?"
-                    rows={3}
+                    rows={2}
                   />
                 </div>
 
                 {/* Background Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-[#e5e5e5] mb-3">
+                  <label className="block text-sm font-medium text-[#e5e5e5] mb-2">
                     Card Background
                   </label>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-2">
                     {PRESET_BACKGROUNDS.map((bg) => (
                       <button
                         key={bg}
@@ -502,17 +519,6 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
         onClose={() => setSelectedCard(null)}
       />
 
-      {/* Pomodoro Completion Toast */}
-      {showPomodoroToast && (
-        <PomodoroCompletionToast
-          minutes={pomodoroMinutes}
-          onCreateCard={handleQuickCreateFromPomodoro}
-          onDismiss={() => {
-            setShowPomodoroToast(false);
-            resetSession();
-          }}
-        />
-      )}
     </AnimatePresence>
   );
 };

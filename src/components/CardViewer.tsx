@@ -158,7 +158,10 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
                 className="w-full h-full object-cover"
               />
               {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/60" />
+              <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/30 to-black/50" />
+              
+              {/* Subtle Color Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/20 via-transparent to-blue-900/20" />
               
               {/* Vignette Effect */}
               <div
@@ -184,7 +187,7 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
                 <img 
                   src="/FlowIcon-Main.png" 
                   alt="Flow" 
-                  className="w-8 h-8 md:w-10 md:h-10 opacity-20"
+                  className="w-8 h-8 md:w-10 md:h-10 opacity-60"
                 />
                 <div className="text-right">
                   <div className="text-xs md:text-sm text-white/40 tracking-wide uppercase font-medium">
@@ -200,7 +203,7 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
               {/* Main Content */}
               <div className="space-y-6">
                 <h1 className="text-4xl md:text-6xl font-semibold text-white leading-[1.1] tracking-[-0.04em]">
-                  {card.title}
+                  {card.title.charAt(0).toUpperCase() + card.title.slice(1)}
                 </h1>
 
                 {/* Stats */}

@@ -1,11 +1,12 @@
 import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard } from 'lucide-react';
 import { DragOverlay } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Note } from '../types';
 import { DraggableTab } from './DraggableTab';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { CardsModal } from './CardsModal';
+import { useTimerStore } from '../stores/timerStore';
 
 interface EditorHeaderProps {
   openNotes: Note[];
@@ -61,6 +62,58 @@ export const EditorHeader = ({
   })();
 
   const [showCardsModal, setShowCardsModal] = useState(false);
+  const { resetSession } = useTimerStore();
+
+  // Global event listener for Pomodoro completion (always active)
+  useEffect(() => {
+    const handlePomodoroComplete = (e: Event) => {
+      console.log('📥 [EditorHeader] Received pomodoroCompleted event:', e);
+      
+      const customEvent = e as CustomEvent;
+      const { minutes: mins, rating } = customEvent.detail;
+      
+      console.log('📊 [EditorHeader] Event details:', { minutes: mins, rating });
+      console.log('🔢 [EditorHeader] Minutes type:', typeof mins, 'Value:', mins);
+      
+      // Create card directly
+      const newCard = {
+        id: Date.now().toString(),
+        title: 'Lock-in Session',
+        minutes: mins,
+        rating: rating || 3,
+        tags: [],
+        note: '',
+        background: '/cards/Cool-Vinland-Saga-image.jpg',
+        createdAt: new Date().toISOString(),
+      };
+
+      console.log('💾 [EditorHeader] Creating new card:', newCard);
+
+      const saved = localStorage.getItem('flowCards');
+      const existingCards = saved ? JSON.parse(saved) : [];
+      const updatedCards = [newCard, ...existingCards];
+      localStorage.setItem('flowCards', JSON.stringify(updatedCards));
+      
+      console.log('✅ [EditorHeader] Card saved successfully. Total cards:', updatedCards.length);
+      
+      resetSession();
+      
+      // Auto-open Cards modal and switch to History tab
+      setShowCardsModal(true);
+      
+      // Dispatch event to switch to History tab and pre-populate form if user switches back to Create
+      window.dispatchEvent(new CustomEvent('cardCreatedFromPomodoro', {
+        detail: { minutes: mins, rating }
+      }));
+    };
+
+    console.log('👂 [EditorHeader] Event listener attached for pomodoroCompleted');
+    window.addEventListener('pomodoroCompleted', handlePomodoroComplete);
+    return () => {
+      console.log('🔇 [EditorHeader] Event listener removed');
+      window.removeEventListener('pomodoroCompleted', handlePomodoroComplete);
+    };
+  }, [resetSession]);
 
   const activeNote = openNotes.find(note => note.id === activeId);
   return (

@@ -7,12 +7,17 @@ interface FloatingTimerProps {
 
 // Simple 25:00 countdown timer with premium glassmorphic styling
 export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
+  const [customDuration, setCustomDuration] = useState(25 * 60);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isExpanded, setIsExpanded] = useState(() => {
     const saved = localStorage.getItem('timerExpanded');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [showLogButton, setShowLogButton] = useState(false);
+  const [completedMinutes, setCompletedMinutes] = useState(0);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -23,10 +28,25 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
   }, [isRunning]);
 
   useEffect(() => {
-    if (secondsLeft === 0) {
+    if (secondsLeft === 0 && isRunning) {
       setIsRunning(false);
+      
+      // Calculate actual minutes worked (convert seconds to minutes with decimals)
+      const minutesWorked = sessionStartTime 
+        ? parseFloat(((Date.now() - sessionStartTime) / 60000).toFixed(2))
+        : parseFloat((customDuration / 60).toFixed(2));
+      
+      console.log('⏱️ [FloatingTimer] Session completed:', { 
+        customDuration, 
+        customDurationMinutes: customDuration / 60,
+        minutesWorked 
+      });
+      
+      setCompletedMinutes(minutesWorked);
+      setShowLogButton(true);
+      setSessionStartTime(null);
     }
-  }, [secondsLeft]);
+  }, [secondsLeft, isRunning, customDuration, sessionStartTime]);
 
   if (!isVisible) return null;
 
@@ -35,9 +55,55 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
     .padStart(2, '0');
   const seconds = (secondsLeft % 60).toString().padStart(2, '0');
 
-  const progress = 1 - secondsLeft / (25 * 60);
+  const progress = 1 - secondsLeft / customDuration;
   const strokeDasharray = 100;
   const strokeDashoffset = strokeDasharray * (1 - progress);
+
+  const timePresets = [
+    { label: '10s', seconds: 10 },
+    { label: '5m', seconds: 5 * 60 },
+    { label: '10m', seconds: 10 * 60 },
+    { label: '15m', seconds: 15 * 60 },
+    { label: '20m', seconds: 20 * 60 },
+    { label: '25m', seconds: 25 * 60 },
+  ];
+
+  const setPresetTime = (seconds: number) => {
+    setCustomDuration(seconds);
+    setSecondsLeft(seconds);
+    setIsRunning(false);
+    setShowTimePicker(false);
+    setSessionStartTime(null);
+    setShowLogButton(false);
+  };
+
+  const handleLogSession = (rating: number) => {
+    console.log('🎯 [FloatingTimer] Dispatching pomodoroCompleted event:', { minutes: completedMinutes, rating });
+    
+    // Dispatch event for Focus Cards
+    const event = new CustomEvent('pomodoroCompleted', {
+      detail: { minutes: completedMinutes, rating }
+    });
+    window.dispatchEvent(event);
+    
+    console.log('✅ [FloatingTimer] Event dispatched successfully');
+    
+    // Reset timer
+    setShowLogButton(false);
+    setSecondsLeft(customDuration);
+  };
+
+  const handleSkipLog = () => {
+    setShowLogButton(false);
+    setSecondsLeft(customDuration);
+  };
+
+  const handleStart = () => {
+    if (!isRunning) {
+      setSessionStartTime(Date.now());
+    }
+    setIsRunning(!isRunning);
+  };
 
   const toggleExpanded = () => {
     const newValue = !isExpanded;
@@ -115,25 +181,62 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
           </div>
           {isExpanded && (
             <div className="mt-2 flex items-center gap-1.5">
-              <button
-                className="px-2.5 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-[11px] font-semibold text-black shadow-md hover:brightness-110 active:scale-[0.97] transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsRunning(!isRunning);
-                }}
-              >
-                {isRunning ? 'Pause' : 'Start'}
-              </button>
-              <button
-                className="px-2.5 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSecondsLeft(25 * 60);
-                  setIsRunning(false);
-                }}
-              >
-                Reset
-              </button>
+              {!showLogButton ? (
+                <>
+                  <button
+                    className="px-2.5 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-[11px] font-semibold text-black shadow-md hover:brightness-110 active:scale-[0.97] transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStart();
+                    }}
+                  >
+                    {isRunning ? 'Pause' : 'Start'}
+                  </button>
+                  <button
+                    className="px-2.5 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSecondsLeft(customDuration);
+                      setIsRunning(false);
+                      setSessionStartTime(null);
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTimePicker(!showTimePicker);
+                    }}
+                    title="Change duration"
+                  >
+                    :
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="px-2.5 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-[11px] font-semibold text-black shadow-md hover:brightness-110 active:scale-[0.97] transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLogSession(3);
+                    }}
+                    title="Log session (3 stars)"
+                  >
+                    ✓ Log
+                  </button>
+                  <button
+                    className="px-2.5 py-1 rounded-full bg-[#18181b] text-[11px] text-gray-200 border border-white/10 hover:bg-[#27272f] active:scale-[0.97] transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSkipLog();
+                    }}
+                  >
+                    Skip
+                  </button>
+                </>
+              )}
               <button
                 className="ml-0.5 px-1.5 py-1 rounded-full text-[11px] text-gray-400 hover:text-gray-100 hover:bg-white/5 active:scale-[0.97] transition"
                 onClick={(e) => {
@@ -148,6 +251,36 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
             </div>
           )}
         </div>
+
+        {/* Time Picker Dropdown */}
+        {showTimePicker && isExpanded && (
+          <div
+            className="absolute bottom-full right-0 mb-2 rounded-lg p-2 shadow-2xl"
+            style={{
+              backdropFilter: 'blur(16px)',
+              background: 'rgba(12,12,15,0.95)',
+              border: '1px solid rgba(248, 250, 252, 0.12)',
+              boxShadow: '0 12px 35px rgba(0,0,0,0.6)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-3 gap-1.5">
+              {timePresets.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => setPresetTime(preset.seconds)}
+                  className={`px-3 py-1.5 rounded text-[11px] font-medium transition-all ${
+                    customDuration === preset.seconds
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-black'
+                      : 'bg-[#18181b] text-gray-200 hover:bg-[#27272f]'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
