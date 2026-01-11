@@ -1,0 +1,24 @@
+{
+  "name": "Flow Notes",
+  "short_name": "Flow",
+  "description": "A premium note-taking app with focus features",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0c0f",
+  "theme_color": "#A0522D",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/FlowIcon-Main.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Flow-icon.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}

@@ -63,8 +63,6 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
           console.error('Failed to reload cards:', e);
         }
       }
-      // Switch to History tab when opened from Pomodoro
-      setActiveTab('history');
     }
   }, [isOpen]);
 
@@ -102,7 +100,7 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
     }
 
     const newCard: Card = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title,
       minutes,
       rating,
@@ -381,7 +379,7 @@ export const CardsModal = ({ isOpen, onClose }: CardsModalProps) => {
                     <p className="text-[#888888]">No cards yet. Create your first focus session!</p>
                   </div>
                 ) : (
-                  cards.map((card) => (
+                  cards.filter(card => card && card.id).map((card) => (
                     <div
                       key={card.id}
                       onClick={() => setSelectedCard(card)}

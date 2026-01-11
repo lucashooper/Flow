@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/FlowIcon-Main.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#A0522D" />
     
     <!-- Primary Meta Tags -->
     <title>Flow Notes</title>
@@ -27,5 +29,23 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register service worker for offline support
+      if ('serviceWorker' in navigator) {
+        console.log('🔍 Service Worker API available');
+        window.addEventListener('load', () => {
+          console.log('🚀 Attempting to register service worker...');
+          navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+              console.log('✅ Service Worker registered successfully:', registration);
+            })
+            .catch((error) => {
+              console.error('❌ Service Worker registration failed:', error);
+            });
+        });
+      } else {
+        console.warn('⚠️ Service Worker API not available in this browser');
+      }
+    </script>
   </body>
 </html>

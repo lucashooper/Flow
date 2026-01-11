@@ -77,7 +77,7 @@ export const EditorHeader = ({
       
       // Create card directly
       const newCard = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: 'Lock-in Session',
         minutes: mins,
         rating: rating || 3,
@@ -98,10 +98,10 @@ export const EditorHeader = ({
       
       resetSession();
       
-      // Auto-open Cards modal and switch to History tab
+      // Auto-open Cards modal to Create tab with pre-populated form
       setShowCardsModal(true);
       
-      // Dispatch event to switch to History tab and pre-populate form if user switches back to Create
+      // Dispatch event to pre-populate form
       window.dispatchEvent(new CustomEvent('cardCreatedFromPomodoro', {
         detail: { minutes: mins, rating }
       }));
