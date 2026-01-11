@@ -1,4 +1,5 @@
 import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard } from 'lucide-react';
+import { SyncStatus } from './SyncStatus';
 import { DragOverlay } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState, useEffect } from 'react';
@@ -177,17 +178,15 @@ export const EditorHeader = ({
                 </button>
               )}
               {pomodoroEnabled && (
-                <button
-                  onClick={() => setIsTimerVisible(!isTimerVisible)}
-                  className={`nav-item p-2 rounded transition-colors ${
-                    isTimerVisible ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
-                  }`}
-                  style={{ color: isTimerVisible ? 'var(--accent)' : 'var(--muted)' }}
-                  title="Pomodoro Timer"
-                >
-                  <Timer className="w-4 h-4" />
-                </button>
+                <SyncStatus />
               )}
+              <button
+                onClick={() => setIsTimerVisible(!isTimerVisible)}
+                className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                title="Toggle Timer"
+              >
+                <Timer className="w-5 h-5 text-[#888888]" />
+              </button>
               {wordCountEnabled && (
                 <button
                   onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}

@@ -10,6 +10,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (userId: string) => {
+    // Skip if offline
+    if (!navigator.onLine) {
+      console.log('📴 Offline - skipping user profile fetch');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -20,7 +26,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error && error.code !== 'PGRST116') throw error;
       if (data) setUserProfile(data);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      // Only log error if online (avoid spam when offline)
+      if (navigator.onLine) {
+        console.error('Error fetching user profile:', error);
+      }
     }
   };
 
@@ -30,8 +39,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         const userData = { id: session.user.id, email: session.user.email || '' };
         setUser(userData);
-        fetchUserProfile(session.user.id);
+        if (navigator.onLine) {
+          fetchUserProfile(session.user.id);
+        }
       }
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
 

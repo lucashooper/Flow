@@ -7,6 +7,7 @@ import { WelcomeModal } from '../components/WelcomeModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 import FloatingTimer from '../components/FloatingTimer';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core';
 import type { Note } from '../types';
@@ -21,6 +22,9 @@ export const NewDashboard = () => {
   const [draggedItem, setDraggedItem] = useState<{ type: 'note' | 'tab'; note: Note } | null>(null);
   
   console.log('🔍 [NewDashboard] searchQuery from URL:', searchQuery);
+
+  // Sync offline notes when connection is restored
+  useOfflineSync();
 
   // Listen for openSettings event from DashboardSwitcher
   useEffect(() => {

@@ -3,6 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Note, Folder, Dashboard } from '../types';
+import { 
+  createNote, 
+  updateNote, 
+  deleteNote, 
+  getNotesByDashboard,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  getFoldersByDashboard,
+  initialSync
+} from '../lib/dataAccess';
 
 export const useDashboardData = () => {
   const { user } = useAuth();
@@ -75,52 +86,82 @@ export const useDashboardData = () => {
   }, [activeDashboard?.id]); // Only refetch when dashboard ID changes
 
   const fetchDashboards = async () => {
+    // Try to load from cache first
+    const cached = localStorage.getItem('cachedDashboards');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        setDashboards(data || []);
+        const active = data?.find((d: Dashboard) => d.is_active) || data?.[0] || null;
+        setActiveDashboard(active);
+        console.log('📦 Loaded', data?.length || 0, 'dashboards from cache');
+      } catch (e) {
+        console.error('Failed to parse cached dashboards:', e);
+      }
+    }
+    
+    // Skip network request if offline
+    if (!navigator.onLine) {
+      console.log('📴 Offline mode - using cached data only');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('dashboards')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Dashboard fetch error:', error);
-        return;
-      }
+      if (error) throw error;
 
       setDashboards(data || []);
+      
+      // Cache for offline use
+      localStorage.setItem('cachedDashboards', JSON.stringify(data || []));
       
       // Set active dashboard (first one or the one marked as active)
       const active = data?.find(d => d.is_active) || data?.[0] || null;
       setActiveDashboard(active);
-    } catch (error) {
-      console.error('Error fetching dashboards:', error);
+      
+      console.log('🌐 Fetched', data?.length || 0, 'dashboards from server');
+    } catch (error: any) {
+      console.log('⚠️ Failed to fetch dashboards, using cache');
     }
   };
 
   const fetchData = async () => {
-    if (!activeDashboard) return;
+    if (!activeDashboard?.id || !user?.id) return;
 
     setLoading(true);
+    
     try {
-      const [notesResponse, foldersResponse] = await Promise.all([
-        supabase
-          .from('notes')
-          .select('*')
-          .eq('dashboard_id', activeDashboard.id)
-          .order('updated_at', { ascending: false }),
-        supabase
-          .from('folders')
-          .select('*')
-          .eq('dashboard_id', activeDashboard.id)
-          .order('name', { ascending: true })
+      // Load from IndexedDB
+      const [notesData, foldersData] = await Promise.all([
+        getNotesByDashboard(activeDashboard.id),
+        getFoldersByDashboard(activeDashboard.id)
       ]);
-
-      if (notesResponse.error) throw notesResponse.error;
-      if (foldersResponse.error) throw foldersResponse.error;
-
-      setNotes(notesResponse.data || []);
-      setFolders(foldersResponse.data || []);
+      
+      setNotes(notesData);
+      setFolders(foldersData);
+      
+      console.log('📦 Loaded from IndexedDB:', notesData.length, 'notes,', foldersData.length, 'folders');
+      
+      // If IndexedDB is empty and we're online, do initial sync
+      if (notesData.length === 0 && foldersData.length === 0 && navigator.onLine) {
+        console.log('🔄 IndexedDB empty, performing initial sync...');
+        await initialSync(user.id);
+        
+        // Reload from IndexedDB after sync
+        const [syncedNotes, syncedFolders] = await Promise.all([
+          getNotesByDashboard(activeDashboard.id),
+          getFoldersByDashboard(activeDashboard.id)
+        ]);
+        
+        setNotes(syncedNotes);
+        setFolders(syncedFolders);
+      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Failed to load data from IndexedDB:', error);
     } finally {
       setLoading(false);
     }
@@ -168,29 +209,16 @@ export const useDashboardData = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .insert([{
-          title: 'Untitled Note',
-          content: '',
-          user_id: user.id,
-          folder_id: folderId || null,
-          dashboard_id: activeDashboard?.id || null,
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Optimistically add the new note to state without refetching
-      if (data && notes) {
-        setNotes(prev => prev ? [data, ...prev] : [data]);
-      }
+      // Create note in IndexedDB (works offline)
+      const newNote = await createNote(user.id, activeDashboard?.id || null, folderId);
+      
+      // Add to UI state
+      setNotes(prev => prev ? [newNote, ...prev] : [newNote]);
       
       // Select the new note
-      if (data) {
-        handleNoteSelect(data.id);
-      }
+      handleNoteSelect(newNote.id);
+      
+      console.log('✅ Created note:', newNote.id, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error creating note:', error);
       alert('Failed to create note');
@@ -199,12 +227,8 @@ export const useDashboardData = () => {
 
   const handleNoteUpdate = async (noteId: string, updates: Partial<Note>) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .update(updates)
-        .eq('id', noteId);
-
-      if (error) throw error;
+      // Update in IndexedDB (works offline)
+      await updateNote(noteId, updates);
 
       // Update local state
       setNotes(prev => 
@@ -219,6 +243,8 @@ export const useDashboardData = () => {
           note.id === noteId ? { ...note, ...updates } : note
         )
       );
+      
+      console.log('✅ Updated note:', noteId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error updating note:', error);
     }
@@ -226,12 +252,8 @@ export const useDashboardData = () => {
 
   const handleNoteDelete = async (noteId: string) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', noteId);
-
-      if (error) throw error;
+      // Delete from IndexedDB (works offline)
+      await deleteNote(noteId);
 
       // Remove from local state
       setNotes(prev => prev ? prev.filter(n => n.id !== noteId) : prev);
@@ -242,6 +264,8 @@ export const useDashboardData = () => {
         setSelectedNoteId(null);
         setSearchParams({});
       }
+      
+      console.log('✅ Deleted note:', noteId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error deleting note:', error);
       alert('Failed to delete note');
@@ -255,25 +279,16 @@ export const useDashboardData = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('folders')
-        .insert([{
-          name: 'New folder',
-          user_id: user.id,
-          parent_id: parentId || null,
-          dashboard_id: activeDashboard?.id || null,
-        }])
-        .select('*')
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        // Optimistically update local state to avoid janky loading
-        setFolders(prev => [...prev, data]);
-        // Notify UI to auto-enter rename mode for this folder
-        window.dispatchEvent(new CustomEvent('folderCreated', { detail: { id: data.id } }));
-      }
+      // Create folder in IndexedDB (works offline)
+      const newFolder = await createFolder(user.id, activeDashboard?.id || null, 'New folder', parentId);
+      
+      // Update local state
+      setFolders(prev => [...prev, newFolder]);
+      
+      // Notify UI to auto-enter rename mode for this folder
+      window.dispatchEvent(new CustomEvent('folderCreated', { detail: { id: newFolder.id } }));
+      
+      console.log('✅ Created folder:', newFolder.id, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error creating folder:', error);
       alert('Failed to create folder');
@@ -282,12 +297,8 @@ export const useDashboardData = () => {
 
   const handleFolderUpdate = async (folderId: string, updates: Partial<Folder>) => {
     try {
-      const { error } = await supabase
-        .from('folders')
-        .update(updates)
-        .eq('id', folderId);
-
-      if (error) throw error;
+      // Update in IndexedDB (works offline)
+      await updateFolder(folderId, updates);
 
       // Update local state
       setFolders(prev => 
@@ -295,24 +306,22 @@ export const useDashboardData = () => {
           folder.id === folderId ? { ...folder, ...updates } : folder
         )
       );
+      
+      console.log('✅ Updated folder:', folderId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error updating folder:', error);
     }
   };
 
   const handleFolderDelete = async (folderId: string) => {
-    if (!confirm('Are you sure you want to delete this folder and all its contents?')) return;
-
     try {
-      const { error } = await supabase
-        .from('folders')
-        .delete()
-        .eq('id', folderId);
+      // Delete from IndexedDB (works offline)
+      await deleteFolder(folderId);
 
-      if (error) throw error;
-
-      // Refresh data
-      await fetchData();
+      // Remove from local state
+      setFolders(prev => prev.filter(f => f.id !== folderId));
+      
+      console.log('✅ Deleted folder:', folderId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error deleting folder:', error);
       alert('Failed to delete folder');
