@@ -44,6 +44,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('cardsEnabled');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [syncIndicatorEnabled, setSyncIndicatorEnabled] = useState(() => {
+    const saved = localStorage.getItem('syncIndicatorEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -645,6 +649,27 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           style={{ backgroundColor: cardsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: cardsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Sync Indicator Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Sync Indicator</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Show connection status and sync progress in the toolbar
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !syncIndicatorEnabled;
+                            setSyncIndicatorEnabled(newValue);
+                            localStorage.setItem('syncIndicatorEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: syncIndicatorEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: syncIndicatorEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
                     </div>
