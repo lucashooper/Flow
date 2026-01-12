@@ -126,13 +126,11 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
         onMouseEnter={(e) => {
           if (!isSelected) {
             e.currentTarget.style.backgroundColor = 'var(--bg-elev)';
-            e.currentTarget.style.opacity = '0.6';
           }
         }}
         onMouseLeave={(e) => {
           if (!isSelected) {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.opacity = '1';
           }
         }}
         onClick={onSelect}

@@ -50,6 +50,7 @@ export const NewDashboard = () => {
     tabsEnabled,
     handleNoteSelect,
     handleTabClose,
+    handleTabReorder,
     handleNoteCreate,
     handleNoteUpdate,
     handleNoteDelete,
@@ -105,6 +106,22 @@ export const NewDashboard = () => {
 
   const handleDragEnd = (event: any) => {
     console.log('[NewDashboard] DRAG END:', event.active.id, 'over:', event.over?.id);
+    
+    const { active, over } = event;
+    
+    // Handle tab reordering
+    if (active && over && draggedItem?.type === 'tab') {
+      const activeIndex = openNotes.findIndex(n => n.id === active.id);
+      const overIndex = openNotes.findIndex(n => n.id === over.id);
+      
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        const reorderedNotes = [...openNotes];
+        const [movedNote] = reorderedNotes.splice(activeIndex, 1);
+        reorderedNotes.splice(overIndex, 0, movedNote);
+        handleTabReorder(reorderedNotes);
+        console.log('[NewDashboard] Tabs reordered:', { from: activeIndex, to: overIndex });
+      }
+    }
     
     // Clear drag state immediately
     setActiveId(null);
