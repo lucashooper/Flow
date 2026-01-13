@@ -30,7 +30,6 @@ interface AppLayoutProps {
   tabsEnabled?: boolean;
   onTabClick?: (noteId: string) => void;
   onTabClose?: (noteId: string) => void;
-  onTabReorder?: (reorderedNotes: Note[]) => void;
   isTimerVisible?: boolean;
   setIsTimerVisible?: (value: boolean) => void;
 }
@@ -59,7 +58,6 @@ export const AppLayout = ({
   tabsEnabled = false,
   onTabClick,
   onTabClose,
-  onTabReorder,
   isTimerVisible = false,
   setIsTimerVisible = () => {},
 }: AppLayoutProps) => {
@@ -202,7 +200,6 @@ export const AppLayout = ({
               tabsEnabled={tabsEnabled}
               onTabClick={onTabClick || (() => {})}
               onTabClose={onTabClose || (() => {})}
-              onTabReorder={onTabReorder || (() => {})}
               isTimerVisible={isTimerVisible}
               setIsTimerVisible={setIsTimerVisible}
               isMobile={isMobile}

@@ -19,6 +19,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'default');
+  const [accentColor, setAccentColor] = useState(() => localStorage.getItem('accentColor') || 'orange');
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
   const [tabsEnabled, setTabsEnabled] = useState(() => {
     const saved = localStorage.getItem('tabsEnabled');
@@ -281,73 +282,24 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Color Theme</label>
+                    <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Changes background colors, panels, and overall theme</p>
                     <select
                       value={theme}
                       onChange={(e) => {
                         const value = e.target.value;
-                        console.log('🎨 [Settings] Theme change requested:', value);
                         setTheme(value);
                         localStorage.setItem('theme', value);
-                        console.log('💾 [Settings] Theme saved to localStorage:', value);
                         
                         const root = document.documentElement;
-                        console.log('📋 [Settings] Current root classes:', Array.from(root.classList));
-                        console.log('🏷️ [Settings] Root element tag:', root.tagName);
                         
-                        // Remove ALL classes that might interfere
+                        // Remove theme classes
                         Array.from(root.classList).forEach((cls) => {
-                          if (cls.startsWith('theme-') || ['light', 'dark', 'default', 'crimson', 'coffee', 'ocean', 'modern-gray'].includes(cls)) {
-                            console.log('🗑️ [Settings] Removing class:', cls);
+                          if (cls.startsWith('theme-')) {
                             root.classList.remove(cls);
                           }
                         });
                         
-                        const newClass = `theme-${value}`;
-                        root.classList.add(newClass);
-                        console.log('✅ [Settings] Added class:', newClass);
-                        console.log('📋 [Settings] New root classes:', Array.from(root.classList));
-                        
-                        // Check if CSS rule exists
-                        const testSelector = `html.${newClass}`;
-                        console.log('🔍 [Settings] Looking for selector:', testSelector);
-                        
-                        // Check all stylesheets for theme rules
-                        let foundRule = false;
-                        try {
-                          Array.from(document.styleSheets).forEach((sheet) => {
-                            try {
-                              Array.from(sheet.cssRules || []).forEach((rule) => {
-                                if (rule instanceof CSSStyleRule && rule.selectorText?.includes(newClass)) {
-                                  console.log('✅ [Settings] Found CSS rule:', rule.selectorText);
-                                  console.log('📜 [Settings] Rule text:', rule.cssText.substring(0, 200));
-                                  foundRule = true;
-                                }
-                              });
-                            } catch (e) {
-                              // CORS error for external stylesheets
-                            }
-                          });
-                        } catch (e) {
-                          console.error('❌ [Settings] Error checking stylesheets:', e);
-                        }
-                        
-                        if (!foundRule) {
-                          console.error('❌ [Settings] No CSS rule found for:', testSelector);
-                        }
-                        
-                        // Force style recalculation
-                        setTimeout(() => {
-                          const computedBg = getComputedStyle(root).getPropertyValue('--bg-editor');
-                          const computedPanel = getComputedStyle(root).getPropertyValue('--bg-panel');
-                          const computedText = getComputedStyle(root).getPropertyValue('--text');
-                          console.log('🎨 [Settings] Computed --bg-editor:', computedBg.trim());
-                          console.log('🎨 [Settings] Computed --bg-panel:', computedPanel.trim());
-                          console.log('🎨 [Settings] Computed --text:', computedText.trim());
-                          
-                          // Check actual background color of body
-                          const bodyBg = getComputedStyle(document.body).backgroundColor;
-                          console.log('🎨 [Settings] Body background:', bodyBg);
-                        }, 100);
+                        root.classList.add(`theme-${value}`);
                       }}
                       className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
                       style={{
@@ -356,11 +308,55 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         color: 'var(--text)',
                       }}
                     >
-                      <option value="default">Default (Dark)</option>
-                      <option value="crimson">Crimson</option>
-                      <option value="coffee">Coffee</option>
-                      <option value="ocean">Ocean</option>
+                      <option value="default">Default Dark</option>
+                      <option value="crimson">Crimson Dark</option>
+                      <option value="coffee">Coffee Dark</option>
+                      <option value="ocean">Ocean Dark</option>
                       <option value="modern-gray">Modern Gray</option>
+                      <option value="purple">Purple Dark</option>
+                      <option value="green">Green Dark</option>
+                      <option value="pink">Pink Dark</option>
+                      <option value="amber">Amber Dark</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Accent Color</label>
+                    <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Changes folder icons, buttons, and highlight colors</p>
+                    <select
+                      value={accentColor}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setAccentColor(value);
+                        localStorage.setItem('accentColor', value);
+                        
+                        const root = document.documentElement;
+                        
+                        // Remove accent classes
+                        Array.from(root.classList).forEach((cls) => {
+                          if (cls.startsWith('accent-')) {
+                            root.classList.remove(cls);
+                          }
+                        });
+                        
+                        root.classList.add(`accent-${value}`);
+                      }}
+                      className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-elev)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <option value="orange">🟠 Orange</option>
+                      <option value="purple">🟣 Purple</option>
+                      <option value="green">🟢 Green</option>
+                      <option value="pink">🩷 Pink</option>
+                      <option value="blue">🔵 Blue</option>
+                      <option value="red">🔴 Red</option>
+                      <option value="amber">🟡 Amber</option>
+                      <option value="teal">🩵 Teal</option>
+                      <option value="indigo">🔮 Indigo</option>
                     </select>
                   </div>
                 </div>

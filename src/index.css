@@ -216,6 +216,61 @@ html.theme-ocean {
   --muted: #90a4ae;
 }
 
+html.theme-purple {
+  --accent: #a78bfa;
+  --bg-editor: #1a1625;
+  --bg-panel: #13111d;
+  --bg-elev: #251f35;
+  --border: #3d3350;
+  --divider: rgba(167,139,250,0.12);
+  --text: #ede9fe;
+  --muted: #a78bcc;
+}
+
+html.theme-green {
+  --accent: #34d399;
+  --bg-editor: #0f1a15;
+  --bg-panel: #0c140f;
+  --bg-elev: #1a2820;
+  --border: #2d4035;
+  --divider: rgba(52,211,153,0.12);
+  --text: #d1fae5;
+  --muted: #86b89e;
+}
+
+html.theme-pink {
+  --accent: #f472b6;
+  --bg-editor: #1a1018;
+  --bg-panel: #150c13;
+  --bg-elev: #2a1a25;
+  --border: #4a2f40;
+  --divider: rgba(244,114,182,0.12);
+  --text: #fce7f3;
+  --muted: #d4a4c0;
+}
+
+html.theme-amber {
+  --accent: #fbbf24;
+  --bg-editor: #1a1710;
+  --bg-panel: #14110c;
+  --bg-elev: #2a2318;
+  --border: #4a3d28;
+  --divider: rgba(251,191,36,0.12);
+  --text: #fef3c7;
+  --muted: #d4bc8a;
+}
+
+/* Accent-only color overrides (don't change backgrounds) */
+html.accent-orange { --accent: #ff7a18; }
+html.accent-purple { --accent: #a78bfa; }
+html.accent-green { --accent: #34d399; }
+html.accent-pink { --accent: #f472b6; }
+html.accent-blue { --accent: #4fc3f7; }
+html.accent-red { --accent: #ff4757; }
+html.accent-amber { --accent: #fbbf24; }
+html.accent-teal { --accent: #14b8a6; }
+html.accent-indigo { --accent: #818cf8; }
+
 /* Apply variables to key surfaces */
 body { background-color: var(--bg-panel) !important; }
 .top-nav, .sidebar { background-color: var(--bg-panel) !important; color: var(--text) !important; }

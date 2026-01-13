@@ -168,9 +168,9 @@ export const FolderItem = ({
             {folder.emoji ? (
               <span className="text-sm">{folder.emoji}</span>
             ) : isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-[#D97706]" />
+              <FolderOpen className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             ) : (
-              <Folder className="w-4 h-4 text-[#D97706]" />
+              <Folder className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             )}
           </div>
 

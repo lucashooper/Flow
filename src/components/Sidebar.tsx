@@ -255,7 +255,8 @@ export const Sidebar = ({
               return (
                 <div 
                   key={note.id}
-                  className={`${isMatch ? 'bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]' : ''} ${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                  className={`${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                  style={isMatch ? { backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderLeft: '2px solid var(--accent)' } : {}}
                 >
                   <DraggableNoteItem
                     note={note}
@@ -294,7 +295,7 @@ export const Sidebar = ({
               className="p-1.5 hover:bg-[#252525] rounded transition-colors group"
               title="Tasks"
             >
-              <CheckCircle className="w-4 h-4 text-[#888888] group-hover:text-[#ff7a18] transition-colors" />
+              <CheckCircle className="w-4 h-4 text-[#888888] transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.color = '#888888'} />
             </button>
           </div>
           <div className="flex items-center gap-1">
@@ -321,14 +322,14 @@ export const Sidebar = ({
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
               title="New Note"
             >
-              <Plus className="w-4 h-4 text-[#D97706]" />
+              <Plus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </button>
             <button
               onClick={() => onFolderCreate()}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
               title="New Folder"
             >
-              <FolderPlus className="w-4 h-4 text-[#D97706]" />
+              <FolderPlus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </button>
           </div>
         </div>

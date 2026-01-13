@@ -1,6 +1,5 @@
 import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard } from 'lucide-react';
 import { SyncStatus } from './SyncStatus';
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState, useEffect } from 'react';
 import type { Note } from '../types';
@@ -15,7 +14,6 @@ interface EditorHeaderProps {
   tabsEnabled: boolean;
   onTabClick: (noteId: string) => void;
   onTabClose: (noteId: string) => void;
-  onTabReorder: (reorderedNotes: Note[]) => void;
   isTimerVisible: boolean;
   setIsTimerVisible: (value: boolean) => void;
   isMobile?: boolean;
@@ -28,47 +26,13 @@ export const EditorHeader = ({
   tabsEnabled,
   onTabClick,
   onTabClose,
-  onTabReorder,
   isTimerVisible,
   setIsTimerVisible,
   isMobile = false,
   onOpenSidebar,
 }: EditorHeaderProps) => {
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
-  
-  // Separate sensors for tab dragging only
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
-  
-  // Tab drag handlers
-  const handleTabDragStart = (event: any) => {
-    setActiveId(event.active.id);
-  };
-  
-  const handleTabDragEnd = (event: any) => {
-    const { active, over } = event;
-    
-    if (active && over && active.id !== over.id) {
-      const activeIndex = openNotes.findIndex(n => n.id === active.id);
-      const overIndex = openNotes.findIndex(n => n.id === over.id);
-      
-      if (activeIndex !== -1 && overIndex !== -1) {
-        const reorderedNotes = [...openNotes];
-        const [movedNote] = reorderedNotes.splice(activeIndex, 1);
-        reorderedNotes.splice(overIndex, 0, movedNote);
-        onTabReorder(reorderedNotes);
-      }
-    }
-    
-    setActiveId(null);
-  };
-  
-  const handleTabDragCancel = () => {
-    setActiveId(null);
-  };
   
   // Check plugin states from localStorage
   const focusModeEnabled = (() => {
@@ -173,38 +137,19 @@ export const EditorHeader = ({
 
         {/* Tabs area - flush contiguous tabs like Chrome/Obsidian */}
         {tabsEnabled && openNotes.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleTabDragStart}
-            onDragEnd={handleTabDragEnd}
-            onDragCancel={handleTabDragCancel}
-          >
-            <SortableContext items={openNotes.map(n => n.id)} strategy={horizontalListSortingStrategy}>
-              <div className="flex items-end flex-1 overflow-x-auto scrollbar-hide">
-                {openNotes.map((note) => (
-                  <DraggableTab
-                    key={note.id}
-                    note={note}
-                    isActive={activeNoteId === note.id}
-                    onTabClick={onTabClick}
-                    onTabClose={onTabClose}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-            
-            {/* Tab Drag Overlay */}
-            <DragOverlay>
-              {activeId ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1a1a1a] text-[#e5e5e5] min-w-[120px] max-w-[200px] shadow-2xl opacity-90">
-                  <span className="text-sm truncate flex-1">
-                    {openNotes.find(n => n.id === activeId)?.title || 'Untitled'}
-                  </span>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+          <SortableContext items={openNotes.map(n => `tab-${n.id}`)} strategy={horizontalListSortingStrategy}>
+            <div className="flex items-end flex-1 overflow-x-auto scrollbar-hide">
+              {openNotes.map((note) => (
+                <DraggableTab
+                  key={note.id}
+                  note={note}
+                  isActive={activeNoteId === note.id}
+                  onTabClick={onTabClick}
+                  onTabClose={onTabClose}
+                />
+              ))}
+            </div>
+          </SortableContext>
         )}
 
         {/* Right-side actions */}

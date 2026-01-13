@@ -8,6 +8,7 @@ import {
   updateNote, 
   deleteNote, 
   getNotesByDashboard,
+  getNote,
   createFolder,
   updateFolder,
   deleteFolder,
@@ -167,7 +168,7 @@ export const useDashboardData = () => {
     }
   };
 
-  const handleNoteSelect = (noteId: string, searchQuery?: string) => {
+  const handleNoteSelect = async (noteId: string, searchQuery?: string) => {
     setSelectedNoteId(noteId);
     const params: Record<string, string> = { note: noteId };
     if (searchQuery) {
@@ -175,12 +176,41 @@ export const useDashboardData = () => {
     }
     setSearchParams(params);
     
-    // Add to open tabs if tabs are enabled
-    if (tabsEnabled && notes) {
-      const note = notes.find(n => n.id === noteId);
-      if (note && !openNotes.some(n => n.id === noteId)) {
-        setOpenNotes(prev => [...prev, note]);
+    // Check if note is in current dashboard
+    let note = notes?.find(n => n.id === noteId);
+    
+    // If note not in current dashboard, fetch it and switch dashboards
+    if (!note) {
+      const fetchedNote = await getNote(noteId);
+      if (fetchedNote && fetchedNote.dashboard_id && fetchedNote.dashboard_id !== activeDashboard?.id) {
+        // Find the dashboard this note belongs to
+        const noteDashboard = dashboards.find(d => d.id === fetchedNote.dashboard_id);
+        if (noteDashboard) {
+          console.log('📍 Note belongs to different dashboard, switching...', noteDashboard.name);
+          setActiveDashboard(noteDashboard);
+          
+          // Update active status in database
+          try {
+            await supabase
+              .from('dashboards')
+              .update({ is_active: false })
+              .neq('id', noteDashboard.id);
+            
+            await supabase
+              .from('dashboards')
+              .update({ is_active: true })
+              .eq('id', noteDashboard.id);
+          } catch (error) {
+            console.error('Error updating active dashboard:', error);
+          }
+        }
+        note = fetchedNote;
       }
+    }
+    
+    // Add to open tabs if tabs are enabled
+    if (tabsEnabled && note && !openNotes.some(n => n.id === noteId)) {
+      setOpenNotes(prev => [...prev, note]);
     }
   };
   

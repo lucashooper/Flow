@@ -90,25 +90,45 @@ export const NewDashboard = () => {
     
     setActiveId(activeId);
     
-    // Extract note data - handle both 'note' and 'tab' types
-    if (data?.type === 'note' || data?.type === 'tab') {
+    // Only set draggedItem for sidebar notes and tabs
+    // This prevents interference between tab and sidebar drags
+    if (data?.type === 'note') {
       const note = data.note;
       if (note) {
-        setDraggedItem({ type: data.type, note });
-        console.log('✅ [DRAG START] DraggedItem set:', note.title);
-      } else {
-        console.warn('⚠️ [DRAG START] No note data found in drag event');
+        setDraggedItem({ type: 'note', note });
+        console.log('✅ [DRAG START] Sidebar note drag:', note.title);
       }
-    } else {
-      console.warn('⚠️ [DRAG START] Unknown drag type:', data?.type);
+    } else if (data?.type === 'tab') {
+      const note = data.note;
+      if (note) {
+        setDraggedItem({ type: 'tab', note });
+        console.log('✅ [DRAG START] Tab drag:', note.title);
+      }
     }
   };
 
   const handleDragEnd = (event: any) => {
     console.log('[NewDashboard] DRAG END:', event.active.id, 'over:', event.over?.id);
     
-    // Only handle sidebar note/folder drags here, NOT tabs
-    // Tabs are handled in their own DndContext in EditorHeader
+    const { active, over } = event;
+    
+    // Handle tab reordering
+    if (active && over && draggedItem?.type === 'tab') {
+      // Extract note ID from tab-prefixed ID
+      const activeNoteId = active.id.toString().replace('tab-', '');
+      const overNoteId = over.id.toString().replace('tab-', '');
+      
+      const activeIndex = openNotes.findIndex(n => n.id === activeNoteId);
+      const overIndex = openNotes.findIndex(n => n.id === overNoteId);
+      
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        const reorderedNotes = [...openNotes];
+        const [movedNote] = reorderedNotes.splice(activeIndex, 1);
+        reorderedNotes.splice(overIndex, 0, movedNote);
+        handleTabReorder(reorderedNotes);
+        console.log('[NewDashboard] Tabs reordered:', { from: activeIndex, to: overIndex });
+      }
+    }
     
     // Clear drag state immediately
     setActiveId(null);
@@ -181,7 +201,6 @@ export const NewDashboard = () => {
           tabsEnabled={tabsEnabled}
           onTabClick={handleNoteSelect}
           onTabClose={handleTabClose}
-          onTabReorder={handleTabReorder}
           isTimerVisible={isTimerVisible}
           setIsTimerVisible={setIsTimerVisible}
         >
