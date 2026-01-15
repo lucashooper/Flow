@@ -1,4 +1,4 @@
-import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard } from 'lucide-react';
+import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp } from 'lucide-react';
 import { SyncStatus } from './SyncStatus';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState, useEffect } from 'react';
@@ -16,6 +16,12 @@ interface EditorHeaderProps {
   onTabClose: (noteId: string) => void;
   isTimerVisible: boolean;
   setIsTimerVisible: (value: boolean) => void;
+  isTasksVisible: boolean;
+  setIsTasksVisible: (value: boolean) => void;
+  isAmbientVisible?: boolean;
+  setIsAmbientVisible?: (value: boolean) => void;
+  isStatsVisible?: boolean;
+  setIsStatsVisible?: (value: boolean) => void;
   isMobile?: boolean;
   onOpenSidebar?: () => void;
 }
@@ -28,6 +34,12 @@ export const EditorHeader = ({
   onTabClose,
   isTimerVisible,
   setIsTimerVisible,
+  isTasksVisible,
+  setIsTasksVisible,
+  isAmbientVisible,
+  setIsAmbientVisible,
+  isStatsVisible,
+  setIsStatsVisible,
   isMobile = false,
   onOpenSidebar,
 }: EditorHeaderProps) => {
@@ -63,6 +75,16 @@ export const EditorHeader = ({
   const syncIndicatorEnabled = (() => {
     const saved = localStorage.getItem('syncIndicatorEnabled');
     return saved !== null ? JSON.parse(saved) : false;
+  })();
+
+  const ambientSoundsEnabled = (() => {
+    const saved = localStorage.getItem('ambientSoundsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
+
+  const focusStatsEnabled = (() => {
+    const saved = localStorage.getItem('focusStatsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
   })();
 
   const [showCardsModal, setShowCardsModal] = useState(false);
@@ -189,6 +211,31 @@ export const EditorHeader = ({
               >
                 <Timer className="w-5 h-5 text-[#888888]" />
               </button>
+              <button
+                onClick={() => setIsTasksVisible(!isTasksVisible)}
+                className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                title="Toggle Tasks"
+              >
+                <CheckCircle className="w-5 h-5 text-[#888888]" />
+              </button>
+              {ambientSoundsEnabled && setIsAmbientVisible && (
+                <button
+                  onClick={() => setIsAmbientVisible(!isAmbientVisible)}
+                  className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                  title="Toggle Ambient Sounds"
+                >
+                  <Volume2 className="w-5 h-5 text-[#888888]" />
+                </button>
+              )}
+              {focusStatsEnabled && setIsStatsVisible && (
+                <button
+                  onClick={() => setIsStatsVisible(!isStatsVisible)}
+                  className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                  title="Toggle Focus Stats"
+                >
+                  <TrendingUp className="w-5 h-5 text-[#888888]" />
+                </button>
+              )}
               {wordCountEnabled && (
                 <button
                   onClick={() => window.dispatchEvent(new Event('toggleWordCount'))}

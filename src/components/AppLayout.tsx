@@ -32,6 +32,12 @@ interface AppLayoutProps {
   onTabClose?: (noteId: string) => void;
   isTimerVisible?: boolean;
   setIsTimerVisible?: (value: boolean) => void;
+  isTasksVisible?: boolean;
+  setIsTasksVisible?: (value: boolean) => void;
+  isAmbientVisible?: boolean;
+  setIsAmbientVisible?: (value: boolean) => void;
+  isStatsVisible?: boolean;
+  setIsStatsVisible?: (value: boolean) => void;
 }
 
 export const AppLayout = ({
@@ -60,6 +66,12 @@ export const AppLayout = ({
   onTabClose,
   isTimerVisible = false,
   setIsTimerVisible = () => {},
+  isTasksVisible = false,
+  setIsTasksVisible = () => {},
+  isAmbientVisible = false,
+  setIsAmbientVisible = () => {},
+  isStatsVisible = false,
+  setIsStatsVisible = () => {},
 }: AppLayoutProps) => {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const toggleFocusMode = () => setIsFocusMode(prev => !prev);
@@ -202,6 +214,12 @@ export const AppLayout = ({
               onTabClose={onTabClose || (() => {})}
               isTimerVisible={isTimerVisible}
               setIsTimerVisible={setIsTimerVisible}
+              isTasksVisible={isTasksVisible}
+              setIsTasksVisible={setIsTasksVisible}
+              isAmbientVisible={isAmbientVisible}
+              setIsAmbientVisible={setIsAmbientVisible}
+              isStatsVisible={isStatsVisible}
+              setIsStatsVisible={setIsStatsVisible}
               isMobile={isMobile}
               onOpenSidebar={() => setIsSidebarOpen(true)}
             />

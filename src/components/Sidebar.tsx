@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, FolderPlus, Search, Star, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useAuth } from '../contexts/AuthContext';
 import {
   DragOverlay,
 } from '@dnd-kit/core';
@@ -29,6 +29,7 @@ interface SidebarProps {
   onDashboardChange: (dashboard: Dashboard) => void;
   onDashboardsUpdate: () => void;
   loading: boolean;
+  isMobile?: boolean;
   onCloseMobile?: () => void;
 }
 
@@ -51,8 +52,10 @@ export const Sidebar = ({
   onDashboardsUpdate,
   loading,
   onCloseMobile,
+  isMobile = false,
 }: SidebarProps) => {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [blurredNotes, setBlurredNotes] = useState<Set<string>>(() => {
@@ -94,8 +97,6 @@ export const Sidebar = ({
       return newSet;
     });
   };
-
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isMobile) return; // Disable resize on mobile
@@ -289,7 +290,29 @@ export const Sidebar = ({
         <div className="p-3 border-b border-subtle">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <img src="/FlowIcon-Main.png" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
+            {userProfile?.profile_picture_url ? (
+              <img 
+                src={userProfile.profile_picture_url} 
+                alt="Profile" 
+                className="w-6 h-6 rounded-full object-cover" 
+                style={{ 
+                  border: '1.5px solid rgba(248, 250, 252, 0.15)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+                }}
+              />
+            ) : (
+              <div 
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ 
+                  backgroundColor: 'var(--accent)', 
+                  color: '#fff',
+                  border: '1.5px solid rgba(248, 250, 252, 0.15)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                {userProfile?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
             <button
               onClick={() => navigate('/tasks')}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors group"

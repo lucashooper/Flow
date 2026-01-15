@@ -9,12 +9,23 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import FloatingTimer from '../components/FloatingTimer';
+import { FloatingTasks } from '../components/FloatingTasks';
+import { AmbientSounds } from '../components/AmbientSounds';
+import { FocusStats } from '../components/FocusStats';
+import { BreakReminder } from '../components/BreakReminder';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core';
 import type { Note } from '../types';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
   const [isTimerVisible, setIsTimerVisible] = useState(false);
+  const [isTasksVisible, setIsTasksVisible] = useState(false);
+  const [isAmbientVisible, setIsAmbientVisible] = useState(false);
+  const [isStatsVisible, setIsStatsVisible] = useState(false);
+  const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
+    const saved = localStorage.getItem('breakRemindersEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
@@ -203,6 +214,12 @@ export const NewDashboard = () => {
           onTabClose={handleTabClose}
           isTimerVisible={isTimerVisible}
           setIsTimerVisible={setIsTimerVisible}
+          isTasksVisible={isTasksVisible}
+          setIsTasksVisible={setIsTasksVisible}
+          isAmbientVisible={isAmbientVisible}
+          setIsAmbientVisible={setIsAmbientVisible}
+          isStatsVisible={isStatsVisible}
+          setIsStatsVisible={setIsStatsVisible}
         >
           {/* Workspace (split panes) */}
           <WorkspaceProvider initialNoteId={selectedNoteId || null} selectedNoteId={selectedNoteId}>
@@ -220,6 +237,27 @@ export const NewDashboard = () => {
       isVisible={isTimerVisible}
       onClose={() => setIsTimerVisible(false)}
     />
+
+    {/* Floating tasks modal */}
+    <FloatingTasks
+      isVisible={isTasksVisible}
+      onClose={() => setIsTasksVisible(false)}
+    />
+
+    {/* Ambient sounds */}
+    <AmbientSounds
+      isVisible={isAmbientVisible}
+      onClose={() => setIsAmbientVisible(false)}
+    />
+
+    {/* Focus stats */}
+    <FocusStats
+      isVisible={isStatsVisible}
+      onClose={() => setIsStatsVisible(false)}
+    />
+
+    {/* Break reminders */}
+    <BreakReminder enabled={breakRemindersEnabled} />
 
     {/* Settings Modal Overlay */}
     <SettingsModal

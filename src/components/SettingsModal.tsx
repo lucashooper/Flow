@@ -49,6 +49,18 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('syncIndicatorEnabled');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [ambientSoundsEnabled, setAmbientSoundsEnabled] = useState(() => {
+    const saved = localStorage.getItem('ambientSoundsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [focusStatsEnabled, setFocusStatsEnabled] = useState(() => {
+    const saved = localStorage.getItem('focusStatsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
+    const saved = localStorage.getItem('breakRemindersEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -666,6 +678,69 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           style={{ backgroundColor: syncIndicatorEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: syncIndicatorEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Ambient Sounds Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Ambient Sounds</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Play ambient sounds like rain, cafe, or ocean waves while working
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !ambientSoundsEnabled;
+                            setAmbientSoundsEnabled(newValue);
+                            localStorage.setItem('ambientSoundsEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: ambientSoundsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: ambientSoundsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Focus Stats Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Focus Stats</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Track daily focus time, completed tasks, and productivity metrics
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !focusStatsEnabled;
+                            setFocusStatsEnabled(newValue);
+                            localStorage.setItem('focusStatsEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: focusStatsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusStatsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Break Reminders Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Break Reminders</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Get gentle reminders to take breaks after long focus sessions (every 50 min)
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !breakRemindersEnabled;
+                            setBreakRemindersEnabled(newValue);
+                            localStorage.setItem('breakRemindersEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: breakRemindersEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: breakRemindersEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
                     </div>
