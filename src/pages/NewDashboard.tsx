@@ -18,10 +18,22 @@ import type { Note } from '../types';
 
 export const NewDashboard = () => {
   const { user } = useAuth();
-  const [isTimerVisible, setIsTimerVisible] = useState(false);
-  const [isTasksVisible, setIsTasksVisible] = useState(false);
-  const [isAmbientVisible, setIsAmbientVisible] = useState(false);
-  const [isStatsVisible, setIsStatsVisible] = useState(false);
+  const [isTimerVisible, setIsTimerVisible] = useState(() => {
+    const saved = localStorage.getItem('isTimerVisible');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [isTasksVisible, setIsTasksVisible] = useState(() => {
+    const saved = localStorage.getItem('isTasksVisible');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [isAmbientVisible, setIsAmbientVisible] = useState(() => {
+    const saved = localStorage.getItem('isAmbientVisible');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [isStatsVisible, setIsStatsVisible] = useState(() => {
+    const saved = localStorage.getItem('isStatsVisible');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [breakRemindersEnabled] = useState(() => {
     const saved = localStorage.getItem('breakRemindersEnabled');
     return saved !== null ? JSON.parse(saved) : false;
@@ -36,6 +48,23 @@ export const NewDashboard = () => {
 
   // Sync offline notes when connection is restored
   useOfflineSync();
+
+  // Persist modal visibility states
+  useEffect(() => {
+    localStorage.setItem('isTimerVisible', JSON.stringify(isTimerVisible));
+  }, [isTimerVisible]);
+
+  useEffect(() => {
+    localStorage.setItem('isTasksVisible', JSON.stringify(isTasksVisible));
+  }, [isTasksVisible]);
+
+  useEffect(() => {
+    localStorage.setItem('isAmbientVisible', JSON.stringify(isAmbientVisible));
+  }, [isAmbientVisible]);
+
+  useEffect(() => {
+    localStorage.setItem('isStatsVisible', JSON.stringify(isStatsVisible));
+  }, [isStatsVisible]);
 
   // Listen for openSettings event from DashboardSwitcher
   useEffect(() => {

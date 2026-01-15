@@ -55,9 +55,17 @@ export const Sidebar = ({
   isMobile = false,
 }: SidebarProps) => {
   const navigate = useNavigate();
-  const { userProfile } = useAuth();
+  const { userProfile, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    if (!user?.id) return new Set();
+    try {
+      const saved = localStorage.getItem(`expandedFolders_${user.id}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [blurredNotes, setBlurredNotes] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
     try {
@@ -85,6 +93,13 @@ export const Sidebar = ({
     return () => window.removeEventListener('folderCreated', handler as EventListener);
   }, []);
 
+
+  // Persist expanded folders to localStorage
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`expandedFolders_${user.id}`, JSON.stringify(Array.from(expandedFolders)));
+    }
+  }, [expandedFolders, user?.id]);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {

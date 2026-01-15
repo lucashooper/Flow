@@ -71,4 +71,5 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
+  updateProfilePicture: (profilePictureUrl: string) => Promise<void>;
 }

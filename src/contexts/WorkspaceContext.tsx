@@ -108,8 +108,52 @@ function setAt(root: PaneNode, path: number[], newNode: PaneNode): PaneNode {
 
 export const WorkspaceProvider: React.FC<{ initialNoteId: string | null; selectedNoteId?: string | null; children: React.ReactNode }>
   = ({ initialNoteId, selectedNoteId, children }) => {
-  const [root, setRoot] = useState<PaneNode>(() => ({ type: 'leaf', id: makeId('leaf'), noteId: initialNoteId }));
-  const [activeLeafId, setActiveLeafId] = useState<string | null>(() => (root as PaneLeaf).id);
+  const [root, setRoot] = useState<PaneNode>(() => {
+    // Try to restore workspace layout from localStorage
+    try {
+      const saved = localStorage.getItem('workspaceLayout');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Validate that it's a valid PaneNode structure
+        if (parsed && (parsed.type === 'leaf' || parsed.type === 'split')) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore workspace layout:', e);
+    }
+    // Default to single pane with initial note
+    return { type: 'leaf', id: makeId('leaf'), noteId: initialNoteId };
+  });
+  const [activeLeafId, setActiveLeafId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('activeLeafId');
+      if (saved) return saved;
+    } catch (e) {
+      console.error('Failed to restore active leaf:', e);
+    }
+    return (root as PaneLeaf).id;
+  });
+
+  // Persist workspace layout whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('workspaceLayout', JSON.stringify(root));
+    } catch (e) {
+      console.error('Failed to save workspace layout:', e);
+    }
+  }, [root]);
+
+  // Persist active leaf ID
+  useEffect(() => {
+    if (activeLeafId) {
+      try {
+        localStorage.setItem('activeLeafId', activeLeafId);
+      } catch (e) {
+        console.error('Failed to save active leaf:', e);
+      }
+    }
+  }, [activeLeafId]);
 
   const replaceIn = useCallback((targetId: string, noteId: string) => {
     setRoot(prev => {

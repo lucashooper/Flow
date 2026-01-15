@@ -12,7 +12,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
-  const { user, userProfile, updateUsername, signOut } = useAuth();
+  const { user, userProfile, updateUsername, updateProfilePicture, signOut } = useAuth();
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,12 +119,8 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         .from('profile-pictures')
         .getPublicUrl(fileName);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ profile_picture_url: data.publicUrl })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      // Update profile using AuthContext function (updates correct table and refreshes state)
+      await updateProfilePicture(data.publicUrl);
 
       setProfilePicture(data.publicUrl);
       setSuccess(true);
