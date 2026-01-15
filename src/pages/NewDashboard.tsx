@@ -22,7 +22,7 @@ export const NewDashboard = () => {
   const [isTasksVisible, setIsTasksVisible] = useState(false);
   const [isAmbientVisible, setIsAmbientVisible] = useState(false);
   const [isStatsVisible, setIsStatsVisible] = useState(false);
-  const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
+  const [breakRemindersEnabled] = useState(() => {
     const saved = localStorage.getItem('breakRemindersEnabled');
     return saved !== null ? JSON.parse(saved) : false;
   });
