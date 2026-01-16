@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { CheckCircle, Calendar, Flag, X, ChevronDown, Inbox } from 'lucide-react';
 import {
   DndContext,
@@ -615,18 +614,16 @@ export const Tasks = () => {
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  <AnimatePresence mode="popLayout">
-                    {listTasks.map(task => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onToggleComplete={toggleComplete}
-                        onDelete={deleteTask}
-                        onUpdatePriority={updateTaskPriority}
-                        getPriorityColor={getPriorityColor}
-                      />
-                    ))}
-                  </AnimatePresence>
+                  {listTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onToggleComplete={toggleComplete}
+                      onDelete={deleteTask}
+                      onUpdatePriority={updateTaskPriority}
+                      getPriorityColor={getPriorityColor}
+                    />
+                  ))}
                 </div>
               </SortableContext>
             </div>

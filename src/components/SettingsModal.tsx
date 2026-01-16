@@ -162,6 +162,16 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      window.location.href = '/';
+    } catch (err: any) {
+      setError(err.message || 'Failed to logout');
+      console.error('Logout error:', err);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
       setError('Please type DELETE to confirm');
@@ -389,7 +399,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 )}
 
                 <div className="mb-8">
-                  <label className="block text-sm font-medium mb-4" style={{ color: 'var(--text)' }}>Profile Picture</label>
                   <div className="flex items-center gap-6">
                     <div className="relative">
                       {profilePicture ? (
@@ -477,10 +486,11 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full font-medium py-2.5 rounded-lg transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                     style={{
-                      backgroundColor: loading ? 'var(--bg-elev)' : 'var(--accent)',
-                      color: loading ? 'var(--muted)' : '#fff',
+                      backgroundColor: 'var(--accent)',
+                      color: '#fff',
+                      opacity: loading ? 0.5 : 1,
                     }}
                   >
                     {loading ? 'Saving...' : 'Save'}
@@ -488,32 +498,27 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 </form>
 
                 {/* Account Actions */}
-                <div className="mt-8 pt-8 border-t space-y-4" style={{ borderColor: 'var(--divider)' }}>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await signOut();
-                        window.location.href = '/login';
-                      } catch (error) {
-                        console.error('Logout error:', error);
-                      }
-                    }}
-                    className="w-full bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
-                  >
-                    Logout
-                  </button>
-
-                  <div className="pt-4">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                      <AlertTriangle className="w-5 h-5 text-red-400" />
-                      Danger Zone
-                    </h3>
-                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                      Once you delete your account, there is no going back. All your notes and data will be permanently deleted.
-                    </p>
+                <div className="mt-8 pt-8 border-t" style={{ borderColor: 'var(--divider)' }}>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleLogout}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                      }}
+                    >
+                      Logout
+                    </button>
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete Account

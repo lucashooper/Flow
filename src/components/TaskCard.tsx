@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -16,7 +16,9 @@ interface TaskCardProps {
 
 export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, getPriorityColor }: TaskCardProps) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isCompleting, setIsCompleting] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   
   const { attachedTaskId, isRunning } = useTimerStore();
   const isAttached = attachedTaskId === task.id;
@@ -27,13 +29,12 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useSortable({ id: task.id });
 
   const cardStyle = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: 'none',
     background: isDragging 
       ? 'var(--bg-panel)' 
       : isAttached 
@@ -61,19 +62,34 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
     }, 220);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowMenu(true);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowMenu(false);
+    if (showMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showMenu]);
+
   return (
+    <>
     <motion.div
       ref={setNodeRef}
       style={cardStyle}
-      initial={{ opacity: 0, y: 6 }}
+      initial={false}
       animate={{ 
-        opacity: isCompleting ? 0 : 1, 
-        y: isCompleting ? 6 : 0,
+        opacity: isCompleting ? 0 : 1,
         scale: isCompleting ? 0.98 : 1
       }}
-      exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.22 } }}
-      whileHover={{ y: shouldDim ? 0 : -1, background: shouldDim ? undefined : 'rgba(255, 255, 255, 0.07)' }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
+      transition={{ duration: 0.15 }}
       className="group relative rounded-xl p-4"
+      onContextMenu={handleContextMenu}
     >
       <div className="flex items-center gap-3">
         {/* Drag Handle */}
@@ -136,30 +152,44 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
           </div>
         )}
 
-        {/* Menu */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-1 rounded transition-opacity opacity-0 group-hover:opacity-100"
-            style={{ 
-              cursor: 'pointer',
-              background: showMenu ? 'var(--bg-panel)' : 'transparent',
-            }}
-          >
-            <MoreVertical className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-          </button>
+        {/* Menu Button */}
+        <button
+          ref={buttonRef}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (buttonRef.current) {
+              const rect = buttonRef.current.getBoundingClientRect();
+              setMenuPosition({ x: rect.right, y: rect.bottom + 4 });
+            }
+            setShowMenu(!showMenu);
+          }}
+          className="p-1 rounded transition-opacity opacity-0 group-hover:opacity-100"
+          style={{ 
+            cursor: 'pointer',
+            background: showMenu ? 'var(--bg-panel)' : 'transparent',
+          }}
+        >
+          <MoreVertical className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+        </button>
+      </div>
+    </motion.div>
 
-          {showMenu && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="absolute right-0 top-full mt-2 rounded-lg shadow-2xl py-1 z-50 min-w-[160px]"
-              style={{
-                background: 'var(--bg-panel)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid var(--border)',
-              }}
-            >
+    {/* Menu Portal - Rendered outside card to escape stacking context */}
+    {showMenu && (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="fixed rounded-lg shadow-2xl py-1 min-w-[160px]"
+        style={{
+          right: `calc(100vw - ${menuPosition.x}px)`,
+          top: menuPosition.y,
+          zIndex: 99999,
+          background: 'var(--bg-panel)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid var(--border)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
               <button
                 onClick={() => {
                   onUpdatePriority(task.id, 1);
@@ -215,8 +245,6 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
               </button>
             </motion.div>
           )}
-        </div>
-      </div>
-    </motion.div>
+    </>
   );
 };
