@@ -313,42 +313,85 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           }
         }
 
-        // Try HTML for web sources (Google Docs, etc.)
+        // Try HTML for web sources (Google Docs, etc.) or internal Flow Notes copy-paste
         if (html && !isFromOffice) {
-          console.log('✅ Found HTML data (web source):', html.substring(0, 200));
+          console.log('✅ Found HTML data:', html.substring(0, 200));
           
-          // Clean up Microsoft Office HTML artifacts and ALL styling
-          let cleanHTML = html
-            .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
-            .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
-            .replace(/<\/o:p>/g, '') // Remove closing Office tags
-            .replace(/class="[^"]*"/g, '') // Remove ALL classes
-            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (color, font-size, etc.)
-            .replace(/color="[^"]*"/g, '') // Remove color attributes
-            .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
-            .replace(/face="[^"]*"/g, '') // Remove font face
-            .replace(/size="[^"]*"/g, '') // Remove font size
-            .replace(/<font[^>]*>/g, '') // Remove font tags
-            .replace(/<\/font>/g, '')
-            .replace(/<span[^>]*>/g, '<span>') // Strip span attributes but keep tag
-            .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
-            .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
-            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
-            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
-            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
-            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
-            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
-            .replace(/<html[^>]*>/gi, '') // Remove html tags
-            .replace(/<\/html>/gi, '')
-            .replace(/<body[^>]*>/gi, '') // Remove body tags
-            .replace(/<\/body>/gi, '');
-
-          console.log('🧹 Cleaned HTML:', cleanHTML.substring(0, 200));
+          // Check if this is internal Flow Notes content (has Tiptap/ProseMirror markers)
+          // Tiptap uses inline styles for formatting, so check for those
+          const isInternalPaste = html.includes('data-type="') || 
+                                  html.includes('class="ProseMirror') ||
+                                  html.includes('style="color:') ||
+                                  html.includes('style="font-size:') ||
+                                  html.includes('<mark ') ||
+                                  (html.includes('<span') && html.includes('style=') && 
+                                   (html.includes('color') || html.includes('font-size')));
+          
+          console.log('🔍 Internal paste check:', {
+            hasDataType: html.includes('data-type="'),
+            hasProseMirror: html.includes('class="ProseMirror'),
+            hasColorStyle: html.includes('style="color:'),
+            hasFontSizeStyle: html.includes('style="font-size:'),
+            hasMark: html.includes('<mark '),
+            hasStyledSpan: html.includes('<span') && html.includes('style='),
+            isInternal: isInternalPaste
+          });
+          
+          let processedHTML: string;
+          
+          if (isInternalPaste) {
+            console.log('🔄 Internal Flow Notes paste detected - preserving all formatting');
+            // For internal pastes, keep ALL formatting - just clean up Office artifacts
+            processedHTML = html
+              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+              .replace(/<\/o:p>/g, '') // Remove closing Office tags
+              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+              .replace(/<html[^>]*>/gi, '') // Remove html tags
+              .replace(/<\/html>/gi, '')
+              .replace(/<body[^>]*>/gi, '') // Remove body tags
+              .replace(/<\/body>/gi, '');
+            
+            console.log('🧹 Cleaned internal HTML (formatting preserved):', processedHTML.substring(0, 200));
+          } else {
+            console.log('🌐 External paste detected - stripping external styling');
+            // For external pastes, strip ALL styling to prevent formatting pollution
+            processedHTML = html
+              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+              .replace(/<\/o:p>/g, '') // Remove closing Office tags
+              .replace(/class="[^"]*"/g, '') // Remove ALL classes
+              .replace(/style="[^"]*"/g, '') // Remove ALL inline styles
+              .replace(/color="[^"]*"/g, '') // Remove color attributes
+              .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
+              .replace(/face="[^"]*"/g, '') // Remove font face
+              .replace(/size="[^"]*"/g, '') // Remove font size
+              .replace(/<font[^>]*>/g, '') // Remove font tags
+              .replace(/<\/font>/g, '')
+              .replace(/<span[^>]*>/g, '<span>') // Strip span attributes
+              .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
+              .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
+              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+              .replace(/<html[^>]*>/gi, '') // Remove html tags
+              .replace(/<\/html>/gi, '')
+              .replace(/<body[^>]*>/gi, '') // Remove body tags
+              .replace(/<\/body>/gi, '');
+            
+            console.log('🧹 Cleaned external HTML (styling stripped):', processedHTML.substring(0, 200));
+          }
 
           // Parse HTML and insert into editor
           try {
             const parser = new DOMParser();
-            const htmlDoc = parser.parseFromString(cleanHTML, 'text/html');
+            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
             
             // Extract text content as fallback
             const textContent = htmlDoc.body.textContent || htmlDoc.body.innerText || '';
