@@ -717,28 +717,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   useEffect(() => {
     if (editor) {
       const calculateMenuPosition = () => {
-        const { from, to } = editor.state.selection;
+        const { from } = editor.state.selection;
         const { view } = editor;
         const start = view.coordsAtPos(from);
-        const end = view.coordsAtPos(to);
-        
-        // Get the editor container's position
-        const editorElement = view.dom.getBoundingClientRect();
-        
-        // Calculate selection bounds
-        const selectionTop = Math.min(start.top, end.top);
-        const selectionBottom = Math.max(start.bottom, end.bottom);
         
         // Bubble menu dimensions
         const menuHeight = 48;
         const menuOffset = 12;
         
-        // Position above selection by default
-        let top = selectionTop - menuHeight - menuOffset;
+        // Always position above the selection start (like Notion)
+        let top = start.top - menuHeight - menuOffset;
         
-        // If not enough room above, position below
-        if (top < editorElement.top + 20) {
-          top = selectionBottom + menuOffset;
+        // Ensure menu stays on screen - if too close to top, add minimum offset
+        const minTopOffset = 60; // Account for header/toolbar
+        if (top < minTopOffset) {
+          top = minTopOffset;
         }
         
         // CONSISTENT horizontal position: center of viewport
