@@ -180,9 +180,15 @@ export const Sidebar = ({
       const bStarred = b.is_starred ?? false;
       if (aStarred && !bStarred) return -1;
       if (!aStarred && bStarred) return 1;
-      // Then sort by updated_at
+      // Then sort by position (for drag-and-drop reordering)
+      // If both have positions, use those; otherwise fall back to updated_at
+      if (a.position !== undefined && b.position !== undefined) {
+        return a.position - b.position;
+      }
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
+  
+  console.log('🔍 [Sidebar] filteredNotes order:', filteredNotes.map(n => `${n.title}:${n.position}`));
 
   // Check if a folder or its descendants contain matching notes
   const folderHasMatches = (folderId: string): boolean => {
@@ -223,6 +229,8 @@ export const Sidebar = ({
   
   // Get notes without folder
   const rootNotes = filteredNotes.filter(n => !n.folder_id);
+  
+  console.log('📋 [Sidebar] SIDEBAR ORDER (rootNotes):', rootNotes.map(n => n.id));
 
   // Get notes for a specific folder
   const getNotesInFolder = (folderId: string) => {

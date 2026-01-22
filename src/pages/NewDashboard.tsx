@@ -42,7 +42,12 @@ export const NewDashboard = () => {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [draggedItem, setDraggedItem] = useState<{ type: 'note' | 'tab'; note: Note } | null>(null);
+  const [draggedItem, setDraggedItem] = useState<
+    | { type: 'note'; note: Note }
+    | { type: 'tab'; note: Note }
+    | { type: 'folder'; folder: any }
+    | null
+  >(null);
   
   console.log('🔍 [NewDashboard] searchQuery from URL:', searchQuery);
 
@@ -91,6 +96,8 @@ export const NewDashboard = () => {
     handleNoteSelect,
     handleTabClose,
     handleTabReorder,
+    handleNoteReorder,
+    handleFolderReorder,
     handleNoteCreate,
     handleNoteUpdate,
     handleNoteDelete,
@@ -125,18 +132,25 @@ export const NewDashboard = () => {
       activeId,
       dataType: data?.type,
       hasNote: !!data?.note,
-      noteTitle: data?.note?.title
+      noteTitle: data?.note?.title,
+      hasFolder: !!data?.folder,
+      folderName: data?.folder?.name
     });
     
     setActiveId(activeId);
     
-    // Only set draggedItem for sidebar notes and tabs
-    // This prevents interference between tab and sidebar drags
+    // Set draggedItem for sidebar notes, folders, and tabs
     if (data?.type === 'note') {
       const note = data.note;
       if (note) {
         setDraggedItem({ type: 'note', note });
         console.log('✅ [DRAG START] Sidebar note drag:', note.title);
+      }
+    } else if (data?.type === 'folder') {
+      const folder = data.folder;
+      if (folder) {
+        setDraggedItem({ type: 'folder', folder });
+        console.log('✅ [DRAG START] Sidebar folder drag:', folder.name);
       }
     } else if (data?.type === 'tab') {
       const note = data.note;
@@ -147,13 +161,19 @@ export const NewDashboard = () => {
     }
   };
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = async (event: any) => {
     console.log('[NewDashboard] DRAG END:', event.active.id, 'over:', event.over?.id);
     
     const { active, over } = event;
     
+    if (!active || !over || active.id === over.id) {
+      setActiveId(null);
+      setDraggedItem(null);
+      return;
+    }
+    
     // Handle tab reordering
-    if (active && over && draggedItem?.type === 'tab') {
+    if (draggedItem?.type === 'tab') {
       // Extract note ID from tab-prefixed ID
       const activeNoteId = active.id.toString().replace('tab-', '');
       const overNoteId = over.id.toString().replace('tab-', '');
@@ -167,6 +187,34 @@ export const NewDashboard = () => {
         reorderedNotes.splice(overIndex, 0, movedNote);
         handleTabReorder(reorderedNotes);
         console.log('[NewDashboard] Tabs reordered:', { from: activeIndex, to: overIndex });
+      }
+    }
+    
+    // Handle note reordering in sidebar (same pattern as tab reordering)
+    if (draggedItem?.type === 'note' && notes) {
+      const activeIndex = notes.findIndex(n => n.id === active.id);
+      const overIndex = notes.findIndex(n => n.id === over.id);
+      
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        const reorderedNotes = [...notes];
+        const [movedNote] = reorderedNotes.splice(activeIndex, 1);
+        reorderedNotes.splice(overIndex, 0, movedNote);
+        handleNoteReorder(reorderedNotes);
+        console.log('[NewDashboard] Notes reordered:', { from: activeIndex, to: overIndex });
+      }
+    }
+    
+    // Handle folder reordering in sidebar (same pattern as tab reordering)
+    if (draggedItem?.type === 'folder' && folders) {
+      const activeIndex = folders.findIndex(f => f.id === active.id);
+      const overIndex = folders.findIndex(f => f.id === over.id);
+      
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        const reorderedFolders = [...folders];
+        const [movedFolder] = reorderedFolders.splice(activeIndex, 1);
+        reorderedFolders.splice(overIndex, 0, movedFolder);
+        handleFolderReorder(reorderedFolders);
+        console.log('[NewDashboard] Folders reordered:', { from: activeIndex, to: overIndex });
       }
     }
     
@@ -207,12 +255,25 @@ export const NewDashboard = () => {
           {activeId && draggedItem ? (
             <div className="bg-[#1a1a1a] text-[#e5e5e5] px-3 py-2 rounded-md shadow-2xl border border-[#333] opacity-90 scale-95 cursor-grabbing">
               <div className="flex items-center gap-2">
-                {draggedItem.note.emoji && (
-                  <span className="text-sm">{draggedItem.note.emoji}</span>
+                {draggedItem.type === 'folder' ? (
+                  <>
+                    {draggedItem.folder.emoji && (
+                      <span className="text-sm">{draggedItem.folder.emoji}</span>
+                    )}
+                    <span className="text-sm font-medium truncate max-w-[200px]">
+                      {draggedItem.folder.name || 'Untitled'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {draggedItem.note.emoji && (
+                      <span className="text-sm">{draggedItem.note.emoji}</span>
+                    )}
+                    <span className="text-sm font-medium truncate max-w-[200px]">
+                      {draggedItem.note.title || 'Untitled'}
+                    </span>
+                  </>
                 )}
-                <span className="text-sm font-medium truncate max-w-[200px]">
-                  {draggedItem.note.title || 'Untitled'}
-                </span>
               </div>
             </div>
           ) : null}

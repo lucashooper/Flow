@@ -232,6 +232,58 @@ export const useDashboardData = () => {
     setOpenNotes(reorderedNotes);
   };
 
+  const handleNoteReorder = (reorderedNotes: Note[]) => {
+    console.log('🔄 [handleNoteReorder] Starting reorder:', reorderedNotes.map(n => n.title));
+    
+    // Create completely new array with positions to ensure React detects the change
+    const notesWithPositions = reorderedNotes.map((note, index) => ({
+      ...note,
+      position: index
+    }));
+    
+    console.log('📝 [handleNoteReorder] Setting state with NEW array:', notesWithPositions.map(n => `${n.title}:${n.position}`));
+    console.log('📝 [handleNoteReorder] Array reference changed:', notesWithPositions !== notes);
+    
+    // Force new reference by spreading into new array
+    setNotes([...notesWithPositions]);
+    
+    // Update positions in database in background (directly, not through handleNoteUpdate)
+    setTimeout(async () => {
+      try {
+        console.log('💾 [handleNoteReorder] Saving positions to database...');
+        for (let i = 0; i < reorderedNotes.length; i++) {
+          // Update directly in IndexedDB without triggering state updates
+          await updateNote(reorderedNotes[i].id, { position: i });
+        }
+        console.log('✅ [handleNoteReorder] Note positions saved to database');
+      } catch (error) {
+        console.error('❌ [handleNoteReorder] Error updating note positions:', error);
+      }
+    }, 0);
+  };
+
+  const handleFolderReorder = (reorderedFolders: Folder[]) => {
+    // Update state immediately with positions already set
+    const foldersWithPositions = reorderedFolders.map((folder, index) => ({
+      ...folder,
+      position: index
+    }));
+    setFolders(foldersWithPositions);
+    
+    // Update positions in database in background (directly, not through handleFolderUpdate)
+    setTimeout(async () => {
+      try {
+        for (let i = 0; i < reorderedFolders.length; i++) {
+          // Update directly in IndexedDB without triggering state updates
+          await updateFolder(reorderedFolders[i].id, { position: i });
+        }
+        console.log('✅ Folder positions saved to database');
+      } catch (error) {
+        console.error('Error updating folder positions:', error);
+      }
+    }, 0);
+  };
+
   const handleNoteCreate = async (folderId?: string) => {
     if (!user?.id) {
       alert('You must be logged in to create notes');
@@ -398,6 +450,8 @@ export const useDashboardData = () => {
     handleNoteSelect,
     handleTabClose,
     handleTabReorder,
+    handleNoteReorder,
+    handleFolderReorder,
     handleNoteCreate,
     handleNoteUpdate,
     handleNoteDelete,

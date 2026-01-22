@@ -90,11 +90,18 @@ export async function getNote(noteId: string): Promise<Note | undefined> {
 }
 
 export async function getNotesByDashboard(dashboardId: string): Promise<Note[]> {
-  return await db.notes
+  const notes = await db.notes
     .where('dashboard_id')
     .equals(dashboardId)
-    .reverse()
-    .sortBy('updated_at');
+    .toArray();
+  
+  // Sort by position if available, otherwise by updated_at
+  return notes.sort((a, b) => {
+    if (a.position !== undefined && b.position !== undefined) {
+      return a.position - b.position;
+    }
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
 }
 
 export async function getAllNotes(userId: string): Promise<Note[]> {
@@ -175,10 +182,18 @@ export async function deleteFolder(folderId: string): Promise<void> {
 }
 
 export async function getFoldersByDashboard(dashboardId: string): Promise<Folder[]> {
-  return await db.folders
+  const folders = await db.folders
     .where('dashboard_id')
     .equals(dashboardId)
-    .sortBy('name');
+    .toArray();
+  
+  // Sort by position if available, otherwise by name
+  return folders.sort((a, b) => {
+    if (a.position !== undefined && b.position !== undefined) {
+      return a.position - b.position;
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 // ==================== SYNC QUEUE ====================

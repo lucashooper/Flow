@@ -8,6 +8,7 @@ export interface Note {
   emoji: string | null;
   drawing_data: string | null;
   is_starred: boolean;
+  position?: number;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +20,7 @@ export interface Folder {
   emoji: string | null;
   parent_id: string | null;
   dashboard_id: string | null;
+  position?: number;
   created_at: string;
   updated_at: string;
 }
