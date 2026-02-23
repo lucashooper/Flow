@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, MoreVertical, Calendar, Trash2, Check } from 'lucide-react';
+import { GripVertical, MoreVertical, Calendar, Trash2, Check, Edit2 } from 'lucide-react';
 import type { Task } from '../types';
 import { useTimerStore } from '../stores/timerStore';
 
@@ -11,14 +11,18 @@ interface TaskCardProps {
   onToggleComplete: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onUpdatePriority: (taskId: string, priority: 1 | 2 | 3) => void;
+  onRename?: (taskId: string, newTitle: string) => void;
   getPriorityColor: (priority: 1 | 2 | 3) => string;
 }
 
-export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, getPriorityColor }: TaskCardProps) => {
+export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, onRename, getPriorityColor }: TaskCardProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(task.title);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   
   const { attachedTaskId, isRunning } = useTimerStore();
   const isAttached = attachedTaskId === task.id;
@@ -33,8 +37,8 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
   } = useSortable({ id: task.id });
 
   const cardStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition: 'none',
+    transform: CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
+    transition: isDragging ? 'none' : 'transform 0ms',
     background: isDragging 
       ? 'var(--bg-panel)' 
       : isAttached 
@@ -78,16 +82,13 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
 
   return (
     <>
-    <motion.div
+    <div
       ref={setNodeRef}
-      style={cardStyle}
-      initial={false}
-      animate={{ 
-        opacity: isCompleting ? 0 : 1,
-        scale: isCompleting ? 0.98 : 1
+      style={{
+        ...cardStyle,
+        opacity: isCompleting ? 0 : (cardStyle.opacity ?? 1),
+        transition: `${cardStyle.transition || ''}, opacity 0.2s ease`,
       }}
-      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
-      transition={{ duration: 0.15 }}
       className="group relative rounded-xl p-4"
       onContextMenu={handleContextMenu}
     >
@@ -131,7 +132,36 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
 
         {/* Title */}
         <div className="flex-1 min-w-0">
-          <p style={{ color: 'var(--text)' }}>{task.title}</p>
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (renameValue.trim() && onRename) {
+                    onRename(task.id, renameValue.trim());
+                  }
+                  setIsRenaming(false);
+                } else if (e.key === 'Escape') {
+                  setRenameValue(task.title);
+                  setIsRenaming(false);
+                }
+              }}
+              onBlur={() => {
+                if (renameValue.trim() && onRename) {
+                  onRename(task.id, renameValue.trim());
+                }
+                setIsRenaming(false);
+              }}
+              className="w-full bg-transparent border-none outline-none text-base"
+              style={{ color: 'var(--text)', caretColor: 'var(--accent)' }}
+              autoFocus
+            />
+          ) : (
+            <p style={{ color: 'var(--text)' }}>{task.title}</p>
+          )}
           {task.list && task.list !== 'Inbox' && (
             <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{task.list}</p>
           )}
@@ -172,7 +202,7 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
           <MoreVertical className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </button>
       </div>
-    </motion.div>
+    </div>
 
     {/* Menu Portal - Rendered outside card to escape stacking context */}
     {showMenu && (
@@ -230,6 +260,21 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, g
                 Low Priority
               </button>
               <div className="border-t my-1" style={{ borderColor: 'var(--border)' }} />
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setIsRenaming(true);
+                  setRenameValue(task.title);
+                  setTimeout(() => renameInputRef.current?.focus(), 50);
+                }}
+                className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                style={{ cursor: 'pointer', color: 'var(--text)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Edit2 className="w-4 h-4" />
+                Rename
+              </button>
               <button
                 onClick={() => {
                   onDelete(task.id);

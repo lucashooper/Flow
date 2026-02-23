@@ -253,6 +253,22 @@ export const Tasks = () => {
     }
   };
 
+  const renameTask = async (taskId: string, newTitle: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ title: newTitle })
+        .eq('id', taskId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error renaming task:', error);
+      fetchTasks();
+    }
+  };
+
   const updateTaskPriority = async (taskId: string, priority: 1 | 2 | 3) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, priority } : t));
 
@@ -417,7 +433,7 @@ export const Tasks = () => {
                       </button>
 
                       {showListMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           {TASK_LISTS.map(list => (
                             <button
                               key={list}
@@ -472,7 +488,7 @@ export const Tasks = () => {
                       </button>
 
                       {showDateMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           <button
                             onClick={() => {
                               setQuickAddDueDate(getTodayDate());
@@ -529,7 +545,7 @@ export const Tasks = () => {
                       </button>
 
                       {showPriorityMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           <button
                             onClick={() => {
                               setQuickAddPriority(1);
@@ -621,6 +637,7 @@ export const Tasks = () => {
                       onToggleComplete={toggleComplete}
                       onDelete={deleteTask}
                       onUpdatePriority={updateTaskPriority}
+                      onRename={renameTask}
                       getPriorityColor={getPriorityColor}
                     />
                   ))}

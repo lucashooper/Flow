@@ -32,6 +32,8 @@ export interface Dashboard {
   emoji: string;
   cover_image: string | null;
   is_active: boolean;
+  parent_id: string | null; // For nested dashboards (dashboard groups)
+  position?: number; // For custom drag-and-drop ordering
   created_at: string;
   updated_at: string;
 }

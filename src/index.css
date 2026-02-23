@@ -42,6 +42,25 @@
     scrollbar-color: rgba(255,255,255,0.22) transparent;
   }
 
+  /* Override emoji-picker-react scrollbar to match app dark theme */
+  .EmojiPickerReact *::-webkit-scrollbar {
+    width: 6px;
+  }
+  .EmojiPickerReact *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .EmojiPickerReact *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 3px;
+  }
+  .EmojiPickerReact *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.22);
+  }
+  .EmojiPickerReact * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+
   /* Force opacity for draggable items - override dnd-kit inline styles */
   .force-visible {
     opacity: 1 !important;
