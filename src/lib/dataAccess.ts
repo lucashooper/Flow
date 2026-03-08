@@ -137,13 +137,16 @@ export async function createFolder(
   await db.folders.add(folder);
   console.log('📁 Created folder in IndexedDB:', folder.id);
 
-  // Queue for sync
+  // Queue for sync (include all fields so Supabase gets a complete row)
   await queueSync('folder', folder.id, 'upsert', {
     id: folder.id,
     name: folder.name,
+    emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
+    created_at: folder.created_at,
+    updated_at: folder.updated_at,
   });
 
   return folder;
@@ -161,10 +164,11 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
   const folder = await db.folders.get(folderId);
   if (!folder) return;
 
-  // Queue for sync
+  // Queue for sync (include all mutable fields so no data is lost)
   await queueSync('folder', folderId, 'upsert', {
     id: folder.id,
     name: folder.name,
+    emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
@@ -204,6 +208,27 @@ async function queueSync(
   operation: 'upsert' | 'delete',
   payload: any
 ): Promise<void> {
+  // Deduplicate: if there's already a pending upsert for this entity,
+  // replace its payload with the latest data instead of adding a duplicate.
+  // This prevents stale data (e.g. old folder name) from overwriting newer changes.
+  if (operation === 'upsert') {
+    const existing = await db.outbox
+      .where('entityId')
+      .equals(entityId)
+      .filter(item => item.entityType === entityType && item.operation === 'upsert')
+      .first();
+
+    if (existing) {
+      await db.outbox.update(existing.id, {
+        payload,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+      });
+      console.log('📤 Updated existing outbox entry for:', entityType, entityId);
+      return;
+    }
+  }
+
   const outboxItem: OutboxItem = {
     id: generateUUID(),
     entityType,

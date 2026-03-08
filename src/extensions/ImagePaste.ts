@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from 'prosemirror-state';
+import { Plugin, PluginKey, TextSelection } from 'prosemirror-state';
 
 export interface ImagePasteOptions {
   uploadImage: (file: File) => Promise<string | null>;
@@ -15,6 +15,64 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
   },
 
   addProseMirrorPlugins() {
+    const uploadImage = this.options.uploadImage;
+
+    // Shared helper: insert image file into editor with upload
+    const insertImageFile = (view: any, file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        const { schema, tr } = view.state;
+        
+        // Insert temporary image with base64
+        const tempImageNode = schema.nodes.image.create({ 
+          src: base64,
+          'data-uploading': 'true'
+        });
+        view.dispatch(tr.replaceSelectionWith(tempImageNode));
+        
+        // Upload actual file in background
+        uploadImage(file).then((url: string | null) => {
+          console.log('✅ Upload complete, URL:', url);
+          if (url) {
+            const { state, dispatch } = view;
+            let tempImagePos: number | null = null;
+            
+            state.doc.descendants((node: any, pos: number) => {
+              if (node.type.name === 'image' && 
+                  node.attrs['data-uploading'] === 'true') {
+                tempImagePos = pos;
+                return false;
+              }
+            });
+            
+            if (tempImagePos !== null) {
+              const finalImageNode = state.schema.nodes.image.create({ src: url });
+              const replaceTr = state.tr.replaceRangeWith(
+                tempImagePos,
+                tempImagePos + 1,
+                finalImageNode
+              );
+              dispatch(replaceTr);
+              console.log('✅ Image replaced with uploaded URL');
+            }
+          }
+        }).catch((error: any) => {
+          console.error('❌ Upload failed:', error);
+          const { state, dispatch } = view;
+          state.doc.descendants((node: any, pos: number) => {
+            if (node.type.name === 'image' && 
+                node.attrs['data-uploading'] === 'true') {
+              dispatch(state.tr.delete(pos, pos + node.nodeSize));
+              return false;
+            }
+          });
+        });
+      };
+      
+      reader.readAsDataURL(file);
+    };
+
     return [
       new Plugin({
         key: new PluginKey('imagePaste'),
@@ -43,63 +101,7 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
 
                 if (file) {
                   console.log('⬆️ Starting upload...');
-                  
-                  // Create a temporary base64 preview for instant feedback
-                  const reader = new FileReader();
-                  reader.onload = (e) => {
-                    const base64 = e.target?.result as string;
-                    const { schema, tr } = view.state;
-                    
-                    // Insert temporary image with base64
-                    const tempImageNode = schema.nodes.image.create({ 
-                      src: base64,
-                      'data-uploading': 'true'
-                    });
-                    view.dispatch(tr.replaceSelectionWith(tempImageNode));
-                    
-                    // Upload actual file in background
-                    this.options.uploadImage(file).then((url) => {
-                      console.log('✅ Upload complete, URL:', url);
-                      if (url) {
-                        // Replace base64 image with uploaded URL
-                        const { state, dispatch } = view;
-                        let tempImagePos = null;
-                        
-                        // Find the temporary image
-                        state.doc.descendants((node, pos) => {
-                          if (node.type.name === 'image' && 
-                              node.attrs['data-uploading'] === 'true') {
-                            tempImagePos = pos;
-                            return false;
-                          }
-                        });
-                        
-                        if (tempImagePos !== null) {
-                          const finalImageNode = state.schema.nodes.image.create({ src: url });
-                          const tr = state.tr.replaceRangeWith(
-                            tempImagePos,
-                            tempImagePos + 1,
-                            finalImageNode
-                          );
-                          dispatch(tr);
-                          console.log('✅ Image replaced with uploaded URL');
-                        }
-                      }
-                    }).catch((error) => {
-                      console.error('❌ Upload failed:', error);
-                      // Remove the temporary image on error
-                      const { state, dispatch } = view;
-                      state.doc.descendants((node, pos) => {
-                        if (node.type.name === 'image' && 
-                            node.attrs['data-uploading'] === 'true') {
-                          dispatch(state.tr.delete(pos, pos + node.nodeSize));
-                          return false;
-                        }
-                      });
-                    });
-                  };
-                  
-                  reader.readAsDataURL(file);
+                  insertImageFile(view, file);
                 }
                 return true;
               }
@@ -107,6 +109,36 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
 
             console.log('📋 No image found in clipboard');
             return false;
+          },
+
+          handleDrop: (view, event) => {
+            const dataTransfer = event.dataTransfer;
+            if (!dataTransfer) return false;
+
+            const files = Array.from(dataTransfer.files);
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            
+            if (imageFiles.length === 0) return false;
+
+            console.log('🖼️ ImagePaste Extension: Drop detected,', imageFiles.length, 'image(s)');
+            event.preventDefault();
+
+            // Set cursor position to drop location
+            const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            if (pos) {
+              const resolved = view.state.doc.resolve(pos.pos);
+              const tr = view.state.tr.setSelection(
+                TextSelection.near(resolved)
+              );
+              view.dispatch(tr);
+            }
+
+            for (const file of imageFiles) {
+              console.log('� Processing dropped image:', file.name, file.type);
+              insertImageFile(view, file);
+            }
+
+            return true;
           },
         },
       }),
