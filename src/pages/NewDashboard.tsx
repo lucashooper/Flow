@@ -128,14 +128,8 @@ export const NewDashboard = () => {
     const activeId = event.active.id;
     const data = event.active.data.current;
     
-    console.log('🎬 [DRAG START]', {
-      activeId,
-      dataType: data?.type,
-      hasNote: !!data?.note,
-      noteTitle: data?.note?.title,
-      hasFolder: !!data?.folder,
-      folderName: data?.folder?.name
-    });
+    // Ignore dashboard drags — handled by DashboardSwitcher's own DndContext
+    if (data?.type === 'dashboard') return;
     
     setActiveId(activeId);
     
@@ -190,21 +184,42 @@ export const NewDashboard = () => {
       }
     }
     
-    // Handle note reordering in sidebar (same pattern as tab reordering)
+    // Handle note drag in sidebar
     if (draggedItem?.type === 'note' && notes) {
-      const activeIndex = notes.findIndex(n => n.id === active.id);
-      const overIndex = notes.findIndex(n => n.id === over.id);
+      const overData = over.data?.current;
       
-      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-        const reorderedNotes = [...notes];
-        const [movedNote] = reorderedNotes.splice(activeIndex, 1);
-        reorderedNotes.splice(overIndex, 0, movedNote);
-        handleNoteReorder(reorderedNotes);
-        console.log('[NewDashboard] Notes reordered:', { from: activeIndex, to: overIndex });
+      // Dropping a note onto a folder → move note into that folder
+      if (overData?.type === 'folder') {
+        const targetFolderId = over.id.toString();
+        const draggedNote = notes.find(n => n.id === active.id);
+        if (draggedNote && draggedNote.folder_id !== targetFolderId) {
+          handleNoteUpdate(active.id.toString(), { folder_id: targetFolderId });
+          console.log('[NewDashboard] Note moved into folder:', { note: draggedNote.title, folder: targetFolderId });
+        }
+      } else {
+        // Note-to-note reordering
+        const activeIndex = notes.findIndex(n => n.id === active.id);
+        const overIndex = notes.findIndex(n => n.id === over.id);
+        
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          // If dropping onto a note that's in a folder, move the dragged note to that folder too
+          const overNote = notes[overIndex];
+          const draggedNote = notes[activeIndex];
+          if (overNote.folder_id !== draggedNote.folder_id) {
+            handleNoteUpdate(active.id.toString(), { folder_id: overNote.folder_id || null });
+            console.log('[NewDashboard] Note moved to folder of target note:', overNote.folder_id);
+          }
+          
+          const reorderedNotes = [...notes];
+          const [movedNote] = reorderedNotes.splice(activeIndex, 1);
+          reorderedNotes.splice(overIndex, 0, movedNote);
+          handleNoteReorder(reorderedNotes);
+          console.log('[NewDashboard] Notes reordered:', { from: activeIndex, to: overIndex });
+        }
       }
     }
     
-    // Handle folder reordering in sidebar (same pattern as tab reordering)
+    // Handle folder reordering in sidebar
     if (draggedItem?.type === 'folder' && folders) {
       const activeIndex = folders.findIndex(f => f.id === active.id);
       const overIndex = folders.findIndex(f => f.id === over.id);
@@ -221,15 +236,6 @@ export const NewDashboard = () => {
     // Clear drag state immediately
     setActiveId(null);
     setDraggedItem(null);
-    
-    // Force re-render of dragged items after a short delay
-    setTimeout(() => {
-      const draggedElement = document.querySelector(`[data-folder-id="${event.active.id}"]`);
-      if (draggedElement) {
-        (draggedElement as HTMLElement).style.visibility = 'visible';
-        (draggedElement as HTMLElement).style.opacity = '1';
-      }
-    }, 0);
   };
 
   const handleDragCancel = () => {
@@ -251,7 +257,7 @@ export const NewDashboard = () => {
         onDragCancel={handleDragCancel}
       >
         {/* Drag Overlay - shows what's being dragged */}
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeId && draggedItem ? (
             <div className="bg-[#1a1a1a] text-[#e5e5e5] px-3 py-2 rounded-md shadow-2xl border border-[#333] opacity-90 scale-95 cursor-grabbing">
               <div className="flex items-center gap-2">

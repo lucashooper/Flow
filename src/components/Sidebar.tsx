@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, FolderPlus, Search, Star, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  DragOverlay,
-} from '@dnd-kit/core';
+import {} from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
@@ -78,8 +76,6 @@ export const Sidebar = ({
     }
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [activeId] = useState<string | null>(null);
-  const [overId] = useState<string | null>(null);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [autoRenameFolderId, setAutoRenameFolderId] = useState<string | null>(null);
 
@@ -247,7 +243,7 @@ export const Sidebar = ({
     const isExpanded = expandedFolders.has(folder.id);
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
-    const isOver = overId === folder.id;
+    const isOver = false;
 
     return (
       <div key={folder.id}>
@@ -491,22 +487,6 @@ export const Sidebar = ({
       `}</style>
       </div>
 
-      {/* Drag Overlay */}
-      <DragOverlay>
-        {activeId ? (
-          <div className="opacity-70 shadow-2xl">
-            {notes.find(n => n.id === activeId) ? (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
-                {notes.find(n => n.id === activeId)?.title || 'Dragging note...'}
-              </div>
-            ) : (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
-                Dragging folder...
-              </div>
-            )}
-          </div>
-        ) : null}
-      </DragOverlay>
     </>
   );
 };

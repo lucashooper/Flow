@@ -48,7 +48,29 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    
+    // Calculate menu position with viewport bounds checking
+    const menuWidth = 200;
+    const menuHeight = 350; // Approximate height of context menu
+    const padding = 8;
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Clamp horizontally
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = window.innerWidth - menuWidth - padding;
+    }
+    if (x < padding) {
+      x = padding;
+    }
+    
+    // Clamp vertically - if menu would go off bottom, show it above the cursor
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = Math.max(padding, y - menuHeight);
+    }
+    
+    setContextMenuPos({ x, y });
     setShowContextMenu(true);
   };
 

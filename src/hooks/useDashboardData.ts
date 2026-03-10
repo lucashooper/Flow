@@ -160,6 +160,53 @@ export const useDashboardData = () => {
         
         setNotes(syncedNotes);
         setFolders(syncedFolders);
+      } else if (navigator.onLine) {
+        // Background refresh: pull latest from Supabase to catch stale cached data
+        // This runs after we've already shown IndexedDB data, so the UI is fast
+        (async () => {
+          try {
+            const { data: remoteFolders } = await supabase
+              .from('folders')
+              .select('*')
+              .eq('dashboard_id', activeDashboard.id);
+            
+            if (remoteFolders) {
+              // Check for new folders OR updated folders
+              const localMap = new Map(foldersData.map(f => [f.id, f]));
+              let hasChanges = false;
+              
+              for (const remote of remoteFolders) {
+                const local = localMap.get(remote.id);
+                // NEW: Detect new folders (!local) OR updated folders
+                if (!local || local.name !== remote.name || local.emoji !== remote.emoji || local.parent_id !== remote.parent_id) {
+                  hasChanges = true;
+                  // Update IndexedDB with server data (only if no pending outbox change)
+                  const { db } = await import('../lib/db');
+                  const pending = await db.outbox
+                    .where('entityId')
+                    .equals(remote.id)
+                    .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
+                    .first();
+                  
+                  if (!pending) {
+                    await db.folders.put({ ...remote, synced: true });
+                    if (!local) {
+                      console.log('📥 New folder synced from server:', remote.name);
+                    }
+                  }
+                }
+              }
+              
+              if (hasChanges) {
+                const refreshedFolders = await getFoldersByDashboard(activeDashboard.id);
+                setFolders(refreshedFolders);
+                console.log('🔄 Background refresh: updated folder data from server');
+              }
+            }
+          } catch (e) {
+            console.log('⚠️ Background folder refresh failed:', e);
+          }
+        })();
       }
     } catch (error) {
       console.error('Failed to load data from IndexedDB:', error);

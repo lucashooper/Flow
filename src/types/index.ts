@@ -49,6 +49,7 @@ export interface UserProfile {
   username: string;
   email: string;
   profile_picture_url: string | null;
+  pin_hash: string | null;
   created_at: string;
   updated_at: string;
 }

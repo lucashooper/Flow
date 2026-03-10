@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
 
-type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features';
+type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security';
+
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -67,6 +75,12 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [pinStep, setPinStep] = useState<'idle' | 'enter' | 'confirm' | 'verify-current'>('idle');
+  const [pinInput, setPinInput] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinSuccess, setPinSuccess] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -199,10 +213,70 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     }
   };
 
+  const hasPinSet = !!userProfile?.pin_hash;
+
+  const handleSetPin = async () => {
+    if (pinInput.length !== 4 || !/^\d{4}$/.test(pinInput)) {
+      setPinError('PIN must be exactly 4 digits');
+      return;
+    }
+    if (pinInput !== pinConfirm) {
+      setPinError('PINs do not match');
+      return;
+    }
+    setSavingPin(true);
+    setPinError('');
+    try {
+      const hash = await hashPin(pinInput);
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ pin_hash: hash, updated_at: new Date().toISOString() })
+        .eq('id', user!.id);
+      if (updateError) throw updateError;
+      setPinSuccess('PIN set successfully!');
+      setPinStep('idle');
+      setPinInput('');
+      setPinConfirm('');
+      setTimeout(() => setPinSuccess(''), 3000);
+    } catch (err: any) {
+      setPinError(err.message || 'Failed to set PIN');
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
+  const handleRemovePin = async () => {
+    if (!hasPinSet) return;
+    const hash = await hashPin(pinInput);
+    if (hash !== userProfile!.pin_hash) {
+      setPinError('Current PIN is incorrect');
+      return;
+    }
+    setSavingPin(true);
+    setPinError('');
+    try {
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ pin_hash: null, updated_at: new Date().toISOString() })
+        .eq('id', user!.id);
+      if (updateError) throw updateError;
+      setPinSuccess('PIN removed successfully!');
+      setPinStep('idle');
+      setPinInput('');
+      sessionStorage.removeItem('pin_unlocked');
+      setTimeout(() => setPinSuccess(''), 3000);
+    } catch (err: any) {
+      setPinError(err.message || 'Failed to remove PIN');
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
   const menuItems = [
     { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
     { id: 'profile' as SettingsSection, label: 'Profile', icon: User },
     { id: 'editor' as SettingsSection, label: 'Editor', icon: Type },
+    { id: 'security' as SettingsSection, label: 'Security', icon: Lock },
     { id: 'plugins' as SettingsSection, label: 'Plugins', icon: Layers },
     { id: 'features' as SettingsSection, label: 'Features', icon: Layers },
   ];
@@ -768,6 +842,186 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         Request a Plugin
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Security Section */}
+            {activeSection === 'security' && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Security</h2>
+
+                {pinSuccess && (
+                  <div className="bg-green-900/20 border border-green-900/50 text-green-400 p-3 rounded-lg mb-4">
+                    {pinSuccess}
+                  </div>
+                )}
+
+                {pinError && (
+                  <div className="bg-red-900/20 border border-red-900/50 text-red-400 p-3 rounded-lg mb-4">
+                    {pinError}
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  <div className="pb-6 border-b" style={{ borderColor: 'var(--divider)' }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--text)' }}>PIN Lock</h3>
+                        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                          Require a 4-digit PIN to access your account each session
+                        </p>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        hasPinSet
+                          ? 'bg-green-900/20 text-green-400 border border-green-900/50'
+                          : ''
+                      }`} style={!hasPinSet ? { backgroundColor: 'var(--bg-elev)', color: 'var(--muted)' } : {}}>
+                        {hasPinSet ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+
+                    {pinStep === 'idle' && (
+                      <div className="flex gap-3">
+                        {!hasPinSet ? (
+                          <button
+                            onClick={() => { setPinStep('enter'); setPinError(''); setPinSuccess(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                          >
+                            Set PIN
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => { setPinStep('enter'); setPinError(''); setPinSuccess(''); setPinInput(''); }}
+                              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                              style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                            >
+                              Change PIN
+                            </button>
+                            <button
+                              onClick={() => { setPinStep('verify-current'); setPinError(''); setPinSuccess(''); setPinInput(''); }}
+                              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
+                            >
+                              Remove PIN
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {pinStep === 'enter' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Enter new PIN (4 digits)</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinInput}
+                            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              if (pinInput.length === 4) { setPinStep('confirm'); setPinError(''); }
+                              else { setPinError('PIN must be exactly 4 digits'); }
+                            }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                          >
+                            Continue
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pinStep === 'confirm' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Confirm new PIN</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinConfirm}
+                            onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleSetPin}
+                            disabled={savingPin}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff', opacity: savingPin ? 0.5 : 1 }}
+                          >
+                            {savingPin ? 'Setting PIN...' : 'Set PIN'}
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinConfirm(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pinStep === 'verify-current' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Enter current PIN to continue</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinInput}
+                            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleRemovePin}
+                            disabled={savingPin}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-red-600 hover:bg-red-700 text-white"
+                            style={{ opacity: savingPin ? 0.5 : 1 }}
+                          >
+                            {savingPin ? 'Removing...' : 'Remove PIN'}
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

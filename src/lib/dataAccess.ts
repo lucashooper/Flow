@@ -258,7 +258,34 @@ export async function initialSync(userId: string): Promise<void> {
   console.log('🔄 Starting initial sync from Supabase...');
 
   try {
-    // Fetch all notes
+    // STEP 1: Push any pending outbox items to server FIRST
+    // This ensures local renames etc. aren't lost when we pull fresh data
+    const outboxItems = await db.outbox.toArray();
+    if (outboxItems.length > 0) {
+      console.log('📤 Pushing', outboxItems.length, 'pending outbox items before initial sync...');
+      for (const item of outboxItems) {
+        try {
+          if (item.operation === 'upsert') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const { error } = await supabase.from(table).upsert(item.payload);
+            if (!error) {
+              await db.outbox.delete(item.id);
+              console.log('✅ Pushed outbox item:', item.entityType, item.entityId);
+            }
+          } else if (item.operation === 'delete') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const { error } = await supabase.from(table).delete().eq('id', item.entityId);
+            if (!error) {
+              await db.outbox.delete(item.id);
+            }
+          }
+        } catch (e) {
+          console.error('❌ Failed to push outbox item:', item.id, e);
+        }
+      }
+    }
+
+    // STEP 2: Pull fresh data from Supabase
     const { data: notes, error: notesError } = await supabase
       .from('notes')
       .select('*')
@@ -267,7 +294,6 @@ export async function initialSync(userId: string): Promise<void> {
     if (notesError) throw notesError;
 
     if (notes && notes.length > 0) {
-      // Clear existing notes and add fresh data
       await db.notes.clear();
       for (const note of notes) {
         await db.notes.add({ ...note, synced: true });
@@ -294,5 +320,48 @@ export async function initialSync(userId: string): Promise<void> {
     console.log('✅ Initial sync complete');
   } catch (error) {
     console.error('❌ Initial sync failed:', error);
+  }
+}
+
+/**
+ * Force a full re-sync: clear local IndexedDB cache and pull everything fresh from Supabase.
+ * Useful when local data is stale or corrupted.
+ */
+export async function forceResync(userId: string): Promise<void> {
+  if (!navigator.onLine) {
+    console.log('📴 Offline - cannot force resync');
+    return;
+  }
+
+  console.log('🔄 Force resync: clearing local cache...');
+
+  try {
+    // Push any pending changes first
+    const outboxItems = await db.outbox.toArray();
+    for (const item of outboxItems) {
+      try {
+        if (item.operation === 'upsert') {
+          const table = item.entityType === 'note' ? 'notes' : 'folders';
+          await supabase.from(table).upsert(item.payload);
+        } else if (item.operation === 'delete') {
+          const table = item.entityType === 'note' ? 'notes' : 'folders';
+          await supabase.from(table).delete().eq('id', item.entityId);
+        }
+        await db.outbox.delete(item.id);
+      } catch (e) {
+        console.error('Failed to push:', e);
+      }
+    }
+
+    // Clear all local data
+    await db.notes.clear();
+    await db.folders.clear();
+    await db.outbox.clear();
+
+    // Pull fresh from Supabase
+    await initialSync(userId);
+    console.log('✅ Force resync complete');
+  } catch (error) {
+    console.error('❌ Force resync failed:', error);
   }
 }

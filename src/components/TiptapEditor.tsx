@@ -385,6 +385,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
               .replace(/<body[^>]*>/gi, '') // Remove body tags
               .replace(/<\/body>/gi, '');
             
+            // CRITICAL FIX: Unwrap emojis from span tags to prevent color inheritance
+            // ChatGPT wraps emojis in <span> tags, which can inherit text color from surrounding styled text
+            // Regex matches emoji characters (Unicode ranges for common emojis and symbols)
+            processedHTML = processedHTML.replace(
+              /<span>([^\x00-\x7F]+)<\/span>/g,
+              (match, content) => {
+                // Check if content is likely an emoji (non-ASCII, typically 1-4 chars)
+                // This includes emojis, symbols, and other Unicode characters
+                if (content.length <= 4 && /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2300}-\u{23FF}\u{2B50}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE0F}\u{20E3}\u{E0020}-\u{E007F}]/u.test(content)) {
+                  return content; // Unwrap emoji - return just the emoji without span
+                }
+                return match; // Keep span for other content
+              }
+            );
+            
             console.log('🧹 Cleaned external HTML (styling stripped):', processedHTML.substring(0, 200));
           }
 
@@ -488,8 +503,33 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       
       // Only update if editor content is different from prop
       if (content !== editor.getHTML()) {
-        console.log('🔄 Setting editor content from prop');
-        editor.commands.setContent(content);
+        console.log('🔄 Setting editor content from prop (note switch)');
+        // Use emitUpdate:false so this doesn't trigger onChange → auto-save loop
+        editor.commands.setContent(content, { emitUpdate: false });
+        
+        // CRITICAL: Clear undo history after switching notes.
+        // Without this, Ctrl+Z undoes back to the previous note's content,
+        // which can delete/replace the current note's text.
+        // This matches Notion/Obsidian behavior — each note has fresh undo history.
+        //
+        // Find the ProseMirror history plugin and reset its state to a fresh
+        // empty HistoryState by dispatching a transaction with the plugin key's
+        // meta set to { historyState: <freshState> }.
+        // See prosemirror-history/src/history.ts applyTransaction():
+        //   let historyTr = tr.getMeta(historyKey);
+        //   if (historyTr) return historyTr.historyState;
+        const historyPlugin = editor.state.plugins.find(
+          (plugin: any) => plugin.key === 'history$'
+        );
+        if (historyPlugin) {
+          // Get a fresh empty HistoryState from the plugin's init()
+          const freshState = (historyPlugin as any).spec.state.init();
+          const tr = editor.state.tr;
+          tr.setMeta(historyPlugin, { historyState: freshState });
+          tr.setMeta('addToHistory', false);
+          editor.view.dispatch(tr);
+          console.log('🧹 Cleared undo history for fresh note');
+        }
       }
     }
   }, [content, editor]);
@@ -1163,26 +1203,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           padding-bottom: 0.5rem;
         }
 
-        /* Emoji icons at the start of headings should keep native color */
-        .ProseMirror .emoji-icon {
+        /* Emoji characters should always render with native color, never inherit text styling */
+        .ProseMirror .emoji-icon,
+        .ProseMirror .emoji-icon span,
+        .ProseMirror .emoji-icon span[style] {
           color: initial !important;
           -webkit-text-fill-color: initial !important;
           background: none !important;
           -webkit-background-clip: initial !important;
           background-clip: initial !important;
-        }
-
-        .ProseMirror h1 .emoji-icon,
-        .ProseMirror h2 .emoji-icon,
-        .ProseMirror h3 .emoji-icon,
-        .ProseMirror h4 .emoji-icon,
-        .ProseMirror h5 .emoji-icon,
-        .ProseMirror h6 .emoji-icon {
-          color: initial !important;
-          -webkit-text-fill-color: initial !important;
-          background: none !important;
-          -webkit-background-clip: initial !important;
-          background-clip: initial !important;
+          font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif !important;
         }
 
         .ProseMirror h2 {
