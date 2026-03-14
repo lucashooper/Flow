@@ -317,6 +317,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         if (html && !isFromOffice) {
           console.log('✅ Found HTML data:', html.substring(0, 200));
           
+          // Skip if HTML contains images - let ImagePaste extension handle it
+          if (html.includes('<img')) {
+            console.log('🖼️ HTML contains <img> tag - delegating to ImagePaste extension');
+            return false;
+          }
+          
           // Check if this is internal Flow Notes content (has Tiptap/ProseMirror markers)
           // Tiptap uses inline styles for formatting, so check for those
           const isInternalPaste = html.includes('data-type="') || 
