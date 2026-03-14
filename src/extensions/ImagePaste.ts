@@ -6,7 +6,9 @@ export interface ImagePasteOptions {
 }
 
 export const ImagePaste = Extension.create<ImagePasteOptions>({
-  name: 'imagePaste',
+  name: 'mediaPaste',
+  
+  priority: 1000, // High priority to run before other extensions
 
   addOptions() {
     return {
@@ -17,26 +19,36 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
   addProseMirrorPlugins() {
     const uploadImage = this.options.uploadImage;
 
-    // Shared helper: insert image file into editor with upload
-    const insertImageFile = (view: any, file: File) => {
+    // Shared helper: insert image or video file into editor with upload
+    const insertMediaFile = (view: any, file: File) => {
+      const isVideo = file.type.startsWith('video/');
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         const { schema, tr } = view.state;
         
-        // Insert temporary image with base64
-        // Use resizableImage node (custom extension) or fallback to image
-        const imageNodeType = schema.nodes.resizableImage || schema.nodes.image;
-        if (!imageNodeType) {
-          console.error('❌ No image node type found in schema');
-          return;
+        // Determine node type based on file type
+        let nodeType;
+        if (isVideo) {
+          nodeType = schema.nodes.resizableVideo;
+          if (!nodeType) {
+            console.error('❌ No video node type found in schema');
+            return;
+          }
+        } else {
+          // Use resizableImage node (custom extension) or fallback to image
+          nodeType = schema.nodes.resizableImage || schema.nodes.image;
+          if (!nodeType) {
+            console.error('❌ No image node type found in schema');
+            return;
+          }
         }
         
-        const tempImageNode = imageNodeType.create({ 
+        const tempNode = nodeType.create({ 
           src: base64,
           'data-uploading': 'true'
         });
-        view.dispatch(tr.replaceSelectionWith(tempImageNode));
+        view.dispatch(tr.replaceSelectionWith(tempNode));
         
         // Upload actual file in background
         uploadImage(file).then((url: string | null) => {
@@ -46,7 +58,7 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
             let tempImagePos: number | null = null;
             
             state.doc.descendants((node: any, pos: number) => {
-              if ((node.type.name === 'resizableImage' || node.type.name === 'image') && 
+              if ((node.type.name === 'resizableImage' || node.type.name === 'image' || node.type.name === 'resizableVideo') && 
                   node.attrs['data-uploading'] === 'true') {
                 tempImagePos = pos;
                 return false;
@@ -54,27 +66,30 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
             });
             
             if (tempImagePos !== null) {
-              const imageNodeType = state.schema.nodes.resizableImage || state.schema.nodes.image;
-              if (!imageNodeType) {
-                console.error('❌ No image node type found in schema for replacement');
+              // Determine correct node type for replacement
+              const nodeType = state.schema.nodes.resizableVideo || 
+                              state.schema.nodes.resizableImage || 
+                              state.schema.nodes.image;
+              if (!nodeType) {
+                console.error('❌ No media node type found in schema for replacement');
                 return;
               }
               
-              const finalImageNode = imageNodeType.create({ src: url });
+              const finalNode = nodeType.create({ src: url });
               const replaceTr = state.tr.replaceRangeWith(
                 tempImagePos,
                 tempImagePos + 1,
-                finalImageNode
+                finalNode
               );
               dispatch(replaceTr);
-              console.log('✅ Image replaced with uploaded URL');
+              console.log('✅ Media replaced with uploaded URL');
             }
           }
         }).catch((error: any) => {
           console.error('❌ Upload failed:', error);
           const { state, dispatch } = view;
           state.doc.descendants((node: any, pos: number) => {
-            if ((node.type.name === 'resizableImage' || node.type.name === 'image') && 
+            if ((node.type.name === 'resizableImage' || node.type.name === 'image' || node.type.name === 'resizableVideo') && 
                 node.attrs['data-uploading'] === 'true') {
               dispatch(state.tr.delete(pos, pos + node.nodeSize));
               return false;
@@ -90,6 +105,57 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
       new Plugin({
         key: new PluginKey('imagePaste'),
         props: {
+          handleDOMEvents: {
+            drop: (view, event) => {
+              console.log('🎯 [MediaPaste] DOM drop event intercepted!', {
+                target: event.target,
+                files: event.dataTransfer?.files.length
+              });
+              
+              const dataTransfer = event.dataTransfer;
+              if (!dataTransfer) {
+                console.log('❌ [MediaPaste] No dataTransfer in DOM event');
+                return false;
+              }
+
+              const files = Array.from(dataTransfer.files);
+              console.log('📋 [MediaPaste] Files in DOM drop:', files.length, files.map(f => f.type));
+              
+              const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+              console.log('📋 [MediaPaste] Media files filtered:', mediaFiles.length);
+              
+              if (mediaFiles.length === 0) {
+                console.log('⚠️ [MediaPaste] No media files found in DOM drop');
+                return false;
+              }
+
+              console.log('🖼️ [MediaPaste] DOM Drop detected,', mediaFiles.length, 'media file(s)');
+              event.preventDefault();
+              event.stopPropagation();
+
+              // Insert at end of document
+              const insertPos = view.state.doc.content.size;
+              console.log('📍 [MediaPaste] Inserting at end of document:', insertPos);
+
+              // Set selection to insert position
+              try {
+                const resolved = view.state.doc.resolve(insertPos);
+                const tr = view.state.tr.setSelection(TextSelection.near(resolved));
+                view.dispatch(tr);
+                console.log('✅ [MediaPaste] Selection set to position:', insertPos);
+              } catch (error) {
+                console.error('❌ [MediaPaste] Failed to set selection:', error);
+              }
+
+              for (const file of mediaFiles) {
+                console.log('📸 [MediaPaste] Processing dropped media:', file.name, file.type);
+                insertMediaFile(view, file);
+              }
+
+              console.log('✅ [MediaPaste] DOM drop completed successfully');
+              return true;
+            }
+          },
           handlePaste: (view, event) => {
             console.log('🎯 ImagePaste Extension: Paste detected');
             const items = event.clipboardData?.items;
@@ -101,13 +167,13 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
 
             console.log('📋 Clipboard items count:', items.length);
 
-            // First pass: look for direct image files
+            // First pass: look for direct image or video files
             for (let i = 0; i < items.length; i++) {
               const item = items[i];
               console.log(`📋 Item ${i} type:`, item.type, 'kind:', item.kind);
 
-              if (item.type.indexOf('image') === 0) {
-                console.log('📸 Direct image detected in paste!');
+              if (item.type.indexOf('image') === 0 || item.type.indexOf('video') === 0) {
+                console.log('📸 Direct media file detected in paste!', item.type);
                 event.preventDefault();
                 
                 const file = item.getAsFile();
@@ -115,7 +181,7 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
 
                 if (file) {
                   console.log('⬆️ Starting upload...');
-                  insertImageFile(view, file);
+                  insertMediaFile(view, file);
                   return true;
                 }
               }
@@ -157,7 +223,7 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
                           
                           const file = new File([blob], `pasted-image.${extension}`, { type: mimeType });
                           console.log('📸 Converted data URI to file:', file);
-                          insertImageFile(view, file);
+                          insertMediaFile(view, file);
                         })
                         .catch(err => {
                           console.error('❌ Failed to convert data URI to file:', err);
@@ -178,7 +244,7 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
                           
                           const file = new File([blob], `whatsapp-image.${extension}`, { type: mimeType });
                           console.log('📸 Converted blob URL to file:', file);
-                          insertImageFile(view, file);
+                          insertMediaFile(view, file);
                         })
                         .catch(err => {
                           console.error('❌ Failed to fetch blob URL:', err);
@@ -212,10 +278,10 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
                 const file = files[i];
                 console.log('📋 File in clipboard:', file.name, file.type);
                 
-                if (file.type.startsWith('image/')) {
-                  console.log('📸 Image file detected in clipboard files!');
+                if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+                  console.log('📸 Media file detected in clipboard files!');
                   event.preventDefault();
-                  insertImageFile(view, file);
+                  insertMediaFile(view, file);
                   return true;
                 }
               }
@@ -226,32 +292,65 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
           },
 
           handleDrop: (view, event) => {
+            console.log('🎯 [MediaPaste] handleDrop called!', {
+              target: event.target,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              dataTransfer: event.dataTransfer
+            });
+
             const dataTransfer = event.dataTransfer;
-            if (!dataTransfer) return false;
+            if (!dataTransfer) {
+              console.log('❌ [MediaPaste] No dataTransfer');
+              return false;
+            }
 
             const files = Array.from(dataTransfer.files);
-            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            console.log('📋 [MediaPaste] Files in drop:', files.length, files.map(f => f.type));
             
-            if (imageFiles.length === 0) return false;
+            const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+            console.log('📋 [MediaPaste] Media files filtered:', mediaFiles.length);
+            
+            if (mediaFiles.length === 0) {
+              console.log('⚠️ [MediaPaste] No media files found in drop');
+              return false;
+            }
 
-            console.log('🖼️ ImagePaste Extension: Drop detected,', imageFiles.length, 'image(s)');
+            console.log('🖼️ [MediaPaste] Drop detected,', mediaFiles.length, 'media file(s)');
             event.preventDefault();
 
-            // Set cursor position to drop location
+            // Try to get drop position, but if it fails (dropped outside content), insert at end
             const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-            if (pos) {
-              const resolved = view.state.doc.resolve(pos.pos);
-              const tr = view.state.tr.setSelection(
-                TextSelection.near(resolved)
-              );
+            console.log('📍 [MediaPaste] posAtCoords result:', pos);
+            
+            let insertPos: number;
+            
+            if (pos && pos.pos >= 0 && pos.pos <= view.state.doc.content.size) {
+              // Valid drop position - use it
+              insertPos = pos.pos;
+              console.log('✅ [MediaPaste] Using drop position:', insertPos);
+            } else {
+              // Invalid position (dropped outside content area) - insert at end
+              insertPos = view.state.doc.content.size;
+              console.log('✅ [MediaPaste] Using end of document:', insertPos);
+            }
+
+            // Set selection to insert position
+            try {
+              const resolved = view.state.doc.resolve(insertPos);
+              const tr = view.state.tr.setSelection(TextSelection.near(resolved));
               view.dispatch(tr);
+              console.log('✅ [MediaPaste] Selection set to position:', insertPos);
+            } catch (error) {
+              console.error('❌ [MediaPaste] Failed to set selection:', error);
             }
 
-            for (const file of imageFiles) {
-              console.log('� Processing dropped image:', file.name, file.type);
-              insertImageFile(view, file);
+            for (const file of mediaFiles) {
+              console.log('📸 [MediaPaste] Processing dropped media:', file.name, file.type);
+              insertMediaFile(view, file);
             }
 
+            console.log('✅ [MediaPaste] handleDrop completed successfully');
             return true;
           },
         },

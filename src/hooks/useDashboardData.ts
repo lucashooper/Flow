@@ -29,16 +29,7 @@ export const useDashboardData = () => {
   );
   const [loading, setLoading] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [openNotes, setOpenNotes] = useState<Note[]>(() => {
-    // Restore open notes from localStorage with user-specific key
-    if (!user?.id) return [];
-    try {
-      const saved = localStorage.getItem(`openNotes_${user.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [openNotes, setOpenNotes] = useState<Note[]>([]);
   
   const hasLoadedDashboards = useRef(false);
   const tabsEnabled = (() => {
@@ -46,26 +37,37 @@ export const useDashboardData = () => {
     return saved !== null ? JSON.parse(saved) : true;
   })();
 
-  // Persist open notes to localStorage with user-specific key whenever they change
+  // Persist open note IDs (not full content) to avoid localStorage quota issues with large videos/images
   useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(`openNotes_${user.id}`, JSON.stringify(openNotes));
+    if (user?.id && openNotes.length > 0) {
+      try {
+        const noteIds = openNotes.map(n => n.id);
+        localStorage.setItem(`openNoteIds_${user.id}`, JSON.stringify(noteIds));
+      } catch (e) {
+        console.warn('Failed to save open note IDs to localStorage:', e);
+      }
     }
   }, [openNotes, user?.id]);
 
-  // Clear open notes when user changes
+  // Restore open notes from IDs on mount
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && notes) {
       try {
-        const saved = localStorage.getItem(`openNotes_${user.id}`);
-        setOpenNotes(saved ? JSON.parse(saved) : []);
-      } catch {
-        setOpenNotes([]);
+        const saved = localStorage.getItem(`openNoteIds_${user.id}`);
+        if (saved) {
+          const noteIds: string[] = JSON.parse(saved);
+          const restoredNotes = noteIds
+            .map(id => notes.find(n => n.id === id))
+            .filter((n): n is Note => n !== undefined);
+          if (restoredNotes.length > 0) {
+            setOpenNotes(restoredNotes);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to restore open notes from localStorage:', e);
       }
-    } else {
-      setOpenNotes([]);
     }
-  }, [user?.id]);
+  }, [user?.id, notes]);
 
   useEffect(() => {
     // Only fetch dashboards once when user is available

@@ -1,25 +1,38 @@
-import Image from '@tiptap/extension-image';
+import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { useState, useRef, useEffect } from 'react';
 
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
-const ResizableImageComponent = (props: any) => {
+const ResizableVideoComponent = (props: any) => {
   const [isResizing, setIsResizing] = useState(false);
-  const [width, setWidth] = useState<number>(props.node.attrs.width || 500);
+  const [width, setWidth] = useState<number>(props.node.attrs.width || 640);
   const [height, setHeight] = useState<number>(props.node.attrs.height || 0);
   const startPos = useRef({ x: 0, y: 0 });
   const startSize = useRef({ width: 0, height: 0 });
   const resizeCorner = useRef<ResizeCorner | null>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const aspectRatio = useRef<number>(1);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const aspectRatio = useRef<number>(16 / 9); // Default 16:9 aspect ratio
 
-  // Calculate aspect ratio on mount
+  // Calculate aspect ratio when video metadata loads
   useEffect(() => {
-    if (imageRef.current && imageRef.current.naturalWidth) {
-      aspectRatio.current = imageRef.current.naturalWidth / imageRef.current.naturalHeight;
-    }
-  }, [props.node.attrs.src]);
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleLoadedMetadata = () => {
+      if (video.videoWidth && video.videoHeight) {
+        aspectRatio.current = video.videoWidth / video.videoHeight;
+        // Update height based on aspect ratio if not set
+        if (!props.node.attrs.height) {
+          const newHeight = width / aspectRatio.current;
+          setHeight(newHeight);
+        }
+      }
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    return () => video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+  }, [props.node.attrs.src, width]);
 
   const handleResizeStart = (e: React.MouseEvent, corner: ResizeCorner) => {
     e.preventDefault();
@@ -30,9 +43,9 @@ const ResizableImageComponent = (props: any) => {
     startPos.current = { x: e.clientX, y: e.clientY };
     startSize.current = { width, height };
     
-    // Get current aspect ratio
-    if (imageRef.current) {
-      aspectRatio.current = imageRef.current.naturalWidth / imageRef.current.naturalHeight;
+    // Get current aspect ratio from video
+    if (videoRef.current && videoRef.current.videoWidth) {
+      aspectRatio.current = videoRef.current.videoWidth / videoRef.current.videoHeight;
     }
   };
 
@@ -64,7 +77,7 @@ const ResizableImageComponent = (props: any) => {
       }
 
       // Maintain aspect ratio
-      newWidth = Math.max(150, Math.min(1000, newWidth));
+      newWidth = Math.max(200, Math.min(1200, newWidth));
       newHeight = newWidth / aspectRatio.current;
       
       setWidth(newWidth);
@@ -93,7 +106,7 @@ const ResizableImageComponent = (props: any) => {
 
   return (
     <NodeViewWrapper 
-      className="resizable-image-wrapper" 
+      className="resizable-video-wrapper" 
       style={{ display: 'block', margin: '1rem 0' }}
       data-drag-handle
     >
@@ -105,15 +118,16 @@ const ResizableImageComponent = (props: any) => {
           userSelect: 'none',
         }}
       >
-        <img
-          ref={imageRef}
+        <video
+          ref={videoRef}
           src={props.node.attrs.src}
-          alt={props.node.attrs.alt || ''}
           className="rounded-lg w-full h-auto select-none"
           style={{
             pointerEvents: isResizing ? 'none' : 'auto',
             opacity: props.node.attrs['data-uploading'] ? 0.5 : 1,
           }}
+          controls
+          preload="metadata"
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         />
@@ -149,7 +163,7 @@ const ResizableImageComponent = (props: any) => {
         {/* Loading indicator */}
         {props.node.attrs['data-uploading'] && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
-            <div className="text-white text-sm font-medium">Uploading...</div>
+            <div className="text-white text-sm font-medium">Uploading video...</div>
           </div>
         )}
       </div>
@@ -157,25 +171,30 @@ const ResizableImageComponent = (props: any) => {
   );
 };
 
-export const ResizableImage = Image.extend({
-  name: 'resizableImage',
+export const ResizableVideo = Node.create({
+  name: 'resizableVideo',
+  
+  group: 'block',
+  
+  atom: true,
+  
+  draggable: true,
 
   addAttributes() {
     return {
       src: {
         default: null,
-      },
-      alt: {
-        default: null,
-      },
-      title: {
-        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('src'),
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.src) return {};
+          return { src: attributes.src };
+        },
       },
       width: {
-        default: 500,
+        default: 640,
         parseHTML: (element: HTMLElement) => {
           const width = element.getAttribute('width');
-          return width ? parseInt(width) : 500;
+          return width ? parseInt(width) : 640;
         },
         renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.width) return {};
@@ -193,10 +212,30 @@ export const ResizableImage = Image.extend({
           return { height: attributes.height };
         },
       },
+      'data-uploading': {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-uploading'),
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes['data-uploading']) return {};
+          return { 'data-uploading': attributes['data-uploading'] };
+        },
+      },
     };
   },
 
+  parseHTML() {
+    return [
+      {
+        tag: 'video[src]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['video', mergeAttributes(HTMLAttributes, { controls: true })];
+  },
+
   addNodeView() {
-    return ReactNodeViewRenderer(ResizableImageComponent);
+    return ReactNodeViewRenderer(ResizableVideoComponent);
   },
 });
