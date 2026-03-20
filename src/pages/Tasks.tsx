@@ -152,6 +152,7 @@ export const Tasks = () => {
       due_date: quickAddDueDate,
       priority: quickAddPriority,
       completed: false,
+      in_progress: false,
       position: maxPosition + 1,
       list: quickAddList,
     };
@@ -281,6 +282,22 @@ export const Tasks = () => {
       if (error) throw error;
     } catch (error) {
       console.error('Error updating priority:', error);
+      fetchTasks();
+    }
+  };
+
+  const toggleInProgress = async (taskId: string, inProgress: boolean) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, in_progress: inProgress } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ in_progress: inProgress })
+        .eq('id', taskId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating in_progress status:', error);
       fetchTasks();
     }
   };
@@ -638,6 +655,7 @@ export const Tasks = () => {
                       onDelete={deleteTask}
                       onUpdatePriority={updateTaskPriority}
                       onRename={renameTask}
+                      onToggleInProgress={toggleInProgress}
                       getPriorityColor={getPriorityColor}
                     />
                   ))}

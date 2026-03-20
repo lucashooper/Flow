@@ -12,21 +12,24 @@ interface TaskCardProps {
   onDelete: (taskId: string) => void;
   onUpdatePriority: (taskId: string, priority: 1 | 2 | 3) => void;
   onRename?: (taskId: string, newTitle: string) => void;
+  onToggleInProgress?: (taskId: string, inProgress: boolean) => void;
   getPriorityColor: (priority: 1 | 2 | 3) => string;
 }
 
-export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, onRename, getPriorityColor }: TaskCardProps) => {
+export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, onRename, onToggleInProgress, getPriorityColor }: TaskCardProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isCompleting, setIsCompleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(task.title);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLParagraphElement>(null);
   
   const { attachedTaskId, isRunning } = useTimerStore();
   const isAttached = attachedTaskId === task.id;
   const shouldDim = isRunning && attachedTaskId && !isAttached;
+  const isInProgress = task.in_progress || false;
 
   const {
     attributes,
@@ -55,7 +58,7 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, o
         : '0 2px 8px rgba(0, 0, 0, 0.2)',
     userSelect: 'none' as const,
     cursor: 'default' as const,
-    opacity: isDragging ? 0.5 : shouldDim ? 0.4 : 1,
+    opacity: isDragging ? 0.5 : shouldDim ? 0.4 : isInProgress ? 0.5 : 1,
     pointerEvents: 'auto' as const,
   };
 
@@ -133,13 +136,20 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, o
         {/* Title */}
         <div className="flex-1 min-w-0">
           {isRenaming ? (
-            <input
+            <textarea
               ref={renameInputRef}
-              type="text"
               value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
+              onChange={(e) => {
+                setRenameValue(e.target.value);
+                // Auto-resize textarea to fit content
+                if (renameInputRef.current) {
+                  renameInputRef.current.style.height = 'auto';
+                  renameInputRef.current.style.height = renameInputRef.current.scrollHeight + 'px';
+                }
+              }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
                   if (renameValue.trim() && onRename) {
                     onRename(task.id, renameValue.trim());
                   }
@@ -155,12 +165,17 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, o
                 }
                 setIsRenaming(false);
               }}
-              className="w-full bg-transparent border-none outline-none text-base"
-              style={{ color: 'var(--text)', caretColor: 'var(--accent)' }}
+              className="w-full bg-transparent border-none outline-none text-base resize-none overflow-hidden"
+              style={{ 
+                color: 'var(--text)', 
+                caretColor: 'var(--accent)',
+                minHeight: titleRef.current?.offsetHeight || 'auto',
+                lineHeight: '1.5'
+              }}
               autoFocus
             />
           ) : (
-            <p style={{ color: 'var(--text)' }}>{task.title}</p>
+            <p ref={titleRef} style={{ color: 'var(--text)', lineHeight: '1.5' }}>{task.title}</p>
           )}
           {task.list && task.list !== 'Inbox' && (
             <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{task.list}</p>
@@ -260,12 +275,34 @@ export const TaskCard = ({ task, onToggleComplete, onDelete, onUpdatePriority, o
                 Low Priority
               </button>
               <div className="border-t my-1" style={{ borderColor: 'var(--border)' }} />
+              {onToggleInProgress && (
+                <button
+                  onClick={() => {
+                    onToggleInProgress(task.id, !isInProgress);
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                  style={{ cursor: 'pointer', color: 'var(--text)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: isInProgress ? '#ff7a18' : 'var(--muted)' }} />
+                  {isInProgress ? 'Remove from In Progress' : 'Mark as In Progress'}
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowMenu(false);
                   setIsRenaming(true);
                   setRenameValue(task.title);
-                  setTimeout(() => renameInputRef.current?.focus(), 50);
+                  setTimeout(() => {
+                    if (renameInputRef.current) {
+                      renameInputRef.current.focus();
+                      // Set initial height to match title
+                      renameInputRef.current.style.height = 'auto';
+                      renameInputRef.current.style.height = renameInputRef.current.scrollHeight + 'px';
+                    }
+                  }, 50);
                 }}
                 className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2"
                 style={{ cursor: 'pointer', color: 'var(--text)' }}
