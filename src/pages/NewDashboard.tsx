@@ -219,17 +219,68 @@ export const NewDashboard = () => {
       }
     }
     
-    // Handle folder reordering in sidebar
+    // Handle folder drag in sidebar
     if (draggedItem?.type === 'folder' && folders) {
-      const activeIndex = folders.findIndex(f => f.id === active.id);
-      const overIndex = folders.findIndex(f => f.id === over.id);
+      const overData = over.data?.current;
+      const draggedFolderId = active.id.toString();
+      const draggedFolder = folders.find(f => f.id === draggedFolderId);
       
-      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-        const reorderedFolders = [...folders];
-        const [movedFolder] = reorderedFolders.splice(activeIndex, 1);
-        reorderedFolders.splice(overIndex, 0, movedFolder);
-        handleFolderReorder(reorderedFolders);
-        console.log('[NewDashboard] Folders reordered:', { from: activeIndex, to: overIndex });
+      // Dropping a folder onto another folder → nest it as a subfolder
+      if (overData?.type === 'folder') {
+        const targetFolderId = over.id.toString();
+        
+        // Prevent nesting a folder into itself or into its own descendants
+        if (draggedFolder && targetFolderId !== draggedFolderId) {
+          // Check if target is a descendant of dragged folder
+          const isDescendant = (folderId: string, ancestorId: string): boolean => {
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder || !folder.parent_id) return false;
+            if (folder.parent_id === ancestorId) return true;
+            return isDescendant(folder.parent_id, ancestorId);
+          };
+          
+          if (!isDescendant(targetFolderId, draggedFolderId)) {
+            // Update the dragged folder's parent_id to nest it
+            handleFolderUpdate(draggedFolderId, { parent_id: targetFolderId });
+            console.log('[NewDashboard] Folder nested into another folder:', { 
+              folder: draggedFolder.name, 
+              parent: targetFolderId 
+            });
+          } else {
+            console.warn('[NewDashboard] Cannot nest folder into its own descendant');
+          }
+        }
+      } else if (overData?.type === 'note') {
+        // Dropping a folder onto a root-level note → move folder to root
+        const overNote = notes?.find(n => n.id === over.id);
+        if (draggedFolder && overNote && !overNote.folder_id && draggedFolder.parent_id) {
+          // Move folder to root level (unnest it)
+          handleFolderUpdate(draggedFolderId, { parent_id: null });
+          console.log('[NewDashboard] Folder moved to root level:', draggedFolder.name);
+        }
+      } else {
+        // Folder-to-folder reordering (between folders, not onto)
+        // OR dropping onto empty space / root area
+        const activeIndex = folders.findIndex(f => f.id === active.id);
+        const overIndex = folders.findIndex(f => f.id === over.id);
+        
+        // If dragging a nested folder and dropping it between root items, unnest it
+        if (draggedFolder && draggedFolder.parent_id) {
+          const overFolder = folders.find(f => f.id === over.id);
+          // If dropping onto a root-level folder (for reordering) or a root note, move to root
+          if (!overFolder || !overFolder.parent_id) {
+            handleFolderUpdate(draggedFolderId, { parent_id: null });
+            console.log('[NewDashboard] Folder moved to root level:', draggedFolder.name);
+          }
+        }
+        
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          const reorderedFolders = [...folders];
+          const [movedFolder] = reorderedFolders.splice(activeIndex, 1);
+          reorderedFolders.splice(overIndex, 0, movedFolder);
+          handleFolderReorder(reorderedFolders);
+          console.log('[NewDashboard] Folders reordered:', { from: activeIndex, to: overIndex });
+        }
       }
     }
     

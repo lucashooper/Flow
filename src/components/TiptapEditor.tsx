@@ -343,23 +343,61 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
                                      html.includes('ProgId=') || 
                                      html.includes('MsoNormal')));
 
-        if (isFromOffice) {
-          console.log('🏢 Detected Microsoft Office paste - using plain text to avoid styling issues');
+        if (isFromOffice && html) {
+          console.log('🏢 Detected Microsoft Office paste - preserving basic formatting');
           
-          // For Office apps, use plain text to avoid black text and huge fonts
-          if (plainText) {
-            console.log('✅ Pasting plain text from Office:', plainText.substring(0, 100));
+          // For Office apps, clean HTML but preserve basic formatting (bold, italic, paragraphs)
+          let processedHTML = html
+            .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+            .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+            .replace(/<\/o:p>/g, '') // Remove closing Office tags
+            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+            .replace(/<style>[\s\S]*?<\/style>/g, '') // Remove style blocks
+            .replace(/<html[^>]*>/gi, '') // Remove html tags
+            .replace(/<\/html>/gi, '')
+            .replace(/<body[^>]*>/gi, '') // Remove body tags
+            .replace(/<\/body>/gi, '')
+            // Remove problematic styling but keep structure
+            .replace(/class="[^"]*"/g, '') // Remove ALL classes (MsoNormal, etc.)
+            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (colors, fonts, sizes)
+            .replace(/color="[^"]*"/g, '') // Remove color attributes
+            .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
+            .replace(/face="[^"]*"/g, '') // Remove font face
+            .replace(/size="[^"]*"/g, '') // Remove font size
+            .replace(/<font[^>]*>/g, '') // Remove font tags
+            .replace(/<\/font>/g, '')
+            // Clean up spans and divs but keep paragraphs, bold, italic
+            .replace(/<span[^>]*>/g, '') // Remove span opening tags
+            .replace(/<\/span>/g, '') // Remove span closing tags
+            .replace(/<div[^>]*>/g, '<p>') // Convert divs to paragraphs
+            .replace(/<\/div>/g, '</p>') // Convert closing divs
+            .replace(/<p[^>]*>/g, '<p>'); // Strip paragraph attributes but keep <p> tags
+          
+          console.log('🧹 Cleaned Office HTML (basic formatting preserved):', processedHTML.substring(0, 200));
+          
+          // Parse and insert the cleaned HTML
+          try {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
             
-            const { from } = view.state.selection;
-            const tr = view.state.tr.insertText(plainText, from);
-            view.dispatch(tr);
-            console.log('✅ Plain text inserted at position:', from);
+            const { state } = view;
+            const pmParser = PMDOMParser.fromSchema(state.schema);
             
-            setTimeout(() => {
-              console.log('📄 Editor content:', editor?.getText().substring(0, 100));
-            }, 50);
+            const slice = pmParser.parseSlice(htmlDoc.body);
             
-            return true;
+            if (slice && slice.size > 0) {
+              const tr = state.tr.replaceSelection(slice);
+              view.dispatch(tr);
+              console.log('✅ Office HTML inserted with formatting preserved');
+              
+              return true;
+            }
+          } catch (error) {
+            console.error('❌ Failed to parse Office HTML:', error);
           }
         }
 
