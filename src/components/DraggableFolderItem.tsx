@@ -1,5 +1,4 @@
 import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { FolderItem } from './FolderItem';
 import type { Folder } from '../types';
 
@@ -23,27 +22,29 @@ export const DraggableFolderItem = ({ isOver, ...props }: DraggableFolderItemPro
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
+    isOver: isSortableOver,
   } = useSortable({ 
     id: props.folder.id, 
     data: { type: 'folder', folder: props.folder } 
   });
 
-  const baseStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    backgroundColor: isOver ? '#A0522D22' : undefined,
-  };
+  // When dragging: dim the original item (like Evernote) so you see both the dimmed folder
+  // and the drag overlay pill. This avoids the ugly black gap from visibility:hidden.
+  const style: React.CSSProperties = isDragging
+    ? {
+        opacity: 0.4,
+      }
+    : {
+        // Highlight when a note is being dragged over this folder
+        backgroundColor: (isOver || isSortableOver) ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : undefined,
+        borderRadius: (isOver || isSortableOver) ? '6px' : undefined,
+      };
 
   return (
     <div 
       ref={setNodeRef} 
-      style={baseStyle} 
-      className="force-visible"
-      data-folder-id={props.folder.id}
-      data-is-dragging={isDragging ? 'true' : 'false'}
+      style={style} 
       {...attributes} 
       {...listeners}
     >

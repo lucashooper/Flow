@@ -25,7 +25,10 @@ import {
   Check,
   Pencil,
   Star,
+  CheckCircle,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { createTaskFromSelection } from '../utils/taskFromSelection';
 
 interface ContextMenuProps {
   editor: Editor | null;
@@ -112,10 +115,21 @@ export const ContextMenu = ({
   suggestions = [],
   onStartDrawing,
 }: ContextMenuProps) => {
+  const { user } = useAuth();
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const currentDefaultBoldColor = localStorage.getItem('defaultBoldColor') || '';
+  
+  const handleAddAsTask = async () => {
+    if (!user || !selectedText.trim()) return;
+    const success = await createTaskFromSelection(selectedText, user.id);
+    if (success) {
+      // Show success notification
+      console.log('✅ Task created from selection:', selectedText);
+    }
+    onClose();
+  };
   const [currentBulletStyle] = useState<string>(() => {
     return localStorage.getItem('bulletStyle') || 'gray';
   });
@@ -1031,6 +1045,16 @@ export const ContextMenu = ({
               window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedText)}`, '_blank');
               onClose();
             }}
+          />
+        )}
+        
+        {/* Add as Task */}
+        {selectedText && user && (
+          <MenuItem
+            icon={CheckCircle}
+            label="Add as Task"
+            name="Add as Task"
+            onClick={handleAddAsTask}
           />
         )}
       </div>

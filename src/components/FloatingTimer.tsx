@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import Draggable from 'react-draggable';
 
 interface FloatingTimerProps {
   isVisible: boolean;
@@ -7,6 +8,7 @@ interface FloatingTimerProps {
 
 // Simple 25:00 countdown timer with premium glassmorphic styling
 export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
+  const nodeRef = useRef(null);
   const [customDuration, setCustomDuration] = useState(25 * 60);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
@@ -112,9 +114,10 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999]">
-      <div
-        className="relative flex items-center gap-3 rounded-2xl text-sm text-white shadow-2xl cursor-pointer transition-all"
+    <Draggable handle=".drag-handle" bounds="parent" nodeRef={nodeRef}>
+      <div ref={nodeRef} className="fixed bottom-6 right-6 z-[9999]">
+        <div
+          className="drag-handle relative flex items-center gap-3 rounded-2xl text-sm text-white shadow-2xl cursor-move transition-all"
         style={{
           backdropFilter: 'blur(16px)',
           background:
@@ -283,6 +286,7 @@ export const FloatingTimer = ({ isVisible, onClose }: FloatingTimerProps) => {
         )}
       </div>
     </div>
+    </Draggable>
   );
 };
 

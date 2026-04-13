@@ -8,6 +8,7 @@ import {
   updateNote, 
   deleteNote, 
   getNotesByDashboard,
+  getNote,
   createFolder,
   updateFolder,
   deleteFolder,
@@ -28,16 +29,7 @@ export const useDashboardData = () => {
   );
   const [loading, setLoading] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [openNotes, setOpenNotes] = useState<Note[]>(() => {
-    // Restore open notes from localStorage with user-specific key
-    if (!user?.id) return [];
-    try {
-      const saved = localStorage.getItem(`openNotes_${user.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [openNotes, setOpenNotes] = useState<Note[]>([]);
   
   const hasLoadedDashboards = useRef(false);
   const tabsEnabled = (() => {
@@ -45,26 +37,37 @@ export const useDashboardData = () => {
     return saved !== null ? JSON.parse(saved) : true;
   })();
 
-  // Persist open notes to localStorage with user-specific key whenever they change
+  // Persist open note IDs (not full content) to avoid localStorage quota issues with large videos/images
   useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(`openNotes_${user.id}`, JSON.stringify(openNotes));
+    if (user?.id && openNotes.length > 0) {
+      try {
+        const noteIds = openNotes.map(n => n.id);
+        localStorage.setItem(`openNoteIds_${user.id}`, JSON.stringify(noteIds));
+      } catch (e) {
+        console.warn('Failed to save open note IDs to localStorage:', e);
+      }
     }
   }, [openNotes, user?.id]);
 
-  // Clear open notes when user changes
+  // Restore open notes from IDs on mount
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && notes) {
       try {
-        const saved = localStorage.getItem(`openNotes_${user.id}`);
-        setOpenNotes(saved ? JSON.parse(saved) : []);
-      } catch {
-        setOpenNotes([]);
+        const saved = localStorage.getItem(`openNoteIds_${user.id}`);
+        if (saved) {
+          const noteIds: string[] = JSON.parse(saved);
+          const restoredNotes = noteIds
+            .map(id => notes.find(n => n.id === id))
+            .filter((n): n is Note => n !== undefined);
+          if (restoredNotes.length > 0) {
+            setOpenNotes(restoredNotes);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to restore open notes from localStorage:', e);
       }
-    } else {
-      setOpenNotes([]);
     }
-  }, [user?.id]);
+  }, [user?.id, notes]);
 
   useEffect(() => {
     // Only fetch dashboards once when user is available
@@ -159,6 +162,53 @@ export const useDashboardData = () => {
         
         setNotes(syncedNotes);
         setFolders(syncedFolders);
+      } else if (navigator.onLine) {
+        // Background refresh: pull latest from Supabase to catch stale cached data
+        // This runs after we've already shown IndexedDB data, so the UI is fast
+        (async () => {
+          try {
+            const { data: remoteFolders } = await supabase
+              .from('folders')
+              .select('*')
+              .eq('dashboard_id', activeDashboard.id);
+            
+            if (remoteFolders) {
+              // Check for new folders OR updated folders
+              const localMap = new Map(foldersData.map(f => [f.id, f]));
+              let hasChanges = false;
+              
+              for (const remote of remoteFolders) {
+                const local = localMap.get(remote.id);
+                // NEW: Detect new folders (!local) OR updated folders
+                if (!local || local.name !== remote.name || local.emoji !== remote.emoji || local.parent_id !== remote.parent_id) {
+                  hasChanges = true;
+                  // Update IndexedDB with server data (only if no pending outbox change)
+                  const { db } = await import('../lib/db');
+                  const pending = await db.outbox
+                    .where('entityId')
+                    .equals(remote.id)
+                    .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
+                    .first();
+                  
+                  if (!pending) {
+                    await db.folders.put({ ...remote, synced: true });
+                    if (!local) {
+                      console.log('📥 New folder synced from server:', remote.name);
+                    }
+                  }
+                }
+              }
+              
+              if (hasChanges) {
+                const refreshedFolders = await getFoldersByDashboard(activeDashboard.id);
+                setFolders(refreshedFolders);
+                console.log('🔄 Background refresh: updated folder data from server');
+              }
+            }
+          } catch (e) {
+            console.log('⚠️ Background folder refresh failed:', e);
+          }
+        })();
       }
     } catch (error) {
       console.error('Failed to load data from IndexedDB:', error);
@@ -167,7 +217,7 @@ export const useDashboardData = () => {
     }
   };
 
-  const handleNoteSelect = (noteId: string, searchQuery?: string) => {
+  const handleNoteSelect = async (noteId: string, searchQuery?: string) => {
     setSelectedNoteId(noteId);
     const params: Record<string, string> = { note: noteId };
     if (searchQuery) {
@@ -175,12 +225,41 @@ export const useDashboardData = () => {
     }
     setSearchParams(params);
     
-    // Add to open tabs if tabs are enabled
-    if (tabsEnabled && notes) {
-      const note = notes.find(n => n.id === noteId);
-      if (note && !openNotes.some(n => n.id === noteId)) {
-        setOpenNotes(prev => [...prev, note]);
+    // Check if note is in current dashboard
+    let note = notes?.find(n => n.id === noteId);
+    
+    // If note not in current dashboard, fetch it and switch dashboards
+    if (!note) {
+      const fetchedNote = await getNote(noteId);
+      if (fetchedNote && fetchedNote.dashboard_id && fetchedNote.dashboard_id !== activeDashboard?.id) {
+        // Find the dashboard this note belongs to
+        const noteDashboard = dashboards.find(d => d.id === fetchedNote.dashboard_id);
+        if (noteDashboard) {
+          console.log('📍 Note belongs to different dashboard, switching...', noteDashboard.name);
+          setActiveDashboard(noteDashboard);
+          
+          // Update active status in database
+          try {
+            await supabase
+              .from('dashboards')
+              .update({ is_active: false })
+              .neq('id', noteDashboard.id);
+            
+            await supabase
+              .from('dashboards')
+              .update({ is_active: true })
+              .eq('id', noteDashboard.id);
+          } catch (error) {
+            console.error('Error updating active dashboard:', error);
+          }
+        }
+        note = fetchedNote;
       }
+    }
+    
+    // Add to open tabs if tabs are enabled
+    if (tabsEnabled && note && !openNotes.some(n => n.id === noteId)) {
+      setOpenNotes(prev => [...prev, note]);
     }
   };
   
@@ -200,6 +279,58 @@ export const useDashboardData = () => {
 
   const handleTabReorder = (reorderedNotes: Note[]) => {
     setOpenNotes(reorderedNotes);
+  };
+
+  const handleNoteReorder = (reorderedNotes: Note[]) => {
+    console.log('🔄 [handleNoteReorder] Starting reorder:', reorderedNotes.map(n => n.title));
+    
+    // Create completely new array with positions to ensure React detects the change
+    const notesWithPositions = reorderedNotes.map((note, index) => ({
+      ...note,
+      position: index
+    }));
+    
+    console.log('📝 [handleNoteReorder] Setting state with NEW array:', notesWithPositions.map(n => `${n.title}:${n.position}`));
+    console.log('📝 [handleNoteReorder] Array reference changed:', notesWithPositions !== notes);
+    
+    // Force new reference by spreading into new array
+    setNotes([...notesWithPositions]);
+    
+    // Update positions in database in background (directly, not through handleNoteUpdate)
+    setTimeout(async () => {
+      try {
+        console.log('💾 [handleNoteReorder] Saving positions to database...');
+        for (let i = 0; i < reorderedNotes.length; i++) {
+          // Update directly in IndexedDB without triggering state updates
+          await updateNote(reorderedNotes[i].id, { position: i });
+        }
+        console.log('✅ [handleNoteReorder] Note positions saved to database');
+      } catch (error) {
+        console.error('❌ [handleNoteReorder] Error updating note positions:', error);
+      }
+    }, 0);
+  };
+
+  const handleFolderReorder = (reorderedFolders: Folder[]) => {
+    // Update state immediately with positions already set
+    const foldersWithPositions = reorderedFolders.map((folder, index) => ({
+      ...folder,
+      position: index
+    }));
+    setFolders(foldersWithPositions);
+    
+    // Update positions in database in background (directly, not through handleFolderUpdate)
+    setTimeout(async () => {
+      try {
+        for (let i = 0; i < reorderedFolders.length; i++) {
+          // Update directly in IndexedDB without triggering state updates
+          await updateFolder(reorderedFolders[i].id, { position: i });
+        }
+        console.log('✅ Folder positions saved to database');
+      } catch (error) {
+        console.error('Error updating folder positions:', error);
+      }
+    }, 0);
   };
 
   const handleNoteCreate = async (folderId?: string) => {
@@ -368,6 +499,8 @@ export const useDashboardData = () => {
     handleNoteSelect,
     handleTabClose,
     handleTabReorder,
+    handleNoteReorder,
+    handleFolderReorder,
     handleNoteCreate,
     handleNoteUpdate,
     handleNoteDelete,

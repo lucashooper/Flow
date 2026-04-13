@@ -115,6 +115,7 @@ const ResizableImageComponent = (props: any) => {
             opacity: props.node.attrs['data-uploading'] ? 0.5 : 1,
           }}
           draggable={false}
+          onDragStart={(e) => e.preventDefault()}
         />
         
         {/* Resize Handle - Top-Left (nw-resize) */}

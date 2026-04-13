@@ -44,6 +44,8 @@ export async function createNote(
     emoji: note.emoji,
     drawing_data: note.drawing_data,
     is_starred: note.is_starred,
+    created_at: note.created_at,
+    updated_at: note.updated_at,
   });
 
   return note;
@@ -90,11 +92,18 @@ export async function getNote(noteId: string): Promise<Note | undefined> {
 }
 
 export async function getNotesByDashboard(dashboardId: string): Promise<Note[]> {
-  return await db.notes
+  const notes = await db.notes
     .where('dashboard_id')
     .equals(dashboardId)
-    .reverse()
-    .sortBy('updated_at');
+    .toArray();
+  
+  // Sort by position if available, otherwise by updated_at
+  return notes.sort((a, b) => {
+    if (a.position !== undefined && b.position !== undefined) {
+      return a.position - b.position;
+    }
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
 }
 
 export async function getAllNotes(userId: string): Promise<Note[]> {
@@ -130,13 +139,16 @@ export async function createFolder(
   await db.folders.add(folder);
   console.log('📁 Created folder in IndexedDB:', folder.id);
 
-  // Queue for sync
+  // Queue for sync (include all fields so Supabase gets a complete row)
   await queueSync('folder', folder.id, 'upsert', {
     id: folder.id,
     name: folder.name,
+    emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
+    created_at: folder.created_at,
+    updated_at: folder.updated_at,
   });
 
   return folder;
@@ -154,10 +166,11 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
   const folder = await db.folders.get(folderId);
   if (!folder) return;
 
-  // Queue for sync
+  // Queue for sync (include all mutable fields so no data is lost)
   await queueSync('folder', folderId, 'upsert', {
     id: folder.id,
     name: folder.name,
+    emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
@@ -175,10 +188,18 @@ export async function deleteFolder(folderId: string): Promise<void> {
 }
 
 export async function getFoldersByDashboard(dashboardId: string): Promise<Folder[]> {
-  return await db.folders
+  const folders = await db.folders
     .where('dashboard_id')
     .equals(dashboardId)
-    .sortBy('name');
+    .toArray();
+  
+  // Sort by position if available, otherwise by name
+  return folders.sort((a, b) => {
+    if (a.position !== undefined && b.position !== undefined) {
+      return a.position - b.position;
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 // ==================== SYNC QUEUE ====================
@@ -189,6 +210,27 @@ async function queueSync(
   operation: 'upsert' | 'delete',
   payload: any
 ): Promise<void> {
+  // Deduplicate: if there's already a pending upsert for this entity,
+  // replace its payload with the latest data instead of adding a duplicate.
+  // This prevents stale data (e.g. old folder name) from overwriting newer changes.
+  if (operation === 'upsert') {
+    const existing = await db.outbox
+      .where('entityId')
+      .equals(entityId)
+      .filter(item => item.entityType === entityType && item.operation === 'upsert')
+      .first();
+
+    if (existing) {
+      await db.outbox.update(existing.id, {
+        payload,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+      });
+      console.log('📤 Updated existing outbox entry for:', entityType, entityId);
+      return;
+    }
+  }
+
   const outboxItem: OutboxItem = {
     id: generateUUID(),
     entityType,
@@ -218,7 +260,34 @@ export async function initialSync(userId: string): Promise<void> {
   console.log('🔄 Starting initial sync from Supabase...');
 
   try {
-    // Fetch all notes
+    // STEP 1: Push any pending outbox items to server FIRST
+    // This ensures local renames etc. aren't lost when we pull fresh data
+    const outboxItems = await db.outbox.toArray();
+    if (outboxItems.length > 0) {
+      console.log('📤 Pushing', outboxItems.length, 'pending outbox items before initial sync...');
+      for (const item of outboxItems) {
+        try {
+          if (item.operation === 'upsert') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const { error } = await supabase.from(table).upsert(item.payload);
+            if (!error) {
+              await db.outbox.delete(item.id);
+              console.log('✅ Pushed outbox item:', item.entityType, item.entityId);
+            }
+          } else if (item.operation === 'delete') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const { error } = await supabase.from(table).delete().eq('id', item.entityId);
+            if (!error) {
+              await db.outbox.delete(item.id);
+            }
+          }
+        } catch (e) {
+          console.error('❌ Failed to push outbox item:', item.id, e);
+        }
+      }
+    }
+
+    // STEP 2: Pull fresh data from Supabase
     const { data: notes, error: notesError } = await supabase
       .from('notes')
       .select('*')
@@ -227,7 +296,6 @@ export async function initialSync(userId: string): Promise<void> {
     if (notesError) throw notesError;
 
     if (notes && notes.length > 0) {
-      // Clear existing notes and add fresh data
       await db.notes.clear();
       for (const note of notes) {
         await db.notes.add({ ...note, synced: true });
@@ -254,5 +322,48 @@ export async function initialSync(userId: string): Promise<void> {
     console.log('✅ Initial sync complete');
   } catch (error) {
     console.error('❌ Initial sync failed:', error);
+  }
+}
+
+/**
+ * Force a full re-sync: clear local IndexedDB cache and pull everything fresh from Supabase.
+ * Useful when local data is stale or corrupted.
+ */
+export async function forceResync(userId: string): Promise<void> {
+  if (!navigator.onLine) {
+    console.log('📴 Offline - cannot force resync');
+    return;
+  }
+
+  console.log('🔄 Force resync: clearing local cache...');
+
+  try {
+    // Push any pending changes first
+    const outboxItems = await db.outbox.toArray();
+    for (const item of outboxItems) {
+      try {
+        if (item.operation === 'upsert') {
+          const table = item.entityType === 'note' ? 'notes' : 'folders';
+          await supabase.from(table).upsert(item.payload);
+        } else if (item.operation === 'delete') {
+          const table = item.entityType === 'note' ? 'notes' : 'folders';
+          await supabase.from(table).delete().eq('id', item.entityId);
+        }
+        await db.outbox.delete(item.id);
+      } catch (e) {
+        console.error('Failed to push:', e);
+      }
+    }
+
+    // Clear all local data
+    await db.notes.clear();
+    await db.folders.clear();
+    await db.outbox.clear();
+
+    // Pull fresh from Supabase
+    await initialSync(userId);
+    console.log('✅ Force resync complete');
+  } catch (error) {
+    console.error('❌ Force resync failed:', error);
   }
 }

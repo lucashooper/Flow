@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Trash2, Edit3, Smile, Star, EyeOff } from 'lucide-react';
+import { Trash2, Edit3, Smile, Star, EyeOff, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Note } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -48,7 +48,29 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    
+    // Calculate menu position with viewport bounds checking
+    const menuWidth = 200;
+    const menuHeight = 350; // Approximate height of context menu
+    const padding = 8;
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Clamp horizontally
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = window.innerWidth - menuWidth - padding;
+    }
+    if (x < padding) {
+      x = padding;
+    }
+    
+    // Clamp vertically - if menu would go off bottom, show it above the cursor
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = Math.max(padding, y - menuHeight);
+    }
+    
+    setContextMenuPos({ x, y });
     setShowContextMenu(true);
   };
 
@@ -85,6 +107,32 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   const handleToggleStar = () => {
     const currentStarred = note.is_starred ?? false;
     onUpdate(note.id, { is_starred: !currentStarred });
+    setShowContextMenu(false);
+  };
+
+  const handleExport = () => {
+    // Create export content
+    let exportContent = `# ${note.title || 'Untitled'}\n\n`;
+    exportContent += `Exported from Flow on ${new Date().toLocaleDateString()}\n\n`;
+    exportContent += '='.repeat(80) + '\n\n';
+    
+    // Strip HTML tags from content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = note.content || '';
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    exportContent += plainText;
+    
+    // Create and download file
+    const blob = new Blob([exportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(note.title || 'Untitled').replace(/[^a-z0-9]/gi, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     setShowContextMenu(false);
   };
 
@@ -126,13 +174,11 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
         onMouseEnter={(e) => {
           if (!isSelected) {
             e.currentTarget.style.backgroundColor = 'var(--bg-elev)';
-            e.currentTarget.style.opacity = '0.6';
           }
         }}
         onMouseLeave={(e) => {
           if (!isSelected) {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.opacity = '1';
           }
         }}
         onClick={onSelect}
@@ -259,6 +305,16 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
                 Remove emoji
               </button>
             )}
+
+            <div className="my-1 border-t border-[#2a2a2a]" />
+
+            <button
+              onClick={handleExport}
+              className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
+            >
+              <Download className="w-4 h-4" />
+              Export as txt
+            </button>
 
             <div className="my-1 border-t border-[#2a2a2a]" />
 

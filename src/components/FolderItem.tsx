@@ -71,7 +71,24 @@ export const FolderItem = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    
+    const menuWidth = 200;
+    const menuHeight = 320;
+    const padding = 8;
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = window.innerWidth - menuWidth - padding;
+    }
+    if (x < padding) x = padding;
+    
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = Math.max(padding, y - menuHeight);
+    }
+    
+    setContextMenuPos({ x, y });
     setShowContextMenu(true);
   };
 
@@ -168,9 +185,9 @@ export const FolderItem = ({
             {folder.emoji ? (
               <span className="text-sm">{folder.emoji}</span>
             ) : isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-[#D97706]" />
+              <FolderOpen className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             ) : (
-              <Folder className="w-4 h-4 text-[#D97706]" />
+              <Folder className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             )}
           </div>
 

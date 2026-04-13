@@ -240,30 +240,30 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
         <div className="absolute inset-0 pointer-events-none z-20">
           {over === 'left' && (
             <>
-              <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-[#ff7a18]/10 border-r-2 border-[#ff7a18]" />
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#ff7a18]" />
+              <div className="absolute left-0 top-0 bottom-0 w-1/2 border-r-2" style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'var(--accent)' }} />
+              <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: 'var(--accent)' }} />
             </>
           )}
           {over === 'right' && (
             <>
-              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]" />
-              <div className="absolute right-0 top-0 bottom-0 w-2 bg-[#ff7a18]" />
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 border-l-2" style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'var(--accent)' }} />
+              <div className="absolute right-0 top-0 bottom-0 w-2" style={{ backgroundColor: 'var(--accent)' }} />
             </>
           )}
           {over === 'top' && (
             <>
-              <div className="absolute left-0 right-0 top-0 h-1/2 bg-[#ff7a18]/10 border-b-2 border-[#ff7a18]" />
-              <div className="absolute left-0 right-0 top-0 h-2 bg-[#ff7a18]" />
+              <div className="absolute left-0 right-0 top-0 h-1/2 border-b-2" style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'var(--accent)' }} />
+              <div className="absolute left-0 right-0 top-0 h-2" style={{ backgroundColor: 'var(--accent)' }} />
             </>
           )}
           {over === 'bottom' && (
             <>
-              <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-[#ff7a18]/10 border-t-2 border-[#ff7a18]" />
-              <div className="absolute left-0 right-0 bottom-0 h-2 bg-[#ff7a18]" />
+              <div className="absolute left-0 right-0 bottom-0 h-1/2 border-t-2" style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'var(--accent)' }} />
+              <div className="absolute left-0 right-0 bottom-0 h-2" style={{ backgroundColor: 'var(--accent)' }} />
             </>
           )}
           {over === 'center' && (
-            <div className="absolute inset-2 rounded bg-[#ff7a18]/10 border-2 border-[#ff7a18] border-dashed" />
+            <div className="absolute inset-2 rounded border-2 border-dashed" style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'var(--accent)' }} />
           )}
         </div>
       )}

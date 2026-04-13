@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -8,6 +9,19 @@ import { Tasks } from './pages/Tasks';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
+  // Apply saved theme and accent color on load
+  useEffect(() => {
+    const root = document.documentElement;
+    
+    // Apply theme
+    const savedTheme = localStorage.getItem('theme') || 'default';
+    root.classList.add(`theme-${savedTheme}`);
+    
+    // Apply accent color
+    const savedAccent = localStorage.getItem('accentColor') || 'orange';
+    root.classList.add(`accent-${savedAccent}`);
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

@@ -12,6 +12,7 @@ export interface Note {
   emoji: string | null;
   drawing_data: any | null;
   is_starred: boolean;
+  position?: number;
   synced: boolean; // Track if synced to server
 }
 
@@ -24,6 +25,7 @@ export interface Folder {
   dashboard_id: string | null;
   created_at: string;
   updated_at: string;
+  position?: number;
   synced: boolean;
 }
 
@@ -51,9 +53,18 @@ export class FlowDatabase extends Dexie {
   constructor() {
     super('FlowDB');
     
+    // Version 1: Original schema
     this.version(1).stores({
       notes: 'id, user_id, dashboard_id, folder_id, updated_at, synced',
       folders: 'id, user_id, dashboard_id, parent_id, updated_at, synced',
+      outbox: 'id, entityType, entityId, createdAt, attempts',
+      meta: 'key'
+    });
+    
+    // Version 2: Add position field for drag-and-drop ordering
+    this.version(2).stores({
+      notes: 'id, user_id, dashboard_id, folder_id, updated_at, position, synced',
+      folders: 'id, user_id, dashboard_id, parent_id, updated_at, position, synced',
       outbox: 'id, entityType, entityId, createdAt, attempts',
       meta: 'key'
     });

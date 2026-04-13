@@ -11,6 +11,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import { ResizableImage } from '../extensions/ResizableImage.tsx';
+import { ResizableVideo } from '../extensions/ResizableVideo.tsx';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
 import { ColoredBold } from '../extensions/ColoredBold';
@@ -187,6 +188,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         inline: false,
         allowBase64: true,
       }),
+      ResizableVideo,
       ImagePaste.configure({
         uploadImage,
       }),
@@ -238,6 +240,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           console.log('📎 Files detected (no text):', files.map(f => `${f.name} (${f.type})`));
           
           const imageFiles = files.filter(file => file.type.startsWith('image/'));
+          const videoFiles = files.filter(file => file.type.startsWith('video/'));
           
           if (imageFiles.length > 0) {
             console.log('🖼️ Processing', imageFiles.length, 'image(s) from clipboard');
@@ -285,6 +288,53 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
             
             return true; // We handled it
           }
+          
+          if (videoFiles.length > 0) {
+            console.log('🎥 Processing', videoFiles.length, 'video(s) from clipboard');
+            event.preventDefault(); // Block default handling
+            
+            videoFiles.forEach(file => {
+              console.log('🎬 Reading video:', file.name || 'clipboard-video', file.type);
+              
+              const reader = new FileReader();
+              reader.onload = async (e) => {
+                const dataUrl = e.target?.result as string;
+                console.log('✅ Video loaded, size:', Math.round(dataUrl.length / 1024), 'KB');
+                
+                // Upload to Supabase if available, otherwise use data URL
+                let videoUrl = dataUrl;
+                if (uploadImage) {
+                  console.log('☁️ Uploading video to Supabase...');
+                  const uploaded = await uploadImage(file);
+                  if (uploaded) {
+                    videoUrl = uploaded;
+                    console.log('✅ Video uploaded to Supabase:', videoUrl);
+                  }
+                }
+                
+                // Insert video into editor
+                const videoNode = view.state.schema.nodes.resizableVideo;
+                if (videoNode) {
+                  view.dispatch(
+                    view.state.tr.replaceSelectionWith(
+                      videoNode.create({ src: videoUrl })
+                    )
+                  );
+                  console.log('✅ Video inserted into editor');
+                } else {
+                  console.error('❌ Video node not found in schema');
+                }
+              };
+              
+              reader.onerror = (error) => {
+                console.error('❌ Video read failed:', error);
+              };
+              
+              reader.readAsDataURL(file);
+            });
+            
+            return true; // We handled it
+          }
         }
 
         // Check if this is from Microsoft Office (has RTF or specific Office markers)
@@ -293,62 +343,164 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
                                      html.includes('ProgId=') || 
                                      html.includes('MsoNormal')));
 
-        if (isFromOffice) {
-          console.log('🏢 Detected Microsoft Office paste - using plain text to avoid styling issues');
+        if (isFromOffice && html) {
+          console.log('🏢 Detected Microsoft Office paste - preserving basic formatting');
           
-          // For Office apps, use plain text to avoid black text and huge fonts
-          if (plainText) {
-            console.log('✅ Pasting plain text from Office:', plainText.substring(0, 100));
-            
-            const { from } = view.state.selection;
-            const tr = view.state.tr.insertText(plainText, from);
-            view.dispatch(tr);
-            console.log('✅ Plain text inserted at position:', from);
-            
-            setTimeout(() => {
-              console.log('📄 Editor content:', editor?.getText().substring(0, 100));
-            }, 50);
-            
-            return true;
-          }
-        }
-
-        // Try HTML for web sources (Google Docs, etc.)
-        if (html && !isFromOffice) {
-          console.log('✅ Found HTML data (web source):', html.substring(0, 200));
-          
-          // Clean up Microsoft Office HTML artifacts and ALL styling
-          let cleanHTML = html
+          // For Office apps, clean HTML but preserve basic formatting (bold, italic, paragraphs)
+          let processedHTML = html
             .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
             .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
             .replace(/<\/o:p>/g, '') // Remove closing Office tags
-            .replace(/class="[^"]*"/g, '') // Remove ALL classes
-            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (color, font-size, etc.)
+            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+            .replace(/<style>[\s\S]*?<\/style>/g, '') // Remove style blocks
+            .replace(/<html[^>]*>/gi, '') // Remove html tags
+            .replace(/<\/html>/gi, '')
+            .replace(/<body[^>]*>/gi, '') // Remove body tags
+            .replace(/<\/body>/gi, '')
+            // Remove problematic styling but keep structure
+            .replace(/class="[^"]*"/g, '') // Remove ALL classes (MsoNormal, etc.)
+            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (colors, fonts, sizes)
             .replace(/color="[^"]*"/g, '') // Remove color attributes
             .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
             .replace(/face="[^"]*"/g, '') // Remove font face
             .replace(/size="[^"]*"/g, '') // Remove font size
             .replace(/<font[^>]*>/g, '') // Remove font tags
             .replace(/<\/font>/g, '')
-            .replace(/<span[^>]*>/g, '<span>') // Strip span attributes but keep tag
-            .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
-            .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
-            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
-            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
-            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
-            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
-            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
-            .replace(/<html[^>]*>/gi, '') // Remove html tags
-            .replace(/<\/html>/gi, '')
-            .replace(/<body[^>]*>/gi, '') // Remove body tags
-            .replace(/<\/body>/gi, '');
+            // Clean up spans and divs but keep paragraphs, bold, italic
+            .replace(/<span[^>]*>/g, '') // Remove span opening tags
+            .replace(/<\/span>/g, '') // Remove span closing tags
+            .replace(/<div[^>]*>/g, '<p>') // Convert divs to paragraphs
+            .replace(/<\/div>/g, '</p>') // Convert closing divs
+            .replace(/<p[^>]*>/g, '<p>'); // Strip paragraph attributes but keep <p> tags
+          
+          console.log('🧹 Cleaned Office HTML (basic formatting preserved):', processedHTML.substring(0, 200));
+          
+          // Parse and insert the cleaned HTML
+          try {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
+            
+            const { state } = view;
+            const pmParser = PMDOMParser.fromSchema(state.schema);
+            
+            const slice = pmParser.parseSlice(htmlDoc.body);
+            
+            if (slice && slice.size > 0) {
+              const tr = state.tr.replaceSelection(slice);
+              view.dispatch(tr);
+              console.log('✅ Office HTML inserted with formatting preserved');
+              
+              return true;
+            }
+          } catch (error) {
+            console.error('❌ Failed to parse Office HTML:', error);
+          }
+        }
 
-          console.log('🧹 Cleaned HTML:', cleanHTML.substring(0, 200));
+        // Try HTML for web sources (Google Docs, etc.) or internal Flow Notes copy-paste
+        if (html && !isFromOffice) {
+          console.log('✅ Found HTML data:', html.substring(0, 200));
+          
+          // Skip if HTML contains images - let ImagePaste extension handle it
+          if (html.includes('<img')) {
+            console.log('🖼️ HTML contains <img> tag - delegating to ImagePaste extension');
+            return false;
+          }
+          
+          // Check if this is internal Flow Notes content (has Tiptap/ProseMirror markers)
+          // Tiptap uses inline styles for formatting, so check for those
+          const isInternalPaste = html.includes('data-type="') || 
+                                  html.includes('class="ProseMirror') ||
+                                  html.includes('style="color:') ||
+                                  html.includes('style="font-size:') ||
+                                  html.includes('<mark ') ||
+                                  (html.includes('<span') && html.includes('style=') && 
+                                   (html.includes('color') || html.includes('font-size')));
+          
+          console.log('🔍 Internal paste check:', {
+            hasDataType: html.includes('data-type="'),
+            hasProseMirror: html.includes('class="ProseMirror'),
+            hasColorStyle: html.includes('style="color:'),
+            hasFontSizeStyle: html.includes('style="font-size:'),
+            hasMark: html.includes('<mark '),
+            hasStyledSpan: html.includes('<span') && html.includes('style='),
+            isInternal: isInternalPaste
+          });
+          
+          let processedHTML: string;
+          
+          if (isInternalPaste) {
+            console.log('🔄 Internal Flow Notes paste detected - preserving all formatting');
+            // For internal pastes, keep ALL formatting - just clean up Office artifacts
+            processedHTML = html
+              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+              .replace(/<\/o:p>/g, '') // Remove closing Office tags
+              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+              .replace(/<html[^>]*>/gi, '') // Remove html tags
+              .replace(/<\/html>/gi, '')
+              .replace(/<body[^>]*>/gi, '') // Remove body tags
+              .replace(/<\/body>/gi, '');
+            
+            console.log('🧹 Cleaned internal HTML (formatting preserved):', processedHTML.substring(0, 200));
+          } else {
+            console.log('🌐 External paste detected - stripping external styling');
+            // For external pastes, strip ALL styling to prevent formatting pollution
+            processedHTML = html
+              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
+              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
+              .replace(/<\/o:p>/g, '') // Remove closing Office tags
+              .replace(/class="[^"]*"/g, '') // Remove ALL classes
+              .replace(/style="[^"]*"/g, '') // Remove ALL inline styles
+              .replace(/color="[^"]*"/g, '') // Remove color attributes
+              .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
+              .replace(/face="[^"]*"/g, '') // Remove font face
+              .replace(/size="[^"]*"/g, '') // Remove font size
+              .replace(/<font[^>]*>/g, '') // Remove font tags
+              .replace(/<\/font>/g, '')
+              .replace(/<span[^>]*>/g, '<span>') // Strip span attributes
+              .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
+              .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
+              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
+              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
+              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
+              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
+              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
+              .replace(/<html[^>]*>/gi, '') // Remove html tags
+              .replace(/<\/html>/gi, '')
+              .replace(/<body[^>]*>/gi, '') // Remove body tags
+              .replace(/<\/body>/gi, '');
+            
+            // CRITICAL FIX: Unwrap emojis from span tags to prevent color inheritance
+            // ChatGPT wraps emojis in <span> tags, which can inherit text color from surrounding styled text
+            // Regex matches emoji characters (Unicode ranges for common emojis and symbols)
+            processedHTML = processedHTML.replace(
+              /<span>([^\x00-\x7F]+)<\/span>/g,
+              (match, content) => {
+                // Check if content is likely an emoji (non-ASCII, typically 1-4 chars)
+                // This includes emojis, symbols, and other Unicode characters
+                if (content.length <= 4 && /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2300}-\u{23FF}\u{2B50}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE0F}\u{20E3}\u{E0020}-\u{E007F}]/u.test(content)) {
+                  return content; // Unwrap emoji - return just the emoji without span
+                }
+                return match; // Keep span for other content
+              }
+            );
+            
+            console.log('🧹 Cleaned external HTML (styling stripped):', processedHTML.substring(0, 200));
+          }
 
           // Parse HTML and insert into editor
           try {
             const parser = new DOMParser();
-            const htmlDoc = parser.parseFromString(cleanHTML, 'text/html');
+            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
             
             // Extract text content as fallback
             const textContent = htmlDoc.body.textContent || htmlDoc.body.innerText || '';
@@ -445,11 +597,165 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       
       // Only update if editor content is different from prop
       if (content !== editor.getHTML()) {
-        console.log('🔄 Setting editor content from prop');
-        editor.commands.setContent(content);
+        console.log('🔄 Setting editor content from prop (note switch)');
+        // Use emitUpdate:false so this doesn't trigger onChange → auto-save loop
+        editor.commands.setContent(content, { emitUpdate: false });
+        
+        // CRITICAL: Clear undo history after switching notes.
+        // Without this, Ctrl+Z undoes back to the previous note's content,
+        // which can delete/replace the current note's text.
+        // This matches Notion/Obsidian behavior — each note has fresh undo history.
+        //
+        // Find the ProseMirror history plugin and reset its state to a fresh
+        // empty HistoryState by dispatching a transaction with the plugin key's
+        // meta set to { historyState: <freshState> }.
+        // See prosemirror-history/src/history.ts applyTransaction():
+        //   let historyTr = tr.getMeta(historyKey);
+        //   if (historyTr) return historyTr.historyState;
+        const historyPlugin = editor.state.plugins.find(
+          (plugin: any) => plugin.key === 'history$'
+        );
+        if (historyPlugin) {
+          // Get a fresh empty HistoryState from the plugin's init()
+          const freshState = (historyPlugin as any).spec.state.init();
+          const tr = editor.state.tr;
+          tr.setMeta(historyPlugin, { historyState: freshState });
+          tr.setMeta('addToHistory', false);
+          editor.view.dispatch(tr);
+          console.log('🧹 Cleared undo history for fresh note');
+        }
       }
     }
   }, [content, editor]);
+
+  // Track drag state for visual feedback
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // Prevent browser's default drag-and-drop behavior (opening files in new tab)
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      // Always prevent default to allow drop
+      e.preventDefault();
+      console.log('🎯 [TiptapEditor] dragover on:', e.target);
+    };
+
+    const handleDragEnter = (e: DragEvent) => {
+      console.log('🎯 [TiptapEditor] dragenter on:', e.target, 'types:', e.dataTransfer?.types);
+      // Check if dragging files (not text)
+      if (e.dataTransfer?.types.includes('Files')) {
+        setIsDraggingFile(true);
+        document.body.classList.add('dragging-file');
+      }
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      console.log('🎯 [TiptapEditor] dragleave from:', e.target);
+      // Only hide overlay if leaving the document entirely
+      if (e.target === document.body || e.relatedTarget === null) {
+        setIsDraggingFile(false);
+        document.body.classList.remove('dragging-file');
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      console.log('🎯 [TiptapEditor] drop on:', e.target, 'files:', e.dataTransfer?.files.length);
+      setIsDraggingFile(false);
+      document.body.classList.remove('dragging-file');
+      
+      // Check if this is a media file drop
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        const mediaFiles = Array.from(files).filter(f => 
+          f.type.startsWith('image/') || f.type.startsWith('video/')
+        );
+        
+        if (mediaFiles.length > 0 && editor) {
+          console.log('🎯 [TiptapEditor] Media files detected, handling drop');
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Insert at end of document
+          const endPos = editor.state.doc.content.size;
+          editor.chain().focus().setTextSelection(endPos).run();
+          
+          // Process each media file
+          mediaFiles.forEach(file => {
+            console.log('📸 [TiptapEditor] Processing file:', file.name, file.type);
+            
+            // Create temporary base64 preview
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+              const base64 = event.target?.result as string;
+              const isVideo = file.type.startsWith('video/');
+              const nodeType = isVideo ? 'resizableVideo' : 'resizableImage';
+              
+              // Insert temporary media
+              editor.chain().focus().insertContent({
+                type: nodeType,
+                attrs: {
+                  src: base64,
+                  'data-uploading': true,
+                },
+              }).run();
+              
+              // Upload to Supabase
+              try {
+                const uploadedUrl = await uploadImage(file);
+                if (uploadedUrl) {
+                  // Replace temporary media with uploaded URL
+                  const { state } = editor;
+                  const { doc } = state;
+                  let found = false;
+                  
+                  doc.descendants((node, pos) => {
+                    if ((node.type.name === 'resizableImage' || node.type.name === 'resizableVideo') && 
+                        node.attrs.src === base64) {
+                      const tr = state.tr.setNodeMarkup(pos, undefined, {
+                        ...node.attrs,
+                        src: uploadedUrl,
+                        'data-uploading': false,
+                      });
+                      editor.view.dispatch(tr);
+                      found = true;
+                      console.log('✅ [TiptapEditor] Replaced temp media with uploaded URL');
+                      return false;
+                    }
+                  });
+                  
+                  if (!found) {
+                    console.warn('⚠️ [TiptapEditor] Could not find temp media to replace');
+                  }
+                } else {
+                  console.error('❌ [TiptapEditor] Upload failed');
+                }
+              } catch (error) {
+                console.error('❌ [TiptapEditor] Upload error:', error);
+              }
+            };
+            reader.readAsDataURL(file);
+          });
+          
+          return;
+        }
+      }
+      
+      console.log('✅ [TiptapEditor] No media files, allowing default behavior');
+    };
+
+    // Prevent browser from opening dropped files in a new tab
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('dragenter', handleDragEnter);
+    document.addEventListener('dragleave', handleDragLeave);
+    document.addEventListener('drop', handleDrop);
+
+    return () => {
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('dragenter', handleDragEnter);
+      document.removeEventListener('dragleave', handleDragLeave);
+      document.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   // Store search query in a ref to use in editor update callback
   const searchQueryRef = useRef(searchQuery);
@@ -674,28 +980,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   useEffect(() => {
     if (editor) {
       const calculateMenuPosition = () => {
-        const { from, to } = editor.state.selection;
+        const { from } = editor.state.selection;
         const { view } = editor;
         const start = view.coordsAtPos(from);
-        const end = view.coordsAtPos(to);
-        
-        // Get the editor container's position
-        const editorElement = view.dom.getBoundingClientRect();
-        
-        // Calculate selection bounds
-        const selectionTop = Math.min(start.top, end.top);
-        const selectionBottom = Math.max(start.bottom, end.bottom);
         
         // Bubble menu dimensions
         const menuHeight = 48;
         const menuOffset = 12;
         
-        // Position above selection by default
-        let top = selectionTop - menuHeight - menuOffset;
+        // Always position above the selection start (like Notion)
+        let top = start.top - menuHeight - menuOffset;
         
-        // If not enough room above, position below
-        if (top < editorElement.top + 20) {
-          top = selectionBottom + menuOffset;
+        // Ensure menu stays on screen - if too close to top, add minimum offset
+        const minTopOffset = 60; // Account for header/toolbar
+        if (top < minTopOffset) {
+          top = minTopOffset;
         }
         
         // CONSISTENT horizontal position: center of viewport
@@ -800,7 +1099,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, []);
 
   return (
-    <div className={`h-full flex flex-col editor-root relative editor-bullets-${bulletStyle}`}>
+    <div ref={editorRef} className={`h-full flex flex-col editor-root relative editor-bullets-${bulletStyle}`}>
       {/* Persistent Drawing Layer */}
       <PersistentDrawingLayer
         isDrawingMode={isDrawingMode}
@@ -1127,26 +1426,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           padding-bottom: 0.5rem;
         }
 
-        /* Emoji icons at the start of headings should keep native color */
-        .ProseMirror .emoji-icon {
+        /* Emoji characters should always render with native color, never inherit text styling */
+        .ProseMirror .emoji-icon,
+        .ProseMirror .emoji-icon span,
+        .ProseMirror .emoji-icon span[style] {
           color: initial !important;
           -webkit-text-fill-color: initial !important;
           background: none !important;
           -webkit-background-clip: initial !important;
           background-clip: initial !important;
-        }
-
-        .ProseMirror h1 .emoji-icon,
-        .ProseMirror h2 .emoji-icon,
-        .ProseMirror h3 .emoji-icon,
-        .ProseMirror h4 .emoji-icon,
-        .ProseMirror h5 .emoji-icon,
-        .ProseMirror h6 .emoji-icon {
-          color: initial !important;
-          -webkit-text-fill-color: initial !important;
-          background: none !important;
-          -webkit-background-clip: initial !important;
-          background-clip: initial !important;
+          font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif !important;
         }
 
         .ProseMirror h2 {
@@ -1453,7 +1742,46 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           margin: 1rem 0;
           color: #888888;
         }
+
+        /* Disable pointer events on images/videos during file drag to prevent browser from thinking we're dragging existing media */
+        body.dragging-file .ProseMirror img,
+        body.dragging-file .ProseMirror video {
+          pointer-events: none !important;
+        }
       `}</style>
+
+      {/* Drop Zone Overlay - shown when dragging files */}
+      {isDraggingFile && (
+        <div
+          className="fixed inset-0 z-50 pointer-events-none"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-blue-500 text-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-4 border-blue-400 border-dashed">
+              <svg
+                className="w-16 h-16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <div className="text-center">
+                <div className="text-2xl font-bold mb-1">Drop your files here</div>
+                <div className="text-blue-100 text-sm">Images and videos supported</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

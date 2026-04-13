@@ -75,6 +75,18 @@ export const useOfflineSync = () => {
 
         if (remoteNotes) {
           for (const note of remoteNotes) {
+            // Skip if there's a pending local change in outbox
+            const pendingChange = await db.outbox
+              .where('entityId')
+              .equals(note.id)
+              .filter(item => item.entityType === 'note' && item.operation === 'upsert')
+              .first();
+            
+            if (pendingChange) {
+              console.log('⏭️ Skipping pull for note with pending local changes:', note.id);
+              continue;
+            }
+
             const localNote = await db.notes.get(note.id);
             
             // Last-write-wins conflict resolution
@@ -94,6 +106,18 @@ export const useOfflineSync = () => {
 
         if (remoteFolders) {
           for (const folder of remoteFolders) {
+            // Skip if there's a pending local change in outbox
+            const pendingChange = await db.outbox
+              .where('entityId')
+              .equals(folder.id)
+              .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
+              .first();
+            
+            if (pendingChange) {
+              console.log('⏭️ Skipping pull for folder with pending local changes:', folder.id);
+              continue;
+            }
+
             const localFolder = await db.folders.get(folder.id);
             
             if (!localFolder || new Date(folder.updated_at) > new Date(localFolder.updated_at)) {

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { CheckCircle, Calendar, Flag, X, ChevronDown, Inbox } from 'lucide-react';
 import {
   DndContext,
@@ -153,6 +152,7 @@ export const Tasks = () => {
       due_date: quickAddDueDate,
       priority: quickAddPriority,
       completed: false,
+      in_progress: false,
       position: maxPosition + 1,
       list: quickAddList,
     };
@@ -254,6 +254,22 @@ export const Tasks = () => {
     }
   };
 
+  const renameTask = async (taskId: string, newTitle: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ title: newTitle })
+        .eq('id', taskId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error renaming task:', error);
+      fetchTasks();
+    }
+  };
+
   const updateTaskPriority = async (taskId: string, priority: 1 | 2 | 3) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, priority } : t));
 
@@ -266,6 +282,22 @@ export const Tasks = () => {
       if (error) throw error;
     } catch (error) {
       console.error('Error updating priority:', error);
+      fetchTasks();
+    }
+  };
+
+  const toggleInProgress = async (taskId: string, inProgress: boolean) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, in_progress: inProgress } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ in_progress: inProgress })
+        .eq('id', taskId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating in_progress status:', error);
       fetchTasks();
     }
   };
@@ -418,7 +450,7 @@ export const Tasks = () => {
                       </button>
 
                       {showListMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           {TASK_LISTS.map(list => (
                             <button
                               key={list}
@@ -473,7 +505,7 @@ export const Tasks = () => {
                       </button>
 
                       {showDateMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           <button
                             onClick={() => {
                               setQuickAddDueDate(getTodayDate());
@@ -530,7 +562,7 @@ export const Tasks = () => {
                       </button>
 
                       {showPriorityMenu && (
-                        <div className="absolute top-full left-0 mt-2 rounded-lg shadow-2xl py-1 z-10 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg shadow-2xl py-1 z-50 min-w-[140px]" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
                           <button
                             onClick={() => {
                               setQuickAddPriority(1);
@@ -615,18 +647,18 @@ export const Tasks = () => {
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  <AnimatePresence mode="popLayout">
-                    {listTasks.map(task => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onToggleComplete={toggleComplete}
-                        onDelete={deleteTask}
-                        onUpdatePriority={updateTaskPriority}
-                        getPriorityColor={getPriorityColor}
-                      />
-                    ))}
-                  </AnimatePresence>
+                  {listTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onToggleComplete={toggleComplete}
+                      onDelete={deleteTask}
+                      onUpdatePriority={updateTaskPriority}
+                      onRename={renameTask}
+                      onToggleInProgress={toggleInProgress}
+                      getPriorityColor={getPriorityColor}
+                    />
+                  ))}
                 </div>
               </SortableContext>
             </div>

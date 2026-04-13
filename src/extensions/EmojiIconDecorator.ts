@@ -4,52 +4,41 @@ import { Decoration, DecorationSet } from 'prosemirror-view';
 
 const EMOJI_PLUGIN_KEY = new PluginKey('emoji-icon-decorator');
 
-// Rough emoji detection using Unicode Extended Pictographic block
-const leadingEmojiRegex = /^[\p{Extended_Pictographic}]/u;
+// Comprehensive emoji regex that matches:
+// - Standard emojis (Extended_Pictographic)
+// - Keycap sequences like 3️⃣ (digit + variation selector + combining enclosing keycap)
+// - Flag sequences, skin tone modifiers, ZWJ sequences
+// - Any character followed by variation selector U+FE0F (emoji presentation)
+const emojiRegex = /(?:\p{Extended_Pictographic}(?:\u{FE0F}|\u{FE0E})?(?:\u{200D}\p{Extended_Pictographic}(?:\u{FE0F}|\u{FE0E})?)*|[0-9#*]\u{FE0F}?\u{20E3}|\p{Regional_Indicator}{2})/gu;
 
 export const EmojiIconDecorator = Extension.create({
   name: 'emojiIconDecorator',
 
   addProseMirrorPlugins() {
-    console.log('[EmojiIconDecorator] Plugin initialised');
-
     const createDecorations = (doc: any): DecorationSet => {
-      console.log('[EmojiIconDecorator] createDecorations called');
       const decorations: Decoration[] = [];
 
       doc.descendants((node: any, pos: number) => {
-        if (node.type.name !== 'heading') return;
+        // Apply emoji-icon class in ALL node types, not just headings
+        // This ensures emojis in paragraphs, list items etc. also render natively
+        if (!node.isTextblock) return;
 
-        console.log('[EmojiIconDecorator] Heading node:', node.textContent);
-
-        // Look only at the very first text child of the heading
-        let accumulatedPos = pos + 1; // position inside heading
-        let found = false;
+        let accumulatedPos = pos + 1; // position inside block
 
         node.forEach((child: any) => {
-          if (found || !child.isText) {
-            accumulatedPos += child.nodeSize;
-            return;
+          if (child.isText) {
+            const text = child.text || '';
+            let match;
+            emojiRegex.lastIndex = 0;
+            
+            while ((match = emojiRegex.exec(text)) !== null) {
+              const emoji = match[0];
+              const from = accumulatedPos + match.index;
+              const to = from + emoji.length;
+
+              decorations.push(Decoration.inline(from, to, { class: 'emoji-icon' }));
+            }
           }
-
-          const text = child.text || '';
-          const match = leadingEmojiRegex.exec(text);
-          if (match) {
-            const emoji = match[0];
-            const from = accumulatedPos;
-            const to = from + emoji.length;
-
-            console.log('[EmojiIconDecorator] Found leading emoji:', {
-              emoji,
-              from,
-              to,
-              text,
-            });
-
-            decorations.push(Decoration.inline(from, to, { class: 'emoji-icon' }));
-            found = true;
-          }
-
           accumulatedPos += child.nodeSize;
         });
       });

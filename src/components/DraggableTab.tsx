@@ -19,8 +19,8 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
     transition,
     isDragging,
   } = useSortable({ 
-    id: note.id,
-    data: { type: 'tab', note }
+    id: `tab-${note.id}`,
+    data: { type: 'tab', note, noteId: note.id }
   });
 
   const style = {

@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
 
-type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features';
+type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security';
+
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,13 +20,14 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
-  const { user, userProfile, updateUsername, signOut } = useAuth();
+  const { user, userProfile, updateUsername, updateProfilePicture, signOut } = useAuth();
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'default');
+  const [accentColor, setAccentColor] = useState(() => localStorage.getItem('accentColor') || 'orange');
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
   const [tabsEnabled, setTabsEnabled] = useState(() => {
     const saved = localStorage.getItem('tabsEnabled');
@@ -44,12 +53,34 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('cardsEnabled');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [syncIndicatorEnabled, setSyncIndicatorEnabled] = useState(() => {
+    const saved = localStorage.getItem('syncIndicatorEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [ambientSoundsEnabled, setAmbientSoundsEnabled] = useState(() => {
+    const saved = localStorage.getItem('ambientSoundsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [focusStatsEnabled, setFocusStatsEnabled] = useState(() => {
+    const saved = localStorage.getItem('focusStatsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
+    const saved = localStorage.getItem('breakRemindersEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [pinStep, setPinStep] = useState<'idle' | 'enter' | 'confirm' | 'verify-current'>('idle');
+  const [pinInput, setPinInput] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinSuccess, setPinSuccess] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -102,12 +133,8 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         .from('profile-pictures')
         .getPublicUrl(fileName);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ profile_picture_url: data.publicUrl })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      // Update profile using AuthContext function (updates correct table and refreshes state)
+      await updateProfilePicture(data.publicUrl);
 
       setProfilePicture(data.publicUrl);
       setSuccess(true);
@@ -149,6 +176,16 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      window.location.href = '/';
+    } catch (err: any) {
+      setError(err.message || 'Failed to logout');
+      console.error('Logout error:', err);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
       setError('Please type DELETE to confirm');
@@ -176,10 +213,70 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     }
   };
 
+  const hasPinSet = !!userProfile?.pin_hash;
+
+  const handleSetPin = async () => {
+    if (pinInput.length !== 4 || !/^\d{4}$/.test(pinInput)) {
+      setPinError('PIN must be exactly 4 digits');
+      return;
+    }
+    if (pinInput !== pinConfirm) {
+      setPinError('PINs do not match');
+      return;
+    }
+    setSavingPin(true);
+    setPinError('');
+    try {
+      const hash = await hashPin(pinInput);
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ pin_hash: hash, updated_at: new Date().toISOString() })
+        .eq('id', user!.id);
+      if (updateError) throw updateError;
+      setPinSuccess('PIN set successfully!');
+      setPinStep('idle');
+      setPinInput('');
+      setPinConfirm('');
+      setTimeout(() => setPinSuccess(''), 3000);
+    } catch (err: any) {
+      setPinError(err.message || 'Failed to set PIN');
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
+  const handleRemovePin = async () => {
+    if (!hasPinSet) return;
+    const hash = await hashPin(pinInput);
+    if (hash !== userProfile!.pin_hash) {
+      setPinError('Current PIN is incorrect');
+      return;
+    }
+    setSavingPin(true);
+    setPinError('');
+    try {
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ pin_hash: null, updated_at: new Date().toISOString() })
+        .eq('id', user!.id);
+      if (updateError) throw updateError;
+      setPinSuccess('PIN removed successfully!');
+      setPinStep('idle');
+      setPinInput('');
+      sessionStorage.removeItem('pin_unlocked');
+      setTimeout(() => setPinSuccess(''), 3000);
+    } catch (err: any) {
+      setPinError(err.message || 'Failed to remove PIN');
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
   const menuItems = [
     { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
     { id: 'profile' as SettingsSection, label: 'Profile', icon: User },
     { id: 'editor' as SettingsSection, label: 'Editor', icon: Type },
+    { id: 'security' as SettingsSection, label: 'Security', icon: Lock },
     { id: 'plugins' as SettingsSection, label: 'Plugins', icon: Layers },
     { id: 'features' as SettingsSection, label: 'Features', icon: Layers },
   ];
@@ -277,73 +374,24 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Color Theme</label>
+                    <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Changes background colors, panels, and overall theme</p>
                     <select
                       value={theme}
                       onChange={(e) => {
                         const value = e.target.value;
-                        console.log('🎨 [Settings] Theme change requested:', value);
                         setTheme(value);
                         localStorage.setItem('theme', value);
-                        console.log('💾 [Settings] Theme saved to localStorage:', value);
                         
                         const root = document.documentElement;
-                        console.log('📋 [Settings] Current root classes:', Array.from(root.classList));
-                        console.log('🏷️ [Settings] Root element tag:', root.tagName);
                         
-                        // Remove ALL classes that might interfere
+                        // Remove theme classes
                         Array.from(root.classList).forEach((cls) => {
-                          if (cls.startsWith('theme-') || ['light', 'dark', 'default', 'crimson', 'coffee', 'ocean', 'modern-gray'].includes(cls)) {
-                            console.log('🗑️ [Settings] Removing class:', cls);
+                          if (cls.startsWith('theme-')) {
                             root.classList.remove(cls);
                           }
                         });
                         
-                        const newClass = `theme-${value}`;
-                        root.classList.add(newClass);
-                        console.log('✅ [Settings] Added class:', newClass);
-                        console.log('📋 [Settings] New root classes:', Array.from(root.classList));
-                        
-                        // Check if CSS rule exists
-                        const testSelector = `html.${newClass}`;
-                        console.log('🔍 [Settings] Looking for selector:', testSelector);
-                        
-                        // Check all stylesheets for theme rules
-                        let foundRule = false;
-                        try {
-                          Array.from(document.styleSheets).forEach((sheet) => {
-                            try {
-                              Array.from(sheet.cssRules || []).forEach((rule) => {
-                                if (rule instanceof CSSStyleRule && rule.selectorText?.includes(newClass)) {
-                                  console.log('✅ [Settings] Found CSS rule:', rule.selectorText);
-                                  console.log('📜 [Settings] Rule text:', rule.cssText.substring(0, 200));
-                                  foundRule = true;
-                                }
-                              });
-                            } catch (e) {
-                              // CORS error for external stylesheets
-                            }
-                          });
-                        } catch (e) {
-                          console.error('❌ [Settings] Error checking stylesheets:', e);
-                        }
-                        
-                        if (!foundRule) {
-                          console.error('❌ [Settings] No CSS rule found for:', testSelector);
-                        }
-                        
-                        // Force style recalculation
-                        setTimeout(() => {
-                          const computedBg = getComputedStyle(root).getPropertyValue('--bg-editor');
-                          const computedPanel = getComputedStyle(root).getPropertyValue('--bg-panel');
-                          const computedText = getComputedStyle(root).getPropertyValue('--text');
-                          console.log('🎨 [Settings] Computed --bg-editor:', computedBg.trim());
-                          console.log('🎨 [Settings] Computed --bg-panel:', computedPanel.trim());
-                          console.log('🎨 [Settings] Computed --text:', computedText.trim());
-                          
-                          // Check actual background color of body
-                          const bodyBg = getComputedStyle(document.body).backgroundColor;
-                          console.log('🎨 [Settings] Body background:', bodyBg);
-                        }, 100);
+                        root.classList.add(`theme-${value}`);
                       }}
                       className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
                       style={{
@@ -352,11 +400,55 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         color: 'var(--text)',
                       }}
                     >
-                      <option value="default">Default (Dark)</option>
-                      <option value="crimson">Crimson</option>
-                      <option value="coffee">Coffee</option>
-                      <option value="ocean">Ocean</option>
+                      <option value="default">Default Dark</option>
+                      <option value="crimson">Crimson Dark</option>
+                      <option value="coffee">Coffee Dark</option>
+                      <option value="ocean">Ocean Dark</option>
                       <option value="modern-gray">Modern Gray</option>
+                      <option value="purple">Purple Dark</option>
+                      <option value="green">Green Dark</option>
+                      <option value="pink">Pink Dark</option>
+                      <option value="amber">Amber Dark</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Accent Color</label>
+                    <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Changes folder icons, buttons, and highlight colors</p>
+                    <select
+                      value={accentColor}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setAccentColor(value);
+                        localStorage.setItem('accentColor', value);
+                        
+                        const root = document.documentElement;
+                        
+                        // Remove accent classes
+                        Array.from(root.classList).forEach((cls) => {
+                          if (cls.startsWith('accent-')) {
+                            root.classList.remove(cls);
+                          }
+                        });
+                        
+                        root.classList.add(`accent-${value}`);
+                      }}
+                      className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-elev)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <option value="orange">🟠 Orange</option>
+                      <option value="purple">🟣 Purple</option>
+                      <option value="green">🟢 Green</option>
+                      <option value="pink">🩷 Pink</option>
+                      <option value="blue">🔵 Blue</option>
+                      <option value="red">🔴 Red</option>
+                      <option value="amber">🟡 Amber</option>
+                      <option value="teal">🩵 Teal</option>
+                      <option value="indigo">🔮 Indigo</option>
                     </select>
                   </div>
                 </div>
@@ -381,7 +473,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 )}
 
                 <div className="mb-8">
-                  <label className="block text-sm font-medium mb-4" style={{ color: 'var(--text)' }}>Profile Picture</label>
                   <div className="flex items-center gap-6">
                     <div className="relative">
                       {profilePicture ? (
@@ -469,10 +560,11 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full font-medium py-2.5 rounded-lg transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                     style={{
-                      backgroundColor: loading ? 'var(--bg-elev)' : 'var(--accent)',
-                      color: loading ? 'var(--muted)' : '#fff',
+                      backgroundColor: 'var(--accent)',
+                      color: '#fff',
+                      opacity: loading ? 0.5 : 1,
                     }}
                   >
                     {loading ? 'Saving...' : 'Save'}
@@ -480,32 +572,27 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 </form>
 
                 {/* Account Actions */}
-                <div className="mt-8 pt-8 border-t space-y-4" style={{ borderColor: 'var(--divider)' }}>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await signOut();
-                        window.location.href = '/login';
-                      } catch (error) {
-                        console.error('Logout error:', error);
-                      }
-                    }}
-                    className="w-full bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors"
-                  >
-                    Logout
-                  </button>
-
-                  <div className="pt-4">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                      <AlertTriangle className="w-5 h-5 text-red-400" />
-                      Danger Zone
-                    </h3>
-                    <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                      Once you delete your account, there is no going back. All your notes and data will be permanently deleted.
-                    </p>
+                <div className="mt-8 pt-8 border-t" style={{ borderColor: 'var(--divider)' }}>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleLogout}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                      }}
+                    >
+                      Logout
+                    </button>
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete Account
@@ -647,6 +734,90 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: cardsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
+
+                      {/* Sync Indicator Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Sync Indicator</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Show connection status and sync progress in the toolbar
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !syncIndicatorEnabled;
+                            setSyncIndicatorEnabled(newValue);
+                            localStorage.setItem('syncIndicatorEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: syncIndicatorEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: syncIndicatorEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Ambient Sounds Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Ambient Sounds</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Play ambient sounds like rain, cafe, or ocean waves while working
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !ambientSoundsEnabled;
+                            setAmbientSoundsEnabled(newValue);
+                            localStorage.setItem('ambientSoundsEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: ambientSoundsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: ambientSoundsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Focus Stats Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Focus Stats</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Track daily focus time, completed tasks, and productivity metrics
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !focusStatsEnabled;
+                            setFocusStatsEnabled(newValue);
+                            localStorage.setItem('focusStatsEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: focusStatsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusStatsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Break Reminders Plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Break Reminders</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Get gentle reminders to take breaks after long focus sessions (every 50 min)
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !breakRemindersEnabled;
+                            setBreakRemindersEnabled(newValue);
+                            localStorage.setItem('breakRemindersEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: breakRemindersEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: breakRemindersEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -671,6 +842,186 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         Request a Plugin
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Security Section */}
+            {activeSection === 'security' && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Security</h2>
+
+                {pinSuccess && (
+                  <div className="bg-green-900/20 border border-green-900/50 text-green-400 p-3 rounded-lg mb-4">
+                    {pinSuccess}
+                  </div>
+                )}
+
+                {pinError && (
+                  <div className="bg-red-900/20 border border-red-900/50 text-red-400 p-3 rounded-lg mb-4">
+                    {pinError}
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  <div className="pb-6 border-b" style={{ borderColor: 'var(--divider)' }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--text)' }}>PIN Lock</h3>
+                        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                          Require a 4-digit PIN to access your account each session
+                        </p>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        hasPinSet
+                          ? 'bg-green-900/20 text-green-400 border border-green-900/50'
+                          : ''
+                      }`} style={!hasPinSet ? { backgroundColor: 'var(--bg-elev)', color: 'var(--muted)' } : {}}>
+                        {hasPinSet ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+
+                    {pinStep === 'idle' && (
+                      <div className="flex gap-3">
+                        {!hasPinSet ? (
+                          <button
+                            onClick={() => { setPinStep('enter'); setPinError(''); setPinSuccess(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                          >
+                            Set PIN
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => { setPinStep('enter'); setPinError(''); setPinSuccess(''); setPinInput(''); }}
+                              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                              style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                            >
+                              Change PIN
+                            </button>
+                            <button
+                              onClick={() => { setPinStep('verify-current'); setPinError(''); setPinSuccess(''); setPinInput(''); }}
+                              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
+                            >
+                              Remove PIN
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {pinStep === 'enter' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Enter new PIN (4 digits)</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinInput}
+                            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              if (pinInput.length === 4) { setPinStep('confirm'); setPinError(''); }
+                              else { setPinError('PIN must be exactly 4 digits'); }
+                            }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                          >
+                            Continue
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pinStep === 'confirm' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Confirm new PIN</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinConfirm}
+                            onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleSetPin}
+                            disabled={savingPin}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff', opacity: savingPin ? 0.5 : 1 }}
+                          >
+                            {savingPin ? 'Setting PIN...' : 'Set PIN'}
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinConfirm(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pinStep === 'verify-current' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Enter current PIN to continue</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={pinInput}
+                            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="••••"
+                            autoFocus
+                            className="w-full max-w-xs px-4 py-2.5 rounded-lg focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleRemovePin}
+                            disabled={savingPin}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-red-600 hover:bg-red-700 text-white"
+                            style={{ opacity: savingPin ? 0.5 : 1 }}
+                          >
+                            {savingPin ? 'Removing...' : 'Remove PIN'}
+                          </button>
+                          <button
+                            onClick={() => { setPinStep('idle'); setPinInput(''); setPinError(''); }}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

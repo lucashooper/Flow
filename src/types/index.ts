@@ -8,6 +8,7 @@ export interface Note {
   emoji: string | null;
   drawing_data: string | null;
   is_starred: boolean;
+  position?: number;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +20,7 @@ export interface Folder {
   emoji: string | null;
   parent_id: string | null;
   dashboard_id: string | null;
+  position?: number;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +32,8 @@ export interface Dashboard {
   emoji: string;
   cover_image: string | null;
   is_active: boolean;
+  parent_id: string | null; // For nested dashboards (dashboard groups)
+  position?: number; // For custom drag-and-drop ordering
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +49,7 @@ export interface UserProfile {
   username: string;
   email: string;
   profile_picture_url: string | null;
+  pin_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +62,7 @@ export interface Task {
   due_date: string | null;
   priority: 1 | 2 | 3; // 1 = high, 2 = medium, 3 = low
   completed: boolean;
+  in_progress: boolean; // Track tasks currently being worked on
   position: number; // For drag-and-drop ordering
   list: string; // Project/list name (e.g., 'Inbox', 'Personal', 'Work')
   created_at: string;
@@ -71,4 +77,5 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
+  updateProfilePicture: (profilePictureUrl: string) => Promise<void>;
 }

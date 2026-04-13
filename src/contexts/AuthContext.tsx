@@ -34,13 +34,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    // Check active sessions
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Check active sessions — wait for profile fetch before clearing loading
+    // so ProtectedRoute has pin_hash available for PIN lock check
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const userData = { id: session.user.id, email: session.user.email || '' };
         setUser(userData);
         if (navigator.onLine) {
-          fetchUserProfile(session.user.id);
+          await fetchUserProfile(session.user.id);
         }
       }
       setLoading(false);
@@ -157,8 +158,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await fetchUserProfile(user.id);
   };
 
+  const updateProfilePicture = async (profilePictureUrl: string) => {
+    if (!user) throw new Error('No user logged in');
+    
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ 
+        profile_picture_url: profilePictureUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id);
+    
+    if (error) throw error;
+    await fetchUserProfile(user.id);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signUp, signIn, signOut, updateUsername }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signUp, signIn, signOut, updateUsername, updateProfilePicture }}>
       {children}
     </AuthContext.Provider>
   );

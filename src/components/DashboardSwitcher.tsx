@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, Plus, Settings as SettingsIcon, Trash2, Edit2, Image, Download } from 'lucide-react';
+import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent, DragMoveEvent } from '@dnd-kit/core';
 import JSZip from 'jszip';
 import type { Dashboard } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { DashboardItem } from './SortableDashboardItem';
+import type { DropPosition } from './SortableDashboardItem';
+import { EmojiPicker } from './EmojiPicker';
 
 interface DashboardSwitcherProps {
   dashboards: Dashboard[];
@@ -32,10 +37,31 @@ export const DashboardSwitcher = ({
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState<{ x: number; y: number } | null>(null);
+  const [quickEditingDashboard, setQuickEditingDashboard] = useState<Dashboard | null>(null);
+  const [expandedDashboards, setExpandedDashboards] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('expandedDashboards');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [draggedDashboard, setDraggedDashboard] = useState<Dashboard | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: DropPosition } | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const switcherRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -44,6 +70,8 @@ export const DashboardSwitcher = ({
         setIsCreating(false);
         setContextMenuPosition(null);
         setContextMenuDashboard(null);
+        setEmojiPickerPosition(null);
+        setQuickEditingDashboard(null);
       }
     };
 
@@ -255,6 +283,222 @@ export const DashboardSwitcher = ({
     }
   };
 
+  // Persist expanded dashboards
+  useEffect(() => {
+    localStorage.setItem('expandedDashboards', JSON.stringify(Array.from(expandedDashboards)));
+  }, [expandedDashboards]);
+
+  const toggleDashboard = (dashboardId: string) => {
+    setExpandedDashboards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(dashboardId)) {
+        newSet.delete(dashboardId);
+      } else {
+        newSet.add(dashboardId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get root dashboards (no parent)
+  const rootDashboards = dashboards.filter(d => !d.parent_id).sort((a, b) => {
+    if (a.position !== undefined && b.position !== undefined) {
+      return a.position - b.position;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Get child dashboards
+  const getChildDashboards = (parentId: string) => {
+    return dashboards.filter(d => d.parent_id === parentId).sort((a, b) => {
+      if (a.position !== undefined && b.position !== undefined) {
+        return a.position - b.position;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const dashboard = dashboards.find(d => d.id === event.active.id);
+    setDraggedDashboard(dashboard || null);
+    setDropTarget(null);
+  };
+
+  // Detect drop position based on pointer position relative to droppable elements
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { active, over } = event;
+    if (!over || !active) {
+      setDropTarget(null);
+      return;
+    }
+
+    // Extract dashboard id from droppable id (format: "drop-{id}")
+    const overId = String(over.id);
+    const dashboardId = overId.startsWith('drop-') ? overId.slice(5) : overId;
+    
+    if (dashboardId === String(active.id)) {
+      setDropTarget(null);
+      return;
+    }
+
+    // Get the DOM element of the over item
+    const overElement = over.rect;
+    if (!overElement) {
+      setDropTarget(null);
+      return;
+    }
+
+    // Use the pointer position from the event
+    const pointerY = (event.activatorEvent as PointerEvent).clientY + (event.delta?.y ?? 0);
+    const rect = overElement;
+    const relativeY = pointerY - rect.top;
+    const height = rect.height;
+
+    let position: DropPosition;
+    if (relativeY < height * 0.25) {
+      position = 'top';
+    } else if (relativeY > height * 0.75) {
+      position = 'bottom';
+    } else {
+      position = 'center';
+    }
+
+    setDropTarget({ id: dashboardId, position });
+  }, []);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active } = event;
+    const currentDropTarget = dropTarget;
+    setDraggedDashboard(null);
+    setDropTarget(null);
+
+    if (!currentDropTarget) return;
+
+    const activeDash = dashboards.find(d => d.id === active.id);
+    const overDash = dashboards.find(d => d.id === currentDropTarget.id);
+
+    if (!activeDash || !overDash || activeDash.id === overDash.id) return;
+
+    const { position: dropPos } = currentDropTarget;
+
+    try {
+      if (dropPos === 'center') {
+        // Nest inside the target dashboard
+        await supabase
+          .from('dashboards')
+          .update({ parent_id: overDash.id })
+          .eq('id', activeDash.id);
+
+        setExpandedDashboards(prev => new Set(prev).add(overDash.id));
+      } else if (dropPos === 'top' || dropPos === 'bottom') {
+        // Move to same level as target (this handles unnesting too!)
+        const newParentId = overDash.parent_id;
+        
+        // Get sorted siblings at the target level, excluding the dragged item
+        const siblings = dashboards
+          .filter(d => d.parent_id === newParentId && d.id !== activeDash.id)
+          .sort((a, b) => {
+            if (a.position !== undefined && b.position !== undefined) return a.position - b.position;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+        
+        const targetIndex = siblings.findIndex(d => d.id === overDash.id);
+        const insertIndex = dropPos === 'top' ? Math.max(0, targetIndex) : targetIndex + 1;
+        
+        // Build new ordered list
+        const newOrder = [...siblings];
+        newOrder.splice(insertIndex, 0, activeDash);
+        
+        // Update parent + position for the dragged item
+        await supabase
+          .from('dashboards')
+          .update({ parent_id: newParentId, position: insertIndex })
+          .eq('id', activeDash.id);
+        
+        // Update positions for all siblings
+        for (let i = 0; i < newOrder.length; i++) {
+          if (newOrder[i].id !== activeDash.id && newOrder[i].position !== i) {
+            await supabase
+              .from('dashboards')
+              .update({ position: i })
+              .eq('id', newOrder[i].id);
+          }
+        }
+      }
+      
+      onDashboardsUpdate();
+    } catch (error) {
+      console.error('Error updating dashboard:', error);
+    }
+  };
+
+  const handleDragCancel = () => {
+    setDraggedDashboard(null);
+    setDropTarget(null);
+  };
+
+  // Handle emoji click on any dashboard in the list
+  const handleDashboardEmojiClick = (e: React.MouseEvent, dashboard: Dashboard) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pickerHeight = 410;
+    // Always try to position above; if not enough space, position at top of viewport
+    const y = rect.top - pickerHeight > 10 ? rect.top - pickerHeight : 10;
+    const x = Math.min(rect.left, window.innerWidth - 360);
+    setEmojiPickerPosition({ x, y });
+    setQuickEditingDashboard(dashboard);
+  };
+
+  // Recursive function to render dashboard tree
+  const renderDashboard = (dashboard: Dashboard, depth: number = 0): React.ReactElement => {
+    const childDashboards = getChildDashboards(dashboard.id);
+    const isExpanded = expandedDashboards.has(dashboard.id);
+    const hasChildren = childDashboards.length > 0;
+
+    return (
+      <div key={dashboard.id}>
+        <DashboardItem
+          dashboard={dashboard}
+          isActive={dashboard.id === activeDashboard?.id}
+          isExpanded={isExpanded}
+          hasChildren={hasChildren}
+          depth={depth}
+          draggedId={draggedDashboard?.id ?? null}
+          dropTarget={dropTarget}
+          onSelect={() => {
+            onDashboardChange(dashboard);
+            setIsOpen(false);
+          }}
+          onToggle={() => toggleDashboard(dashboard.id)}
+          onDelete={() => handleDeleteDashboard(dashboard.id)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            // Clamp context menu position so it doesn't go off-screen
+            const menuWidth = 220;
+            const menuHeight = 320;
+            const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+            const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+            setContextMenuPosition({ x, y });
+            setContextMenuDashboard(dashboard);
+          }}
+          onEmojiClick={handleDashboardEmojiClick}
+        />
+        {isExpanded && hasChildren && (
+          <div>
+            {childDashboards.map(child => renderDashboard(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderDashboardTree = () => {
+    return (
+      <div>
+        {rootDashboards.map(dashboard => renderDashboard(dashboard, 0))}
+      </div>
+    );
+  };
+
   return (
     <div ref={switcherRef} className="relative">
       <div className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#1a1a1a] transition-colors rounded-lg group">
@@ -275,7 +519,22 @@ export const DashboardSwitcher = ({
               />
             </div>
           ) : (
-            <span className="text-lg flex-shrink-0">{activeDashboard?.emoji || '📝'}</span>
+            <span 
+              className="text-lg flex-shrink-0 relative cursor-pointer hover:ring-2 hover:ring-[#A0522D]/50 rounded px-1 transition-all"
+              onClick={(e) => {
+                if (!activeDashboard) return;
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                // Position above the element since it's near the bottom of the screen
+                const pickerHeight = 410;
+                const y = rect.top - pickerHeight > 10 ? rect.top - pickerHeight : 10;
+                setEmojiPickerPosition({ x: rect.left, y });
+                setQuickEditingDashboard(activeDashboard);
+              }}
+              title="Click to change emoji"
+            >
+              {activeDashboard?.emoji || '📝'}
+            </span>
           )}
           <span className="text-sm font-medium text-[#e5e5e5] truncate">
             {activeDashboard?.name || 'My Notes'}
@@ -305,61 +564,30 @@ export const DashboardSwitcher = ({
             transition={{ duration: 0.15 }}
             className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl overflow-hidden z-50"
           >
-            <div className="max-h-64 overflow-y-auto scrollbar-hide">
+            <div ref={listRef} className="max-h-64 overflow-y-auto custom-scrollbar">
               {dashboards && dashboards.length > 0 ? (
-                dashboards.map((dashboard) => (
-                  <div 
-                    key={dashboard.id} 
-                    className="group relative"
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenuPosition({ x: e.clientX, y: e.clientY });
-                      setContextMenuDashboard(dashboard);
-                    }}
-                  >
-                    <div
-                      onClick={() => {
-                        onDashboardChange(dashboard);
-                        setIsOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-3 hover:bg-[#252525] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        {dashboard.cover_image ? (
-                          <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
-                            <img 
-                              src={dashboard.cover_image} 
-                              alt={dashboard.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-lg">{dashboard.emoji}</span>
-                        )}
-                        <span className="text-sm text-[#e5e5e5] truncate">
-                          {dashboard.name}
-                        </span>
-                        {dashboard.is_active && (
-                          <div className="w-2 h-2 bg-[#A0522D] rounded-full" />
-                        )}
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={handleDragStart}
+                  onDragMove={handleDragMove}
+                  onDragEnd={handleDragEnd}
+                  onDragCancel={handleDragCancel}
+                >
+                  {renderDashboardTree()}
+                  <DragOverlay dropAnimation={null}>
+                    {draggedDashboard && (
+                      <div className="shadow-2xl bg-[#252525] border border-[#A0522D]/40 rounded-md px-3 py-2 flex items-center gap-2">
+                        <span className="text-lg">{draggedDashboard.emoji}</span>
+                        <span className="text-sm text-[#e5e5e5]">{draggedDashboard.name}</span>
                       </div>
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDashboard(dashboard.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#3a3a3a] rounded transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4 text-[#ef4444]" />
-                      </div>
-                    </div>
-                  </div>
-                ))
+                    )}
+                  </DragOverlay>
+                </DndContext>
               ) : (
-              <div className="p-4 text-center text-[#888888] text-sm">
-                No dashboards found. Create one below!
-              </div>
-            )}
+                <div className="p-4 text-center text-[#888888] text-sm">
+                  No dashboards found. Create one below!
+                </div>
+              )}
             </div>
 
             <div className="border-t border-[#2a2a2a]">
@@ -513,6 +741,80 @@ export const DashboardSwitcher = ({
             </button>
             
             <div className="border-t border-[#2a2a2a] my-1" />
+            
+            {/* Add Dashboard to Group - show available dashboards */}
+            <div className="relative group/add">
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Dashboard to Group
+              </button>
+              
+              {/* Submenu - positioned to the right, or left if near edge, and clamped to viewport */}
+              <div className="absolute right-full top-0 mr-1 hidden group-hover/add:block bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 min-w-[180px] max-h-48 overflow-y-auto" style={{ bottom: 'auto', maxHeight: Math.min(192, window.innerHeight - (contextMenuPosition?.y ?? 0) - 20) }}>
+                {dashboards
+                  .filter(d => d.id !== contextMenuDashboard?.id && d.parent_id !== contextMenuDashboard?.id)
+                  .map(dashboard => (
+                    <button
+                      key={dashboard.id}
+                      onClick={async () => {
+                        if (!contextMenuDashboard) return;
+                        try {
+                          const { error } = await supabase
+                            .from('dashboards')
+                            .update({ parent_id: contextMenuDashboard.id })
+                            .eq('id', dashboard.id);
+                          
+                          if (error) throw error;
+                          
+                          setExpandedDashboards(prev => new Set(prev).add(contextMenuDashboard.id));
+                          onDashboardsUpdate();
+                          setContextMenuPosition(null);
+                          setContextMenuDashboard(null);
+                        } catch (error) {
+                          console.error('Error adding dashboard to group:', error);
+                        }
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-base">{dashboard.emoji}</span>
+                      <span className="truncate">{dashboard.name}</span>
+                    </button>
+                  ))}
+                {dashboards.filter(d => d.id !== contextMenuDashboard?.id && d.parent_id !== contextMenuDashboard?.id).length === 0 && (
+                  <div className="px-4 py-2 text-sm text-[#666666]">No dashboards available</div>
+                )}
+              </div>
+            </div>
+            
+            {contextMenuDashboard?.parent_id && (
+              <button
+                onClick={async () => {
+                  if (!contextMenuDashboard) return;
+                  try {
+                    const { error } = await supabase
+                      .from('dashboards')
+                      .update({ parent_id: null })
+                      .eq('id', contextMenuDashboard.id);
+                    
+                    if (error) throw error;
+                    
+                    onDashboardsUpdate();
+                    setContextMenuPosition(null);
+                    setContextMenuDashboard(null);
+                  } catch (error) {
+                    console.error('Error moving dashboard to root:', error);
+                  }
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] transition-colors flex items-center gap-2"
+              >
+                <ChevronUp className="w-4 h-4" />
+                Move to Root
+              </button>
+            )}
+            
+            <div className="border-t border-[#2a2a2a] my-1" />
 
             <button
               onClick={() => {
@@ -579,7 +881,11 @@ export const DashboardSwitcher = ({
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setEmojiPickerPosition({ x: rect.left, y: rect.bottom + 5 });
+                        setShowEditEmojiPicker(true);
+                      }}
                       className="bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-2xl hover:bg-[#252525] transition-colors"
                     >
                       {editEmoji}
@@ -612,6 +918,42 @@ export const DashboardSwitcher = ({
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Emoji Picker */}
+      <AnimatePresence>
+        {emojiPickerPosition && (
+          <EmojiPicker
+            position={emojiPickerPosition}
+            onSelect={async (emoji) => {
+              if (quickEditingDashboard) {
+                // Quick edit from main header
+                try {
+                  const { error } = await supabase
+                    .from('dashboards')
+                    .update({ emoji })
+                    .eq('id', quickEditingDashboard.id);
+                  
+                  if (error) throw error;
+                  onDashboardsUpdate();
+                } catch (error) {
+                  console.error('Error updating emoji:', error);
+                }
+              } else if (showEditEmojiPicker) {
+                // Edit from modal
+                setEditEmoji(emoji);
+              }
+              setEmojiPickerPosition(null);
+              setQuickEditingDashboard(null);
+              setShowEditEmojiPicker(false);
+            }}
+            onClose={() => {
+              setEmojiPickerPosition(null);
+              setQuickEditingDashboard(null);
+              setShowEditEmojiPicker(false);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

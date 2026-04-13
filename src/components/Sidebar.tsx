@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, FolderPlus, Search, Star, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from '../hooks/useMediaQuery';
-import {
-  DragOverlay,
-} from '@dnd-kit/core';
+import { useAuth } from '../contexts/AuthContext';
+import {} from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Note, Folder, Dashboard } from '../types';
 import { DraggableNoteItem } from './DraggableNoteItem';
@@ -29,6 +27,7 @@ interface SidebarProps {
   onDashboardChange: (dashboard: Dashboard) => void;
   onDashboardsUpdate: () => void;
   loading: boolean;
+  isMobile?: boolean;
   onCloseMobile?: () => void;
 }
 
@@ -51,10 +50,20 @@ export const Sidebar = ({
   onDashboardsUpdate,
   loading,
   onCloseMobile,
+  isMobile = false,
 }: SidebarProps) => {
   const navigate = useNavigate();
+  const { userProfile, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    if (!user?.id) return new Set();
+    try {
+      const saved = localStorage.getItem(`expandedFolders_${user.id}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [blurredNotes, setBlurredNotes] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
     try {
@@ -67,8 +76,6 @@ export const Sidebar = ({
     }
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [activeId] = useState<string | null>(null);
-  const [overId] = useState<string | null>(null);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [autoRenameFolderId, setAutoRenameFolderId] = useState<string | null>(null);
 
@@ -83,6 +90,13 @@ export const Sidebar = ({
   }, []);
 
 
+  // Persist expanded folders to localStorage
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`expandedFolders_${user.id}`, JSON.stringify(Array.from(expandedFolders)));
+    }
+  }, [expandedFolders, user?.id]);
+
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
@@ -94,8 +108,6 @@ export const Sidebar = ({
       return newSet;
     });
   };
-
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isMobile) return; // Disable resize on mobile
@@ -164,9 +176,15 @@ export const Sidebar = ({
       const bStarred = b.is_starred ?? false;
       if (aStarred && !bStarred) return -1;
       if (!aStarred && bStarred) return 1;
-      // Then sort by updated_at
+      // Then sort by position (for drag-and-drop reordering)
+      // If both have positions, use those; otherwise fall back to updated_at
+      if (a.position !== undefined && b.position !== undefined) {
+        return a.position - b.position;
+      }
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
+  
+  console.log('🔍 [Sidebar] filteredNotes order:', filteredNotes.map(n => `${n.title}:${n.position}`));
 
   // Check if a folder or its descendants contain matching notes
   const folderHasMatches = (folderId: string): boolean => {
@@ -207,6 +225,8 @@ export const Sidebar = ({
   
   // Get notes without folder
   const rootNotes = filteredNotes.filter(n => !n.folder_id);
+  
+  console.log('📋 [Sidebar] SIDEBAR ORDER (rootNotes):', rootNotes.map(n => n.id));
 
   // Get notes for a specific folder
   const getNotesInFolder = (folderId: string) => {
@@ -223,7 +243,7 @@ export const Sidebar = ({
     const isExpanded = expandedFolders.has(folder.id);
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
-    const isOver = overId === folder.id;
+    const isOver = false;
 
     return (
       <div key={folder.id}>
@@ -255,7 +275,8 @@ export const Sidebar = ({
               return (
                 <div 
                   key={note.id}
-                  className={`${isMatch ? 'bg-[#ff7a18]/10 border-l-2 border-[#ff7a18]' : ''} ${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                  className={`${searchQuery && !isMatch ? 'opacity-40' : ''}`}
+                  style={isMatch ? { backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderLeft: '2px solid var(--accent)' } : {}}
                 >
                   <DraggableNoteItem
                     note={note}
@@ -288,13 +309,35 @@ export const Sidebar = ({
         <div className="p-3 border-b border-subtle">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <img src="/FlowIcon-Main.png" alt="Flow" className="w-7 h-7 rounded-md" style={{ filter: 'brightness(1.1)' }} />
+            {userProfile?.profile_picture_url ? (
+              <img 
+                src={userProfile.profile_picture_url} 
+                alt="Profile" 
+                className="w-6 h-6 rounded-full object-cover" 
+                style={{ 
+                  border: '1.5px solid rgba(248, 250, 252, 0.15)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+                }}
+              />
+            ) : (
+              <div 
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ 
+                  backgroundColor: 'var(--accent)', 
+                  color: '#fff',
+                  border: '1.5px solid rgba(248, 250, 252, 0.15)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                {userProfile?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
             <button
               onClick={() => navigate('/tasks')}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors group"
               title="Tasks"
             >
-              <CheckCircle className="w-4 h-4 text-[#888888] group-hover:text-[#ff7a18] transition-colors" />
+              <CheckCircle className="w-4 h-4 text-[#888888] transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.color = '#888888'} />
             </button>
           </div>
           <div className="flex items-center gap-1">
@@ -321,14 +364,14 @@ export const Sidebar = ({
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
               title="New Note"
             >
-              <Plus className="w-4 h-4 text-[#D97706]" />
+              <Plus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </button>
             <button
               onClick={() => onFolderCreate()}
               className="p-1.5 hover:bg-[#252525] rounded transition-colors"
               title="New Folder"
             >
-              <FolderPlus className="w-4 h-4 text-[#D97706]" />
+              <FolderPlus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </button>
           </div>
         </div>
@@ -444,22 +487,6 @@ export const Sidebar = ({
       `}</style>
       </div>
 
-      {/* Drag Overlay */}
-      <DragOverlay>
-        {activeId ? (
-          <div className="opacity-70 shadow-2xl">
-            {notes.find(n => n.id === activeId) ? (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
-                {notes.find(n => n.id === activeId)?.title || 'Dragging note...'}
-              </div>
-            ) : (
-              <div className="px-2 py-1.5 bg-[#1a1a1a] rounded border border-[#333333] text-[#e5e5e5]">
-                Dragging folder...
-              </div>
-            )}
-          </div>
-        ) : null}
-      </DragOverlay>
     </>
   );
 };
