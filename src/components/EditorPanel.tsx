@@ -14,8 +14,26 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const [drawingData, setDrawingData] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentNoteIdRef = useRef<string | undefined>(undefined);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionsByNote = useRef<Map<string, number>>(new Map());
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   
   console.log('📝 [EditorPanel] Received searchQuery:', searchQuery, 'for note:', note?.title);
+
+  // Save scroll position when scrolling
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !currentNoteIdRef.current) return;
+
+    const handleScroll = () => {
+      if (currentNoteIdRef.current) {
+        scrollPositionsByNote.current.set(currentNoteIdRef.current, container.scrollTop);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     // Only update state if the note ID actually changed (switching notes)
@@ -26,8 +44,42 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
       setTitle(note.title);
       setContent(note.content);
       setDrawingData(note.drawing_data || '');
+      
+      // Restore scroll position for this note after content loads
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          const savedPosition = scrollPositionsByNote.current.get(note.id) || 0;
+          scrollContainerRef.current.scrollTop = savedPosition;
+          console.log('📜 Restored scroll position:', savedPosition, 'for note:', note.id);
+        }
+      });
     }
   }, [note?.id]);
+
+  // Handle container resize (e.g., when split pane is created)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    resizeObserverRef.current = new ResizeObserver(() => {
+      // When container resizes, restore the scroll position
+      if (currentNoteIdRef.current) {
+        const savedPosition = scrollPositionsByNote.current.get(currentNoteIdRef.current) || 0;
+        if (savedPosition > 0 && Math.abs(container.scrollTop - savedPosition) > 10) {
+          container.scrollTop = savedPosition;
+          console.log('📐 Restored scroll after resize:', savedPosition);
+        }
+      }
+    });
+
+    resizeObserverRef.current.observe(container);
+
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // Auto-save with debounce
   useEffect(() => {
@@ -63,7 +115,10 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col editor-background editor-root overflow-y-auto custom-scrollbar">
+    <div 
+      ref={scrollContainerRef}
+      className="flex-1 min-h-0 flex flex-col editor-background editor-root overflow-y-auto custom-scrollbar"
+    >
       {/* Editor Header - fixed at top, scrolls with content */}
       <div className="pt-6 pb-4 editor-header flex-shrink-0 px-8">
         <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
