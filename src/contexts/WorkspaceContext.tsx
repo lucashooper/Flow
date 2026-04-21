@@ -106,8 +106,13 @@ function setAt(root: PaneNode, path: number[], newNode: PaneNode): PaneNode {
   return setAt(root, parentPath, nextParent);
 }
 
-export const WorkspaceProvider: React.FC<{ initialNoteId: string | null; selectedNoteId?: string | null; children: React.ReactNode }>
-  = ({ initialNoteId, selectedNoteId, children }) => {
+export const WorkspaceProvider: React.FC<{ 
+  initialNoteId: string | null; 
+  selectedNoteId?: string | null; 
+  onActiveNoteChange?: (noteId: string | null) => void;
+  children: React.ReactNode 
+}>
+  = ({ initialNoteId, selectedNoteId, onActiveNoteChange, children }) => {
   const [root, setRoot] = useState<PaneNode>(() => {
     // Try to restore workspace layout from localStorage
     try {
@@ -289,6 +294,24 @@ export const WorkspaceProvider: React.FC<{ initialNoteId: string | null; selecte
     }
     if (target) replaceIn(target, selectedNoteId);
   }, [selectedNoteId, activeLeafId, root]);
+
+  // Notify parent when active pane's note changes (for sidebar highlighting)
+  const lastNotifiedActiveNoteIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeLeafId || !onActiveNoteChange) return;
+    
+    const path = findPath(root, activeLeafId);
+    if (!path) return;
+    
+    const leaf = getAt(root, path);
+    if (leaf.type !== 'leaf') return;
+
+    const nextNoteId = leaf.noteId;
+    if (lastNotifiedActiveNoteIdRef.current === nextNoteId) return;
+    lastNotifiedActiveNoteIdRef.current = nextNoteId;
+
+    onActiveNoteChange(nextNoteId);
+  }, [activeLeafId, root, onActiveNoteChange]);
 
   const findLeafIdByNote = useCallback((noteId: string) => findLeafIdByNoteIn(root, noteId), [root]);
 

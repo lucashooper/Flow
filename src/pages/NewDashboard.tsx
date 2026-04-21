@@ -41,6 +41,7 @@ export const NewDashboard = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
+  const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedItem, setDraggedItem] = useState<
     | { type: 'note'; note: Note }
@@ -48,8 +49,6 @@ export const NewDashboard = () => {
     | { type: 'folder'; folder: any }
     | null
   >(null);
-  
-  console.log('🔍 [NewDashboard] searchQuery from URL:', searchQuery);
 
   // Sync offline notes when connection is restored
   useOfflineSync();
@@ -107,6 +106,11 @@ export const NewDashboard = () => {
     handleDashboardChange,
     handleDashboardsUpdate,
   } = useDashboardData();
+
+  const handleNoteSelectWithFocus = (noteId: string) => {
+    setFocusedNoteId(noteId);
+    handleNoteSelect(noteId);
+  };
 
   // const selectedNote = notes?.find(note => note.id === selectedNoteId);
 
@@ -341,10 +345,10 @@ export const NewDashboard = () => {
           folders={folders}
           dashboards={dashboards}
           activeDashboard={activeDashboard}
-          selectedNoteId={selectedNoteId}
+          selectedNoteId={focusedNoteId ?? selectedNoteId}
           sidebarWidth={sidebarWidth}
           setSidebarWidth={setSidebarWidth}
-          onNoteSelect={handleNoteSelect}
+          onNoteSelect={handleNoteSelectWithFocus}
           onNoteCreate={handleNoteCreate}
           onNoteUpdate={handleNoteUpdate}
           onNoteDelete={handleNoteDelete}
@@ -357,7 +361,7 @@ export const NewDashboard = () => {
           showHeader={true}
           openNotes={openNotes}
           tabsEnabled={tabsEnabled}
-          onTabClick={handleNoteSelect}
+          onTabClick={handleNoteSelectWithFocus}
           onTabClose={handleTabClose}
           isTimerVisible={isTimerVisible}
           setIsTimerVisible={setIsTimerVisible}
@@ -369,7 +373,15 @@ export const NewDashboard = () => {
           setIsStatsVisible={setIsStatsVisible}
         >
           {/* Workspace (split panes) */}
-          <WorkspaceProvider initialNoteId={selectedNoteId || null} selectedNoteId={selectedNoteId}>
+          <WorkspaceProvider 
+            initialNoteId={selectedNoteId || null} 
+            selectedNoteId={selectedNoteId}
+            onActiveNoteChange={(noteId) => {
+              // Pane focus should only update highlighting, not navigation (URL/search params).
+              if (import.meta.env.DEV) console.log('🎯 [NewDashboard] Focused pane noteId:', noteId);
+              setFocusedNoteId(noteId);
+            }}
+          >
             <EditorWorkspace
               notes={notes || []}
               onNoteUpdate={handleNoteUpdate}

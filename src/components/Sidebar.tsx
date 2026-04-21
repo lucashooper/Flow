@@ -184,7 +184,9 @@ export const Sidebar = ({
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
   
-  console.log('🔍 [Sidebar] filteredNotes order:', filteredNotes.map(n => `${n.title}:${n.position}`));
+  if (import.meta.env.DEV) {
+    console.log('🔍 [Sidebar] filteredNotes order:', filteredNotes.map(n => `${n.title}:${n.position}`));
+  }
 
   // Check if a folder or its descendants contain matching notes
   const folderHasMatches = (folderId: string): boolean => {
@@ -226,7 +228,9 @@ export const Sidebar = ({
   // Get notes without folder
   const rootNotes = filteredNotes.filter(n => !n.folder_id);
   
-  console.log('📋 [Sidebar] SIDEBAR ORDER (rootNotes):', rootNotes.map(n => n.id));
+  if (import.meta.env.DEV) {
+    console.log('📋 [Sidebar] SIDEBAR ORDER (rootNotes):', rootNotes.map(n => n.id));
+  }
 
   // Get notes for a specific folder
   const getNotesInFolder = (folderId: string) => {

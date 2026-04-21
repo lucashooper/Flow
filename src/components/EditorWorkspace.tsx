@@ -222,7 +222,8 @@ function PaneView({ node, notes, onNoteUpdate, searchQuery }: { node: PaneNode; 
   return (
     <div
       ref={(el) => { ref.current = el; setNodeRef(el as HTMLElement | null); }}
-      onClick={onFocusPane}
+      onPointerDownCapture={onFocusPane}
+      onMouseDownCapture={onFocusPane}
       onFocusCapture={onFocusPane}
       className={`h-full w-full min-h-0 editor-root relative flex flex-col ring-1 ring-[var(--divider)]`}
     >
