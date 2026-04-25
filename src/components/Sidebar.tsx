@@ -223,7 +223,9 @@ export const Sidebar = ({
   }, [searchQuery, notes, folders]);
 
   // Get root folders (no parent)
-  const rootFolders = folders.filter(f => !f.parent_id);
+  const rootFolders = folders
+    .filter(f => !f.parent_id)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   
   // Get notes without folder
   const rootNotes = filteredNotes.filter(n => !n.folder_id);
@@ -239,7 +241,9 @@ export const Sidebar = ({
 
   // Get subfolders
   const getSubfolders = (parentId: string) => {
-    return folders.filter(f => f.parent_id === parentId);
+    return folders
+      .filter(f => f.parent_id === parentId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   };
 
   // Render folder tree recursively
@@ -248,6 +252,22 @@ export const Sidebar = ({
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
     const isOver = false;
+
+    const siblingFolders = (folder.parent_id
+      ? getSubfolders(folder.parent_id)
+      : rootFolders);
+    const siblingIndex = siblingFolders.findIndex(f => f.id === folder.id);
+    const canMoveUp = siblingIndex > 0;
+    const canMoveDown = siblingIndex !== -1 && siblingIndex < siblingFolders.length - 1;
+
+    const persistSiblingOrder = (ordered: Folder[]) => {
+      for (let i = 0; i < ordered.length; i++) {
+        const f = ordered[i];
+        if ((f.position ?? 0) !== i) {
+          onFolderUpdate(f.id, { position: i });
+        }
+      }
+    };
 
     return (
       <div key={folder.id}>
@@ -260,6 +280,24 @@ export const Sidebar = ({
           onDelete={onFolderDelete}
           onCreateNote={() => onNoteCreate(folder.id)}
           onCreateSubfolder={() => onFolderCreate(folder.id)}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMoveUp={() => {
+            if (!canMoveUp) return;
+            const next = siblingFolders.slice();
+            const tmp = next[siblingIndex - 1];
+            next[siblingIndex - 1] = next[siblingIndex];
+            next[siblingIndex] = tmp;
+            persistSiblingOrder(next);
+          }}
+          onMoveDown={() => {
+            if (!canMoveDown) return;
+            const next = siblingFolders.slice();
+            const tmp = next[siblingIndex + 1];
+            next[siblingIndex + 1] = next[siblingIndex];
+            next[siblingIndex] = tmp;
+            persistSiblingOrder(next);
+          }}
           isOver={isOver}
           autoRenameId={autoRenameFolderId ?? undefined}
           onRenameStarted={(id: string) => {

@@ -132,8 +132,9 @@ export async function createFolder(
     dashboard_id: dashboardId,
     created_at: now,
     updated_at: now,
+    position: 0,
     synced: false,
-};
+  };
 
   // Write to IndexedDB
   await db.folders.add(folder);
@@ -147,6 +148,7 @@ export async function createFolder(
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
+    position: folder.position,
     created_at: folder.created_at,
     updated_at: folder.updated_at,
   });
@@ -174,6 +176,7 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
+    position: folder.position,
     updated_at: folder.updated_at,
   });
 }

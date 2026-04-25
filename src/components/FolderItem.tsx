@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Folder, FolderOpen, ChevronRight, ChevronDown, Trash2, Edit3, Smile, Plus, FolderPlus, Download } from 'lucide-react';
+import { Folder, FolderOpen, ChevronRight, ChevronDown, Trash2, Edit3, Smile, Plus, FolderPlus, Download, ArrowUp, ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Folder as FolderType } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -13,6 +13,10 @@ interface FolderItemProps {
   onDelete: (folderId: string) => void;
   onCreateNote: () => void;
   onCreateSubfolder: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   autoRenameId?: string;
   onRenameStarted?: (folderId: string) => void;
   notes?: any[];
@@ -27,6 +31,10 @@ export const FolderItem = ({
   onDelete,
   onCreateNote,
   onCreateSubfolder,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
   autoRenameId,
   onRenameStarted,
   notes = [],
@@ -107,6 +115,16 @@ export const FolderItem = ({
   const handleDelete = () => {
     onDelete(folder.id);
     setShowContextMenu(false);
+  };
+
+  const handleMoveUp = () => {
+    setShowContextMenu(false);
+    onMoveUp?.();
+  };
+
+  const handleMoveDown = () => {
+    setShowContextMenu(false);
+    onMoveDown?.();
   };
 
   const handleExportFolder = () => {
@@ -248,6 +266,30 @@ export const FolderItem = ({
             >
               <FolderPlus className="w-4 h-4" />
               New subfolder
+            </button>
+
+            <div className="my-1 border-t border-[#2a2a2a]" />
+
+            <button
+              onClick={handleMoveUp}
+              disabled={!canMoveUp}
+              className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 ${
+                canMoveUp ? 'text-[#e5e5e5] hover:bg-[#252525]' : 'text-[#777] opacity-60 cursor-not-allowed'
+              }`}
+            >
+              <ArrowUp className="w-4 h-4" />
+              Move folder up
+            </button>
+
+            <button
+              onClick={handleMoveDown}
+              disabled={!canMoveDown}
+              className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 ${
+                canMoveDown ? 'text-[#e5e5e5] hover:bg-[#252525]' : 'text-[#777] opacity-60 cursor-not-allowed'
+              }`}
+            >
+              <ArrowDown className="w-4 h-4" />
+              Move folder down
             </button>
 
             <div className="my-1 border-t border-[#2a2a2a]" />

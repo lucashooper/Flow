@@ -11,6 +11,10 @@ interface DraggableFolderItemProps {
   onDelete: (folderId: string) => void;
   onCreateNote: () => void;
   onCreateSubfolder: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   isOver?: boolean;
   autoRenameId?: string;
   onRenameStarted?: (folderId: string) => void;
