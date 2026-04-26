@@ -228,7 +228,7 @@ export const Tasks = () => {
     try {
       const { error } = await supabase
         .from('tasks')
-        .update({ completed: true })
+        .update({ completed: true, completed_at: new Date().toISOString() })
         .eq('id', task.id);
 
       if (error) throw error;

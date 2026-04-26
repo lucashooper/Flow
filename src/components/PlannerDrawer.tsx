@@ -18,6 +18,11 @@ type Timebox = {
   titleOverride?: string;
 };
 
+type PlannerEditorState = {
+  taskId: string;
+  timeboxId: string | null;
+};
+
 interface PlannerDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,10 +68,13 @@ function nowMinutes() {
   return now.getHours() * 60 + now.getMinutes();
 }
 
+const DURATION_OPTIONS = [5, 10, 15, 30, 45, 60, 90];
+
 export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
   const { user } = useAuth();
   const [tab, setTab] = useState<PlannerTab>('tasks');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [completedToday, setCompletedToday] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [taskDraft, setTaskDraft] = useState('');
   const [deepDiveDraft, setDeepDiveDraft] = useState('');
@@ -75,14 +83,29 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
   const [timeboxes, setTimeboxes] = useState<Timebox[]>([]);
   const [showTimelineOnly, setShowTimelineOnly] = useState(false);
   const [timelineMenu, setTimelineMenu] = useState<{ x: number; y: number; timeboxId: string } | null>(null);
-  const [editingTimeboxId, setEditingTimeboxId] = useState<string | null>(null);
+  const [unscheduledMenu, setUnscheduledMenu] = useState<{ x: number; y: number; taskId: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<PlannerEditorState | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editStartTime, setEditStartTime] = useState('');
   const [editDuration, setEditDuration] = useState(30);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [timelineDropActive, setTimelineDropActive] = useState(false);
+  const [showDeepDiveDurationPicker, setShowDeepDiveDurationPicker] = useState(false);
+  const [showCompletedToday, setShowCompletedToday] = useState(true);
 
   const today = new Date();
   const todayKey = isoDate(today);
   const timeboxesKey = `calendar_timeboxes_${todayKey}`;
+
+  const getDayRangeIso = (dateKey: string) => {
+    const start = new Date(`${dateKey}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return {
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
+    };
+  };
 
   const loadTasks = async () => {
     if (!user || !isOpen) return;
@@ -96,6 +119,18 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
         .order('position', { ascending: true });
       if (error) throw error;
       setTasks((data || []) as Task[]);
+
+      const { startIso, endIso } = getDayRangeIso(todayKey);
+      const { data: completedData, error: completedError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('completed', true)
+        .gte('completed_at', startIso)
+        .lt('completed_at', endIso)
+        .order('completed_at', { ascending: false });
+      if (completedError) throw completedError;
+      setCompletedToday((completedData || []) as Task[]);
     } catch (error) {
       console.error('Error loading planner tasks:', error);
     } finally {
@@ -105,8 +140,10 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
 
   const deleteTask = async (taskId: string) => {
     const previousTasks = tasks;
+    const previousCompleted = completedToday;
     const previousTimeboxes = timeboxes;
     setTasks(prev => prev.filter(task => task.id !== taskId));
+    setCompletedToday(prev => prev.filter(task => task.id !== taskId));
     const nextTimeboxes = timeboxes.filter(tb => tb.taskId !== taskId);
     persistTimeboxes(nextTimeboxes);
     try {
@@ -115,6 +152,7 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
     } catch (error) {
       console.error('Error deleting planner task:', error);
       setTasks(previousTasks);
+      setCompletedToday(previousCompleted);
       persistTimeboxes(previousTimeboxes);
     }
   };
@@ -141,26 +179,89 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
   };
 
   const openTimelineEditor = (tb: Timebox, task: Task) => {
-    setEditingTimeboxId(tb.id);
+    setEditingItem({ taskId: task.id, timeboxId: tb.id });
     setEditTitle(task.title);
     setEditStartTime(minutesToTimeLabel(tb.startMinutes));
     setEditDuration(tb.durationMinutes);
     setTimelineMenu(null);
+    setUnscheduledMenu(null);
+    setShowDeepDiveDurationPicker(false);
+  };
+
+  const openUnscheduledEditor = (task: Task) => {
+    const suggestedStart = clamp(nowMinutes(), 8 * 60, 24 * 60 - deepDiveDuration);
+    setEditingItem({ taskId: task.id, timeboxId: null });
+    setEditTitle(task.title);
+    setEditStartTime(minutesToTimeLabel(suggestedStart));
+    setEditDuration(deepDiveDuration);
+    setTimelineMenu(null);
+    setUnscheduledMenu(null);
+    setShowDeepDiveDurationPicker(false);
   };
 
   const saveTimelineEditor = async () => {
-    if (!editingTimeboxId) return;
-    const tb = timeboxes.find(item => item.id === editingTimeboxId);
-    if (!tb) return;
-    const task = tasks.find(item => item.id === tb.taskId);
+    if (!editingItem) return;
+    const task = tasks.find(item => item.id === editingItem.taskId);
     if (!task) return;
     const parsed = parseTimeInput(editStartTime);
     const nextDuration = clamp(editDuration, 15, 180);
     const maxStart = 24 * 60 - nextDuration;
-    const nextStart = clamp(parsed ?? tb.startMinutes, 8 * 60, maxStart);
+    const currentStart = editingItem.timeboxId
+      ? (timeboxes.find(item => item.id === editingItem.timeboxId)?.startMinutes ?? clamp(nowMinutes(), 8 * 60, maxStart))
+      : clamp(nowMinutes(), 8 * 60, maxStart);
+    const nextStart = clamp(parsed ?? currentStart, 8 * 60, maxStart);
     await renameTask(task.id, editTitle);
-    updateTimebox(tb.id, { startMinutes: nextStart, durationMinutes: nextDuration });
-    setEditingTimeboxId(null);
+    if (editingItem.timeboxId) {
+      updateTimebox(editingItem.timeboxId, { startMinutes: nextStart, durationMinutes: nextDuration });
+    } else {
+      const next = [
+        ...timeboxes,
+        {
+          id: crypto.randomUUID(),
+          taskId: task.id,
+          date: todayKey,
+          startMinutes: nextStart,
+          durationMinutes: nextDuration,
+          kind: 'admin' as const,
+        },
+      ].sort((a, b) => a.startMinutes - b.startMinutes);
+      persistTimeboxes(next);
+    }
+    setEditingItem(null);
+    setTimelineDropActive(false);
+  };
+
+  const scheduleTaskForToday = (task: Task, options?: { openEditor?: boolean }) => {
+    const existing = timeboxes.find(tb => tb.taskId === task.id);
+    if (existing) {
+      if (options?.openEditor) openTimelineEditor(existing, task);
+      return;
+    }
+    const duration = deepDiveDuration;
+    const defaultStart = clamp(nowMinutes(), 8 * 60, 24 * 60 - duration);
+    if (options?.openEditor) {
+      setEditingItem({ taskId: task.id, timeboxId: null });
+      setEditTitle(task.title);
+      setEditStartTime(minutesToTimeLabel(defaultStart));
+      setEditDuration(duration);
+      setTimelineDropActive(true);
+      setTimelineMenu(null);
+      setUnscheduledMenu(null);
+      setShowDeepDiveDurationPicker(false);
+      return;
+    }
+    const next = [
+      ...timeboxes,
+      {
+        id: crypto.randomUUID(),
+        taskId: task.id,
+        date: todayKey,
+        startMinutes: defaultStart,
+        durationMinutes: duration,
+        kind: 'admin' as const,
+      },
+    ].sort((a, b) => a.startMinutes - b.startMinutes);
+    persistTimeboxes(next);
   };
 
   useEffect(() => {
@@ -196,11 +297,18 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleCloseMenus = () => setTimelineMenu(null);
+    const handleCloseMenus = () => {
+      setTimelineMenu(null);
+      setUnscheduledMenu(null);
+      setShowDeepDiveDurationPicker(false);
+    };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setTimelineMenu(null);
-        setEditingTimeboxId(null);
+        setUnscheduledMenu(null);
+        setEditingItem(null);
+        setTimelineDropActive(false);
+        setShowDeepDiveDurationPicker(false);
       }
     };
     window.addEventListener('mousedown', handleCloseMenus);
@@ -245,13 +353,23 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
 
   const toggleComplete = async (taskId: string, completed: boolean) => {
     try {
+      const nextCompleted = !completed;
+      const completedAt = nextCompleted ? new Date().toISOString() : null;
       const { error } = await supabase
         .from('tasks')
-        .update({ completed: !completed })
+        .update({ completed: nextCompleted, completed_at: completedAt })
         .eq('id', taskId);
       if (error) throw error;
-      setTasks(prev => prev.filter(task => task.id !== taskId));
-      setTimeboxes(prev => prev.filter(tb => tb.taskId !== taskId));
+      const task = tasks.find(item => item.id === taskId) ?? completedToday.find(item => item.id === taskId);
+      if (nextCompleted) {
+        setTasks(prev => prev.filter(item => item.id !== taskId));
+        setTimeboxes(prev => prev.filter(tb => tb.taskId !== taskId));
+        if (task) {
+          setCompletedToday(prev => [{ ...task, completed: true, completed_at: completedAt }, ...prev.filter(item => item.id !== taskId)]);
+        }
+      } else {
+        setCompletedToday(prev => prev.filter(item => item.id !== taskId));
+      }
       loadTasks();
     } catch (error) {
       console.error('Error toggling planner task:', error);
@@ -311,6 +429,11 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
     return tasks.filter(task => !task.due_date && !scheduledIds.has(task.id)).slice(0, 8);
   }, [tasks, timeboxes]);
 
+  const completedTimeboxedCount = useMemo(() => {
+    const scheduledIds = new Set(timeboxes.map(tb => tb.taskId));
+    return completedToday.filter(task => scheduledIds.has(task.id)).length;
+  }, [completedToday, timeboxes]);
+
   const renderCheckbox = (task: Task) => (
     <button onClick={() => toggleComplete(task.id, !!task.completed)} className="flex-shrink-0">
       {task.completed ? (
@@ -321,8 +444,7 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
     </button>
   );
 
-  const editingTimebox = editingTimeboxId ? timeboxes.find(tb => tb.id === editingTimeboxId) ?? null : null;
-  const editingTask = editingTimebox ? tasks.find(task => task.id === editingTimebox.taskId) ?? null : null;
+  const editingTask = editingItem ? tasks.find(task => task.id === editingItem.taskId) ?? null : null;
 
   if (!isOpen) return null;
 
@@ -457,24 +579,56 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {[15, 30, 45, 60].map((minutes) => (
-                      <button
-                        key={minutes}
-                        onClick={() => setDeepDiveDuration(minutes)}
-                        className="px-2 py-1 rounded-lg text-xs"
-                        style={{
-                          color: deepDiveDuration === minutes ? 'var(--accent)' : 'var(--muted)',
-                          border: '1px solid rgba(255,255,255,0.10)',
-                          background: deepDiveDuration === minutes ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-                        }}
-                      >
-                        {minutes}m
-                      </button>
-                    ))}
+                  <div className="relative flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDeepDiveDurationPicker(v => !v);
+                      }}
+                      className="h-9 px-3 rounded-lg text-xs flex items-center gap-2"
+                      style={{
+                        color: 'var(--muted)',
+                        border: '1px solid rgba(255,255,255,0.10)',
+                        background: showDeepDiveDurationPicker ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
+                      }}
+                    >
+                      <Clock3 className="w-4 h-4" style={{ color: deepDiveDuration ? 'var(--accent)' : 'var(--muted)' }} />
+                      <span>{deepDiveDuration}m</span>
+                    </button>
                     <div className="ml-auto text-[11px]" style={{ color: 'var(--muted)' }}>
                       Starts at {minutesToTimeLabel(clamp(nowMinutes(), 8 * 60, 24 * 60 - deepDiveDuration))}
                     </div>
+                    {showDeepDiveDurationPicker ? (
+                      <div
+                        className="absolute left-0 top-full mt-2 z-20 rounded-xl p-2 min-w-[220px]"
+                        style={{
+                          background: 'var(--bg-panel)',
+                          border: '1px solid var(--border)',
+                          boxShadow: '0 16px 40px rgba(0,0,0,0.35)',
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="grid grid-cols-3 gap-2">
+                          {DURATION_OPTIONS.map((minutes) => (
+                            <button
+                              key={minutes}
+                              onClick={() => {
+                                setDeepDiveDuration(minutes);
+                                setShowDeepDiveDurationPicker(false);
+                              }}
+                              className="px-2 py-2 rounded-lg text-xs"
+                              style={{
+                                color: deepDiveDuration === minutes ? 'var(--accent)' : 'var(--text)',
+                                border: '1px solid rgba(255,255,255,0.10)',
+                                background: deepDiveDuration === minutes ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'rgba(255,255,255,0.03)',
+                              }}
+                            >
+                              {minutes}m
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </>
               ) : null}
@@ -485,7 +639,31 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
                 <Clock3 className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                 <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Today’s timeline</div>
               </div>
-              <div className="flex flex-col gap-2">
+              <div
+                className="flex flex-col gap-2 rounded-lg transition-colors"
+                style={{
+                  minHeight: 64,
+                  border: timelineDropActive ? '1px dashed var(--accent)' : '1px dashed transparent',
+                  background: timelineDropActive ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
+                  padding: timelineDropActive ? 8 : 0,
+                }}
+                onDragOver={(e) => {
+                  if (!draggedTaskId) return;
+                  e.preventDefault();
+                  setTimelineDropActive(true);
+                }}
+                onDragLeave={() => {
+                  if (!draggedTaskId) return;
+                  setTimelineDropActive(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const taskId = e.dataTransfer.getData('text/planner-task-id') || draggedTaskId;
+                  const task = taskId ? tasks.find(item => item.id === taskId) : null;
+                  if (task) scheduleTaskForToday(task, { openEditor: true });
+                  setDraggedTaskId(null);
+                }}
+              >
                 {todaysTimeboxes.length === 0 ? (
                   <div className="text-xs" style={{ color: 'var(--muted)' }}>Nothing scheduled yet.</div>
                 ) : (
@@ -510,8 +688,8 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
+                    ))
+                  )}
               </div>
             </div>
 
@@ -524,15 +702,104 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
                   ) : (
                     unscheduledTasks.map(task => (
                       <div key={task.id} className="rounded-lg px-3 py-2 text-xs flex items-center gap-2" style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text)' }}>
-                        {renderCheckbox(task)}
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: priorityColor((task.priority ?? 2) as TaskPriority) }} />
-                        <span className="truncate flex-1 min-w-0">{task.title}</span>
+                        <div
+                          className="flex items-center gap-2 w-full"
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggedTaskId(task.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/planner-task-id', task.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTaskId(null);
+                            setTimelineDropActive(false);
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setUnscheduledMenu({ x: e.clientX, y: e.clientY, taskId: task.id });
+                          }}
+                        >
+                          {renderCheckbox(task)}
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: priorityColor((task.priority ?? 2) as TaskPriority) }} />
+                          <span className="truncate flex-1 min-w-0">{task.title}</span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Drag to timeline</span>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
               </div>
             ) : null}
+
+            <div className="rounded-xl p-3" style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
+              <button
+                onClick={() => setShowCompletedToday(v => !v)}
+                className="w-full flex items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Completed today</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                    {completedToday.length === 0
+                      ? 'Finish a few tasks to see your day review here.'
+                      : `Nice — you finished ${completedToday.length} task${completedToday.length === 1 ? '' : 's'} today`}
+                  </div>
+                </div>
+                <div
+                  className="px-2 py-1 rounded-lg text-[11px]"
+                  style={{
+                    color: completedToday.length > 0 ? '#22c55e' : 'var(--muted)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: completedToday.length > 0 ? 'rgba(34,197,94,0.08)' : 'transparent',
+                  }}
+                >
+                  {showCompletedToday ? 'Hide' : `${completedToday.length} done`}
+                </div>
+              </button>
+
+              {showCompletedToday ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  {completedToday.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
+                        <div className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Total done</div>
+                        <div className="text-base font-semibold" style={{ color: 'var(--text)' }}>{completedToday.length}</div>
+                      </div>
+                      <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Scheduled wins</div>
+                        <div className="text-base font-semibold" style={{ color: 'var(--text)' }}>{completedTimeboxedCount}</div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {completedToday.length === 0 ? (
+                    <div className="text-xs" style={{ color: 'var(--muted)' }}>Completed tasks from today will appear here.</div>
+                  ) : (
+                    completedToday.map((task) => (
+                      <div key={task.id} className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <button onClick={() => toggleComplete(task.id, true)} className="flex-shrink-0">
+                          <CheckCircle2 className="w-4 h-4" style={{ color: '#22c55e' }} />
+                        </button>
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: priorityColor((task.priority ?? 2) as TaskPriority) }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm truncate" style={{ color: 'var(--text)' }}>{task.title}</div>
+                          <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                            {task.completed_at ? `Done at ${new Date(task.completed_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Completed today'}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="text-[11px] px-2 py-1 rounded-lg"
+                          style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.22)' }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </div>
           </>
         )}
       </div>
@@ -599,7 +866,7 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
               Set to now
             </button>
             <div className="border-t my-1" style={{ borderColor: 'var(--border)' }} />
-            {[15, 30, 45, 60, 90].map((duration) => (
+            {DURATION_OPTIONS.map((duration) => (
               <button
                 key={duration}
                 onClick={() => {
@@ -634,8 +901,57 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
         );
       })() : null}
 
-      {editingTimebox && editingTask ? (
-        <div className="fixed inset-0 z-[99998] bg-black/40" onMouseDown={() => setEditingTimeboxId(null)}>
+      {unscheduledMenu ? (() => {
+        const task = tasks.find(item => item.id === unscheduledMenu.taskId);
+        if (!task) return null;
+        return (
+          <div
+            className="fixed rounded-lg shadow-2xl py-1 min-w-[190px]"
+            style={{
+              left: Math.min(unscheduledMenu.x, window.innerWidth - 210),
+              top: Math.min(unscheduledMenu.y, window.innerHeight - 220),
+              zIndex: 99999,
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => openUnscheduledEditor(task)}
+              className="w-full px-4 py-2 text-left text-sm transition-colors"
+              style={{ color: 'var(--text)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Edit details
+            </button>
+            <button
+              onClick={() => scheduleTaskForToday(task, { openEditor: true })}
+              className="w-full px-4 py-2 text-left text-sm transition-colors"
+              style={{ color: 'var(--text)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Schedule on timeline
+            </button>
+            <button
+              onClick={() => {
+                deleteTask(task.id);
+                setUnscheduledMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left text-sm transition-colors"
+              style={{ color: '#ef4444' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Delete task
+            </button>
+          </div>
+        );
+      })() : null}
+
+      {editingTask ? (
+        <div className="fixed inset-0 z-[99998] bg-black/40" onMouseDown={() => { setEditingItem(null); setTimelineDropActive(false); }}>
           <div
             className="absolute top-1/2 left-1/2 w-[320px] max-w-[92vw] rounded-xl p-4"
             style={{
@@ -662,20 +978,32 @@ export const PlannerDrawer = ({ isOpen, onClose }: PlannerDrawerProps) => {
                   className="rounded-lg px-3 h-10 text-sm outline-none"
                   style={{ color: 'var(--text)', background: 'rgba(0,0,0,0.10)', border: '1px solid rgba(255,255,255,0.10)' }}
                 />
-                <select
-                  value={editDuration}
-                  onChange={(e) => setEditDuration(Number(e.target.value))}
-                  className="rounded-lg px-3 h-10 text-sm outline-none"
-                  style={{ color: 'var(--text)', background: 'rgba(0,0,0,0.10)', border: '1px solid rgba(255,255,255,0.10)' }}
+                <div
+                  className="rounded-lg px-3 min-h-10 flex items-center"
+                  style={{ background: 'rgba(0,0,0,0.10)', border: '1px solid rgba(255,255,255,0.10)' }}
                 >
-                  {[15, 30, 45, 60, 90].map((duration) => (
-                    <option key={duration} value={duration}>{duration} min</option>
-                  ))}
-                </select>
+                  <span className="text-sm" style={{ color: 'var(--muted)' }}>{editDuration} min</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {DURATION_OPTIONS.map((duration) => (
+                  <button
+                    key={duration}
+                    onClick={() => setEditDuration(duration)}
+                    className="px-2 py-2 rounded-lg text-xs"
+                    style={{
+                      color: editDuration === duration ? 'var(--accent)' : 'var(--text)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      background: editDuration === duration ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    {duration}m
+                  </button>
+                ))}
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button
-                  onClick={() => setEditingTimeboxId(null)}
+                  onClick={() => { setEditingItem(null); setTimelineDropActive(false); }}
                   className="px-3 h-9 rounded-lg text-sm"
                   style={{ color: 'var(--muted)', border: '1px solid rgba(255,255,255,0.10)' }}
                 >

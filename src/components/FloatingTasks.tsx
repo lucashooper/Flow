@@ -8,6 +8,7 @@ interface Task {
   id: string;
   title: string;
   completed: boolean;
+  completed_at?: string | null;
   priority: number;
   created_at: string;
 }
@@ -86,13 +87,15 @@ export const FloatingTasks = ({ isVisible, onClose }: FloatingTasksProps) => {
 
   const toggleTask = async (taskId: string, completed: boolean) => {
     try {
+      const nextCompleted = !completed;
+      const completedAt = nextCompleted ? new Date().toISOString() : null;
       const { error } = await supabase
         .from('tasks')
-        .update({ completed: !completed })
+        .update({ completed: nextCompleted, completed_at: completedAt })
         .eq('id', taskId);
 
       if (error) throw error;
-      setTasks(tasks.map(t => t.id === taskId ? { ...t, completed: !completed } : t));
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, completed: nextCompleted, completed_at: completedAt } : t));
     } catch (error) {
       console.error('Error toggling task:', error);
     }

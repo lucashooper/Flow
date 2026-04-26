@@ -461,6 +461,7 @@ export const Calendar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -593,6 +594,17 @@ export const Calendar = () => {
 
       if (error) throw error;
       setTasks(data || []);
+
+      const { data: completedData, error: completedError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('completed', true)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false });
+
+      if (completedError) throw completedError;
+      setCompletedTasks(completedData || []);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     } finally {
@@ -717,6 +729,29 @@ export const Calendar = () => {
   const unscheduledTasks = useMemo(() => {
     return tasks.filter(t => !t.due_date);
   }, [tasks]);
+
+  const completedTasksForDeepDiveDay = useMemo(() => {
+    if (!deepDiveDayKey) return [] as Task[];
+    return completedTasks.filter((task) => {
+      if (!task.completed_at) return false;
+      return isoDate(new Date(task.completed_at)) === deepDiveDayKey;
+    });
+  }, [completedTasks, deepDiveDayKey]);
+
+  const deleteCompletedTask = async (taskId: string) => {
+    const previousCompletedTasks = completedTasks;
+    setCompletedTasks(prev => prev.filter(task => task.id !== taskId));
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting completed task:', error);
+      setCompletedTasks(previousCompletedTasks);
+    }
+  };
 
   const intentionsKey = `calendar_intentions_${todayKey}`;
   const [intention, setIntention] = useState(() => {
@@ -1641,6 +1676,57 @@ export const Calendar = () => {
                       })()}
                     </div>
                   )}
+
+                  <div className="mt-3 rounded-xl p-3" style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Completed</div>
+                        <div className="text-xs" style={{ color: 'var(--muted)' }}>
+                          {completedTasksForDeepDiveDay.length === 0
+                            ? 'Nothing completed for this day yet.'
+                            : `${completedTasksForDeepDiveDay.length} task${completedTasksForDeepDiveDay.length === 1 ? '' : 's'} finished`}
+                        </div>
+                      </div>
+                      <div
+                        className="px-2 py-1 rounded-lg text-[11px]"
+                        style={{
+                          color: completedTasksForDeepDiveDay.length > 0 ? '#22c55e' : 'var(--muted)',
+                          border: '1px solid rgba(255,255,255,0.10)',
+                          background: completedTasksForDeepDiveDay.length > 0 ? 'rgba(34,197,94,0.08)' : 'transparent',
+                        }}
+                      >
+                        {completedTasksForDeepDiveDay.length} done
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      {completedTasksForDeepDiveDay.length === 0 ? (
+                        <div className="text-xs" style={{ color: 'var(--muted)' }}>
+                          At the end of the day, your completed tasks will show up here as a small recap.
+                        </div>
+                      ) : (
+                        completedTasksForDeepDiveDay.map((task) => (
+                          <div key={task.id} className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                            <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#22c55e' }} />
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: task.priority === 1 ? '#ef4444' : task.priority === 2 ? '#ff7a18' : '#22c55e' }} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm truncate" style={{ color: 'var(--text)' }}>{task.title}</div>
+                              <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                                {task.completed_at ? `Done at ${new Date(task.completed_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Completed'}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => deleteCompletedTask(task.id)}
+                              className="text-[11px] px-2 py-1 rounded-lg"
+                              style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.22)' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
