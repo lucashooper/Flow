@@ -5,6 +5,7 @@ import { EditorHeader } from './EditorHeader';
 import type { Note, Folder, Dashboard } from '../types';
 import FocusFloat from '../../landing/components/FocusFloat';
 import { FocusModeContext } from '../contexts/FocusModeContext';
+import { PlannerDrawer } from './PlannerDrawer';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -77,6 +78,7 @@ export const AppLayout = ({
   const toggleFocusMode = () => setIsFocusMode(prev => !prev);
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -103,6 +105,20 @@ export const AppLayout = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobile, isSidebarOpen]);
+
+  useEffect(() => {
+    const handlePlannerHotkey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== '.') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (target?.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      e.preventDefault();
+      setIsPlannerOpen(prev => !prev);
+    };
+
+    document.addEventListener('keydown', handlePlannerHotkey);
+    return () => document.removeEventListener('keydown', handlePlannerHotkey);
+  }, []);
 
   // Close sidebar on ESC key
   useEffect(() => {
@@ -203,32 +219,52 @@ export const AppLayout = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-w-0">
           {/* Header with Tabs (optional) */}
-          {showHeader && tabsEnabled && (
-            <EditorHeader
-              openNotes={openNotes}
-              activeNoteId={selectedNoteId || null}
-              tabsEnabled={tabsEnabled}
-              onTabClick={onTabClick || (() => {})}
-              onTabClose={onTabClose || (() => {})}
-              isTimerVisible={isTimerVisible}
-              setIsTimerVisible={setIsTimerVisible}
-              isTasksVisible={isTasksVisible}
-              setIsTasksVisible={setIsTasksVisible}
-              isAmbientVisible={isAmbientVisible}
-              setIsAmbientVisible={setIsAmbientVisible}
-              isStatsVisible={isStatsVisible}
-              setIsStatsVisible={setIsStatsVisible}
-              isMobile={isMobile}
-              onOpenSidebar={() => setIsSidebarOpen(true)}
-            />
-          )}
-        
-          {/* Main Content */}
-          <div className="flex-1 overflow-auto">
-            {children}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {showHeader && tabsEnabled && (
+              <EditorHeader
+                openNotes={openNotes}
+                activeNoteId={selectedNoteId || null}
+                tabsEnabled={tabsEnabled}
+                onTabClick={onTabClick || (() => {})}
+                onTabClose={onTabClose || (() => {})}
+                isTimerVisible={isTimerVisible}
+                setIsTimerVisible={setIsTimerVisible}
+                isTasksVisible={isTasksVisible}
+                setIsTasksVisible={setIsTasksVisible}
+                isAmbientVisible={isAmbientVisible}
+                setIsAmbientVisible={setIsAmbientVisible}
+                isStatsVisible={isStatsVisible}
+                setIsStatsVisible={setIsStatsVisible}
+                isMobile={isMobile}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                isPlannerOpen={isPlannerOpen}
+                onTogglePlanner={() => setIsPlannerOpen(prev => !prev)}
+              />
+            )}
+
+            <div className="flex-1 overflow-auto relative">
+              {children}
+            </div>
           </div>
+
+          {!isMobile && isPlannerOpen ? (
+            <div className="w-[360px] max-w-[38vw] h-full flex-shrink-0">
+              <PlannerDrawer isOpen={isPlannerOpen} onClose={() => setIsPlannerOpen(false)} />
+            </div>
+          ) : null}
+
+          {isMobile && isPlannerOpen ? (
+            <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setIsPlannerOpen(false)}>
+              <div
+                className="absolute top-0 right-0 h-full w-[88vw] max-w-[380px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <PlannerDrawer isOpen={isPlannerOpen} onClose={() => setIsPlannerOpen(false)} />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

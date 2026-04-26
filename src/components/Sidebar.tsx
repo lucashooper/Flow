@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, Star, CheckCircle, X } from 'lucide-react';
+import { Plus, FolderPlus, Search, Star, CheckCircle, Calendar as CalendarIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {} from '@dnd-kit/core';
@@ -380,6 +380,13 @@ export const Sidebar = ({
               title="Tasks"
             >
               <CheckCircle className="w-4 h-4 text-[#888888] transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.color = '#888888'} />
+            </button>
+            <button
+              onClick={() => navigate('/calendar')}
+              className="p-1.5 hover:bg-[#252525] rounded transition-colors group"
+              title="Calendar"
+            >
+              <CalendarIcon className="w-4 h-4 text-[#888888] transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.color = '#888888'} />
             </button>
           </div>
           <div className="flex items-center gap-1">

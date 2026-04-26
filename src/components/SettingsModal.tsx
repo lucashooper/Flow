@@ -65,6 +65,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('focusStatsEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [plannerEnabled, setPlannerEnabled] = useState(() => {
+    const saved = localStorage.getItem('plannerEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
     const saved = localStorage.getItem('breakRemindersEnabled');
     return saved !== null ? JSON.parse(saved) : false;
@@ -795,6 +799,26 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           style={{ backgroundColor: focusStatsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusStatsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Planner</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Show the planner toggle in the top-right toolbar for quick access to Tasks and Daily Deep Dive
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !plannerEnabled;
+                            setPlannerEnabled(newValue);
+                            localStorage.setItem('plannerEnabled', JSON.stringify(newValue));
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: plannerEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: plannerEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
 

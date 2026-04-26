@@ -1,4 +1,4 @@
-import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp } from 'lucide-react';
+import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { SyncStatus } from './SyncStatus';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState, useEffect } from 'react';
@@ -24,6 +24,8 @@ interface EditorHeaderProps {
   setIsStatsVisible?: (value: boolean) => void;
   isMobile?: boolean;
   onOpenSidebar?: () => void;
+  isPlannerOpen?: boolean;
+  onTogglePlanner?: () => void;
 }
 
 export const EditorHeader = ({ 
@@ -42,6 +44,8 @@ export const EditorHeader = ({
   setIsStatsVisible,
   isMobile = false,
   onOpenSidebar,
+  isPlannerOpen = false,
+  onTogglePlanner,
 }: EditorHeaderProps) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const { isFocusMode, toggleFocusMode } = useFocusMode();
@@ -84,6 +88,11 @@ export const EditorHeader = ({
 
   const focusStatsEnabled = (() => {
     const saved = localStorage.getItem('focusStatsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  })();
+
+  const plannerEnabled = (() => {
+    const saved = localStorage.getItem('plannerEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   })();
 
@@ -218,6 +227,15 @@ export const EditorHeader = ({
               >
                 <CheckCircle className="w-5 h-5 text-[#888888]" />
               </button>
+              {plannerEnabled && onTogglePlanner && (
+                <button
+                  onClick={onTogglePlanner}
+                  className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                  title="Toggle Planner"
+                >
+                  {isPlannerOpen ? <PanelRightClose className="w-5 h-5 text-[#888888]" /> : <PanelRightOpen className="w-5 h-5 text-[#888888]" />}
+                </button>
+              )}
               {ambientSoundsEnabled && setIsAmbientVisible && (
                 <button
                   onClick={() => setIsAmbientVisible(!isAmbientVisible)}
@@ -311,6 +329,21 @@ export const EditorHeader = ({
                     >
                       <Timer className="w-5 h-5" />
                       <span>Pomodoro Timer</span>
+                    </button>
+                  )}
+                  {plannerEnabled && onTogglePlanner && (
+                    <button
+                      onClick={() => {
+                        onTogglePlanner();
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
+                      style={{ color: 'var(--text)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      {isPlannerOpen ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+                      <span>Planner</span>
                     </button>
                   )}
                 </div>

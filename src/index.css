@@ -6,6 +6,26 @@
   body {
     @apply bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100;
   }
+
+  /* Global dark scrollbar so page-level scrollbars don't show up as bright white */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.22) transparent;
+  }
+  html::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  html::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  html::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 8px;
+  }
+  html::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.22);
+  }
 }
 
 @layer utilities {

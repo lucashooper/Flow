@@ -6,6 +6,7 @@ import { Signup } from './pages/Signup';
 import { NewDashboard } from './pages/NewDashboard';
 import { Settings } from './pages/Settings';
 import { Tasks } from './pages/Tasks';
+import { Calendar } from './pages/Calendar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -49,6 +50,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Tasks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Calendar />
             </ProtectedRoute>
           }
         />
