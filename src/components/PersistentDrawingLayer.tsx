@@ -30,11 +30,51 @@ export const PersistentDrawingLayer = ({
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [hasActiveSelection, setHasActiveSelection] = useState(false);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const lastDebugLogAtRef = useRef(0);
+
+  const debugEnabled = (() => {
+    try {
+      return localStorage.getItem('drawingDebug') === 'true';
+    } catch {
+      return false;
+    }
+  })();
+
+  const debugLog = (...args: any[]) => {
+    if (!debugEnabled) return;
+    console.log(...args);
+  };
+
+  const sampleAlpha = (
+    ctx: CanvasRenderingContext2D | null,
+    x: number,
+    y: number
+  ) => {
+    if (!ctx) return null;
+    const canvas = ctx.canvas;
+    const px = Math.max(0, Math.min(canvas.width - 1, Math.floor(x)));
+    const py = Math.max(0, Math.min(canvas.height - 1, Math.floor(y)));
+    try {
+      const a = ctx.getImageData(px, py, 1, 1).data[3];
+      return { a, px, py };
+    } catch {
+      return null;
+    }
+  };
 
   const colors = [
     '#a855f7', '#3b82f6', '#10b981', '#f59e0b',
     '#ef4444', '#ec4899', '#06b6d4', '#ffffff',
   ];
+
+  useEffect(() => {
+    debugLog('🧩 [drawingDebug] tool changed', { tool });
+  }, [tool]);
+
+  useEffect(() => {
+    debugLog('🧩 [drawingDebug] brush size changed', { brushSize, effectiveEraser: brushSize * 4 });
+  }, [brushSize]);
 
   // Handle Delete key for selection
   useEffect(() => {
@@ -59,23 +99,40 @@ export const PersistentDrawingLayer = ({
     displayCanvas.width = window.innerWidth;
     displayCanvas.height = window.innerHeight;
 
+    const displayCtx = displayCanvas.getContext('2d');
+    if (displayCtx) {
+      displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+    }
+
     // Load existing drawing data to display canvas
     if (drawingData && drawingData.length > 0) {
       console.log('📥 LOADING DRAWING DATA - Length:', drawingData.length);
+      debugLog('🧩 [drawingDebug] displayCanvas size', {
+        w: displayCanvas.width,
+        h: displayCanvas.height,
+        devicePixelRatio: window.devicePixelRatio,
+      });
       const img = new Image();
       img.onload = () => {
-        const displayCtx = displayCanvas.getContext('2d');
-        if (displayCtx) {
-          displayCtx.drawImage(img, 0, 0);
+        const ctx = displayCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+          ctx.drawImage(img, 0, 0);
           console.log('✅ DRAWING LOADED TO DISPLAY');
+          debugLog('🧩 [drawingDebug] display image loaded', {
+            imgW: img.width,
+            imgH: img.height,
+          });
         }
       };
       img.onerror = () => {
         console.error('❌ FAILED TO LOAD DRAWING');
+        debugLog('🧩 [drawingDebug] display image failed to load');
       };
       img.src = drawingData;
     } else {
       console.log('ℹ️ No drawing data for this note');
+      debugLog('🧩 [drawingDebug] display cleared due to empty drawingData');
     }
   }, [drawingData]);
 
@@ -95,15 +152,31 @@ export const PersistentDrawingLayer = ({
       ctx.lineJoin = 'round';
     }
 
-    // Copy display canvas to drawing canvas when entering drawing mode
-    const displayCanvas = displayCanvasRef.current;
-    if (displayCanvas && drawingData && drawingData.length > 0) {
+    // Clear first, then copy saved drawing into drawing canvas when entering drawing mode
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    debugLog('🧩 [drawingDebug] enter drawing mode', {
+      canvasW: canvas.width,
+      canvasH: canvas.height,
+      drawingDataLength: drawingData ? drawingData.length : 0,
+      devicePixelRatio: window.devicePixelRatio,
+    });
+    if (drawingData && drawingData.length > 0) {
       const img = new Image();
       img.onload = () => {
         if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
           console.log('✅ DRAWING LOADED TO DRAWING CANVAS');
+          debugLog('🧩 [drawingDebug] drawing image loaded', {
+            imgW: img.width,
+            imgH: img.height,
+          });
         }
+      };
+      img.onerror = () => {
+        debugLog('🧩 [drawingDebug] drawing image failed to load');
       };
       img.src = drawingData;
     }
@@ -133,12 +206,40 @@ export const PersistentDrawingLayer = ({
     }
   };
 
+  const getDisplayCtx = () => {
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return null;
+    return canvas.getContext('2d');
+  };
+
+  const configureCtxForTool = (ctx: CanvasRenderingContext2D, activeTool: 'pen' | 'eraser', x: number, y: number) => {
+    if (activeTool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = brushSize * 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      return;
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    setCursorPos({ x: e.clientX, y: e.clientY });
 
     setIsDrawing(true);
     const x = e.clientX;
@@ -148,29 +249,33 @@ export const PersistentDrawingLayer = ({
       // Start selection rectangle
       setSelectionStart({ x, y });
       setSelectionEnd({ x, y });
-    } else if (tool === 'eraser') {
-      // Improved eraser - use round brush
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize * 4; // Larger for easier erasing
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x, y);
     } else {
-      // Pen tool
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x, y);
+      const displayCtx = getDisplayCtx();
+      configureCtxForTool(ctx, tool, x, y);
+      if (displayCtx) configureCtxForTool(displayCtx, tool, x, y);
+
+      if (tool === 'eraser') {
+        const now = Date.now();
+        if (debugEnabled && now - lastDebugLogAtRef.current > 250) {
+          lastDebugLogAtRef.current = now;
+          debugLog('🧽 [drawingDebug] eraser down', {
+            x,
+            y,
+            brushSize,
+            effective: brushSize * 4,
+            drawingAlpha: sampleAlpha(ctx, x, y),
+            displayAlpha: sampleAlpha(displayCtx, x, y),
+          });
+        }
+      }
     }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const x = e.clientX;
     const y = e.clientY;
+
+    setCursorPos({ x, y });
 
     if (tool === 'select' && selectionStart && isDrawing) {
       setSelectionEnd({ x, y });
@@ -185,10 +290,34 @@ export const PersistentDrawingLayer = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const displayCtx = getDisplayCtx();
+
+    if (tool === 'eraser') {
+      const now = Date.now();
+      if (debugEnabled && now - lastDebugLogAtRef.current > 350) {
+        lastDebugLogAtRef.current = now;
+        debugLog('🧽 [drawingDebug] eraser move', {
+          x,
+          y,
+          brushSize,
+          effective: brushSize * 4,
+          drawingAlpha: sampleAlpha(ctx, x, y),
+          displayAlpha: sampleAlpha(displayCtx, x, y),
+        });
+      }
+    }
+
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(x, y);
+
+    if (displayCtx) {
+      displayCtx.lineTo(x, y);
+      displayCtx.stroke();
+      displayCtx.beginPath();
+      displayCtx.moveTo(x, y);
+    }
   };
 
   const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -216,20 +345,35 @@ export const PersistentDrawingLayer = ({
         if (ctx) {
           const x = e.clientX;
           const y = e.clientY;
+          const displayCtx = getDisplayCtx();
           
           // Set fill style for dot
           if (tool === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
             ctx.fillStyle = 'rgba(0,0,0,1)';
+            if (displayCtx) {
+              displayCtx.globalCompositeOperation = 'destination-out';
+              displayCtx.fillStyle = 'rgba(0,0,0,1)';
+            }
           } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = color;
+            if (displayCtx) {
+              displayCtx.globalCompositeOperation = 'source-over';
+              displayCtx.fillStyle = color;
+            }
           }
           
           // Draw a dot (small circle) for single clicks
           ctx.beginPath();
           ctx.arc(x, y, brushSize, 0, Math.PI * 2);
           ctx.fill();
+
+          if (displayCtx) {
+            displayCtx.beginPath();
+            displayCtx.arc(x, y, tool === 'eraser' ? brushSize * 2 : brushSize, 0, Math.PI * 2);
+            displayCtx.fill();
+          }
         }
       }
     }
@@ -237,6 +381,22 @@ export const PersistentDrawingLayer = ({
     setIsDrawing(false);
     if (tool !== 'select') {
       saveDrawing(); // Auto-save after each stroke
+    }
+
+    if (tool === 'eraser') {
+      const canvas = canvasRef.current;
+      const ctx = canvas ? canvas.getContext('2d') : null;
+      const displayCtx = getDisplayCtx();
+      const x = e.clientX;
+      const y = e.clientY;
+      debugLog('🧽 [drawingDebug] eraser up', {
+        x,
+        y,
+        brushSize,
+        effective: brushSize * 4,
+        drawingAlpha: sampleAlpha(ctx, x, y),
+        displayAlpha: sampleAlpha(displayCtx, x, y),
+      });
     }
   };
 
@@ -302,7 +462,7 @@ export const PersistentDrawingLayer = ({
             className="absolute inset-0"
             style={{ 
               backgroundColor: 'transparent',
-              cursor: tool === 'select' ? 'crosshair' : tool === 'eraser' ? 'crosshair' : 'crosshair'
+              cursor: tool === 'select' ? 'crosshair' : tool === 'eraser' ? 'none' : 'crosshair'
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -311,6 +471,29 @@ export const PersistentDrawingLayer = ({
               if (isDrawing) stopDrawing(e);
             }}
           />
+
+          {tool === 'eraser' && cursorPos && (
+            <div
+              className="fixed z-[60]"
+              style={{
+                left: cursorPos.x,
+                top: cursorPos.y,
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                className="rounded-full"
+                style={{
+                  width: Math.max(10, brushSize * 4),
+                  height: Math.max(10, brushSize * 4),
+                  border: '2px solid rgba(255,255,255,0.85)',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.45)',
+                  background: 'transparent',
+                }}
+              />
+            </div>
+          )}
 
           {/* Selection Rectangle */}
           {tool === 'select' && selectionStart && selectionEnd && (
