@@ -11,6 +11,10 @@ interface DraggableNoteItemProps {
   onDelete: (noteId: string) => void;
   isBlurred?: boolean;
   onToggleBlur?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 export const DraggableNoteItem = (props: DraggableNoteItemProps) => {

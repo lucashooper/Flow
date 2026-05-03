@@ -14,9 +14,13 @@ interface NoteItemProps {
   onDelete: (noteId: string) => void;
   isBlurred?: boolean;
   onToggleBlur?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
-export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete, isBlurred, onToggleBlur }: NoteItemProps) => {
+export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete, isBlurred, onToggleBlur, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: NoteItemProps) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [isRenaming, setIsRenaming] = useState(false);
@@ -91,6 +95,16 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
   const handleDelete = () => {
     onDelete(note.id);
     setShowContextMenu(false);
+  };
+
+  const handleMoveUp = () => {
+    setShowContextMenu(false);
+    onMoveUp?.();
+  };
+
+  const handleMoveDown = () => {
+    setShowContextMenu(false);
+    onMoveDown?.();
   };
 
   const handleEmojiSelect = (emoji: string) => {
@@ -255,6 +269,32 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
             className="fixed z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 min-w-[200px]"
             style={{ left: contextMenuPos.x, top: contextMenuPos.y }}
           >
+            {(canMoveUp || canMoveDown) && (
+              <>
+                {canMoveUp && (
+                  <button
+                    onClick={handleMoveUp}
+                    className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
+                  >
+                    <span className="w-4 text-center">↑</span>
+                    Move up
+                  </button>
+                )}
+
+                {canMoveDown && (
+                  <button
+                    onClick={handleMoveDown}
+                    className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"
+                  >
+                    <span className="w-4 text-center">↓</span>
+                    Move down
+                  </button>
+                )}
+
+                <div className="my-1 border-t border-[#2a2a2a]" />
+              </>
+            )}
+
             <button
               onClick={handleToggleStar}
               className="w-full px-4 py-2 text-left text-sm text-[#e5e5e5] hover:bg-[#252525] flex items-center gap-3"

@@ -177,9 +177,11 @@ export const Sidebar = ({
       if (aStarred && !bStarred) return -1;
       if (!aStarred && bStarred) return 1;
       // Then sort by position (for drag-and-drop reordering)
-      // If both have positions, use those; otherwise fall back to updated_at
-      if (a.position !== undefined && b.position !== undefined) {
-        return a.position - b.position;
+      // If either note has a position, treat missing position as "after" all positioned notes.
+      const aPos = a.position;
+      const bPos = b.position;
+      if (aPos !== undefined || bPos !== undefined) {
+        return (aPos ?? Number.POSITIVE_INFINITY) - (bPos ?? Number.POSITIVE_INFINITY);
       }
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
@@ -237,6 +239,15 @@ export const Sidebar = ({
   // Get notes for a specific folder
   const getNotesInFolder = (folderId: string) => {
     return filteredNotes.filter(n => n.folder_id === folderId);
+  };
+
+  const persistNoteOrder = (ordered: Note[]) => {
+    for (let i = 0; i < ordered.length; i++) {
+      const n = ordered[i];
+      if ((n.position ?? -1) !== i) {
+        onNoteUpdate(n.id, { position: i });
+      }
+    }
   };
 
   // Get subfolders
@@ -314,6 +325,10 @@ export const Sidebar = ({
             {/* Notes in this folder */}
             {folderNotes.map(note => {
               const isMatch = searchQuery && noteMatchesSearch(note);
+              const siblingNotes = folderNotes;
+              const siblingIndex = siblingNotes.findIndex(n => n.id === note.id);
+              const canMoveUp = siblingIndex > 0;
+              const canMoveDown = siblingIndex !== -1 && siblingIndex < siblingNotes.length - 1;
               return (
                 <div 
                   key={note.id}
@@ -329,6 +344,24 @@ export const Sidebar = ({
                     onUpdate={onNoteUpdate}
                     onDelete={onNoteDelete}
                     onToggleBlur={() => toggleNoteBlur(note.id)}
+                    canMoveUp={canMoveUp}
+                    canMoveDown={canMoveDown}
+                    onMoveUp={() => {
+                      if (!canMoveUp) return;
+                      const next = siblingNotes.slice();
+                      const tmp = next[siblingIndex - 1];
+                      next[siblingIndex - 1] = next[siblingIndex];
+                      next[siblingIndex] = tmp;
+                      persistNoteOrder(next);
+                    }}
+                    onMoveDown={() => {
+                      if (!canMoveDown) return;
+                      const next = siblingNotes.slice();
+                      const tmp = next[siblingIndex + 1];
+                      next[siblingIndex + 1] = next[siblingIndex];
+                      next[siblingIndex] = tmp;
+                      persistNoteOrder(next);
+                    }}
                   />
                 </div>
               );
