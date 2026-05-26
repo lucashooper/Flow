@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, getLastSyncTime, setLastSyncTime } from '../lib/db';
+import { reconcileFromServer } from '../lib/syncHealth';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -61,12 +62,31 @@ export const useOfflineSync = () => {
         }
       }
 
-      // 2. Pull changes from server (since last sync)
+      // 2. Pull changes from server
       const lastSync = await getLastSyncTime();
       const syncTime = new Date().toISOString();
 
-      if (lastSync) {
-        // Fetch notes updated since last sync
+      // Always reconcile if server has more data than local (fixes missing folders after cache clear)
+      const [localNoteCount, localFolderCount] = await Promise.all([
+        db.notes.where('user_id').equals(user.id).count(),
+        db.folders.where('user_id').equals(user.id).count(),
+      ]);
+      const [{ count: serverNoteCount }, { count: serverFolderCount }] = await Promise.all([
+        supabase.from('notes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('folders').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      ]);
+
+      const serverHasMore =
+        (serverNoteCount ?? 0) > localNoteCount ||
+        (serverFolderCount ?? 0) > localFolderCount;
+
+      if (!lastSync || serverHasMore) {
+        const result = await reconcileFromServer(user.id);
+        if (result.notesAdded > 0 || result.foldersAdded > 0) {
+          window.dispatchEvent(new CustomEvent('dataReconciled', { detail: result }));
+        }
+      } else if (lastSync) {
+        // Incremental pull for recently changed items
         const { data: remoteNotes } = await supabase
           .from('notes')
           .select('*')
@@ -75,21 +95,15 @@ export const useOfflineSync = () => {
 
         if (remoteNotes) {
           for (const note of remoteNotes) {
-            // Skip if there's a pending local change in outbox
             const pendingChange = await db.outbox
               .where('entityId')
               .equals(note.id)
               .filter(item => item.entityType === 'note' && item.operation === 'upsert')
               .first();
             
-            if (pendingChange) {
-              console.log('⏭️ Skipping pull for note with pending local changes:', note.id);
-              continue;
-            }
+            if (pendingChange) continue;
 
             const localNote = await db.notes.get(note.id);
-            
-            // Last-write-wins conflict resolution
             if (!localNote || new Date(note.updated_at) > new Date(localNote.updated_at)) {
               await db.notes.put({ ...note, synced: true });
               console.log('⬇️ Pulled note:', note.id);
@@ -97,7 +111,6 @@ export const useOfflineSync = () => {
           }
         }
 
-        // Fetch folders updated since last sync
         const { data: remoteFolders } = await supabase
           .from('folders')
           .select('*')
@@ -106,20 +119,15 @@ export const useOfflineSync = () => {
 
         if (remoteFolders) {
           for (const folder of remoteFolders) {
-            // Skip if there's a pending local change in outbox
             const pendingChange = await db.outbox
               .where('entityId')
               .equals(folder.id)
               .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
               .first();
             
-            if (pendingChange) {
-              console.log('⏭️ Skipping pull for folder with pending local changes:', folder.id);
-              continue;
-            }
+            if (pendingChange) continue;
 
             const localFolder = await db.folders.get(folder.id);
-            
             if (!localFolder || new Date(folder.updated_at) > new Date(localFolder.updated_at)) {
               await db.folders.put({ ...folder, synced: true });
               console.log('⬇️ Pulled folder:', folder.id);
@@ -128,7 +136,6 @@ export const useOfflineSync = () => {
         }
       }
 
-      // Update last sync time
       await setLastSyncTime(syncTime);
       console.log('✅ Sync complete');
     } catch (error) {
@@ -142,12 +149,16 @@ export const useOfflineSync = () => {
   useEffect(() => {
     if (!user?.id) return;
 
-    // Initial sync on mount if online
+    const handleRequestSync = () => {
+      syncToServer();
+    };
+
+    window.addEventListener('requestSync', handleRequestSync);
+
     if (navigator.onLine) {
       syncToServer();
     }
 
-    // Sync on online event
     const handleOnline = () => {
       console.log('🌐 Connection restored - syncing...');
       syncToServer();
@@ -155,7 +166,6 @@ export const useOfflineSync = () => {
 
     window.addEventListener('online', handleOnline);
 
-    // Periodic sync every 60 seconds while online
     syncInterval.current = setInterval(() => {
       if (navigator.onLine) {
         syncToServer();
@@ -163,6 +173,7 @@ export const useOfflineSync = () => {
     }, 60000);
 
     return () => {
+      window.removeEventListener('requestSync', handleRequestSync);
       window.removeEventListener('online', handleOnline);
       if (syncInterval.current) {
         clearInterval(syncInterval.current);

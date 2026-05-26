@@ -3,6 +3,7 @@ import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock } f
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
+import { SyncDiagnostics } from './SyncDiagnostics';
 
 type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security';
 
@@ -1055,9 +1056,11 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             {activeSection === 'features' && (
               <div>
                 <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Features</h2>
-                
+
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between py-4 border-b" style={{ borderColor: 'var(--divider)' }}>
+                  <SyncDiagnostics />
+
+                  <div className="flex items-center justify-between py-4 border-t border-b" style={{ borderColor: 'var(--divider)' }}>
                     <div>
                       <label className="block text-sm font-medium" style={{ color: 'var(--text)' }}>Note Tabs</label>
                       <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>

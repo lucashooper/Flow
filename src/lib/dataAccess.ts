@@ -246,6 +246,11 @@ async function queueSync(
 
   await db.outbox.add(outboxItem);
   console.log('📤 Queued for sync:', entityType, entityId, operation);
+
+  // Push to server immediately when online (don't wait for 60s interval)
+  if (navigator.onLine) {
+    window.dispatchEvent(new Event('requestSync'));
+  }
 }
 
 // ==================== INITIAL SYNC ====================

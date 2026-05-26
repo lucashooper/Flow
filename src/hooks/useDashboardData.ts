@@ -88,6 +88,15 @@ export const useDashboardData = () => {
     }
   }, [activeDashboard?.id]); // Only refetch when dashboard ID changes
 
+  // Refresh when server reconciliation adds missing data
+  useEffect(() => {
+    const handleReconciled = () => {
+      if (activeDashboard?.id) fetchData();
+    };
+    window.addEventListener('dataReconciled', handleReconciled);
+    return () => window.removeEventListener('dataReconciled', handleReconciled);
+  }, [activeDashboard?.id]);
+
   const fetchDashboards = async () => {
     // Try to load from cache first
     const cached = localStorage.getItem('cachedDashboards');
@@ -164,49 +173,65 @@ export const useDashboardData = () => {
         setFolders(syncedFolders);
       } else if (navigator.onLine) {
         // Background refresh: pull latest from Supabase to catch stale cached data
-        // This runs after we've already shown IndexedDB data, so the UI is fast
         (async () => {
           try {
-            const { data: remoteFolders } = await supabase
-              .from('folders')
-              .select('*')
-              .eq('dashboard_id', activeDashboard.id);
-            
+            const { db } = await import('../lib/db');
+            const [{ data: remoteFolders }, { data: remoteNotes }] = await Promise.all([
+              supabase.from('folders').select('*').eq('dashboard_id', activeDashboard.id),
+              supabase.from('notes').select('*').eq('dashboard_id', activeDashboard.id),
+            ]);
+
+            let hasChanges = false;
+
             if (remoteFolders) {
-              // Check for new folders OR updated folders
-              const localMap = new Map(foldersData.map(f => [f.id, f]));
-              let hasChanges = false;
-              
+              const localFolderMap = new Map(foldersData.map(f => [f.id, f]));
               for (const remote of remoteFolders) {
-                const local = localMap.get(remote.id);
-                // NEW: Detect new folders (!local) OR updated folders
+                const local = localFolderMap.get(remote.id);
                 if (!local || local.name !== remote.name || local.emoji !== remote.emoji || local.parent_id !== remote.parent_id) {
-                  hasChanges = true;
-                  // Update IndexedDB with server data (only if no pending outbox change)
-                  const { db } = await import('../lib/db');
                   const pending = await db.outbox
                     .where('entityId')
                     .equals(remote.id)
                     .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
                     .first();
-                  
                   if (!pending) {
                     await db.folders.put({ ...remote, synced: true });
-                    if (!local) {
-                      console.log('📥 New folder synced from server:', remote.name);
-                    }
+                    hasChanges = true;
+                    if (!local) console.log('📥 New folder synced from server:', remote.name);
                   }
                 }
               }
-              
-              if (hasChanges) {
-                const refreshedFolders = await getFoldersByDashboard(activeDashboard.id);
-                setFolders(refreshedFolders);
-                console.log('🔄 Background refresh: updated folder data from server');
+            }
+
+            if (remoteNotes) {
+              const localNoteMap = new Map(notesData.map(n => [n.id, n]));
+              for (const remote of remoteNotes) {
+                const local = localNoteMap.get(remote.id);
+                if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
+                  const pending = await db.outbox
+                    .where('entityId')
+                    .equals(remote.id)
+                    .filter(item => item.entityType === 'note' && item.operation === 'upsert')
+                    .first();
+                  if (!pending) {
+                    await db.notes.put({ ...remote, synced: true });
+                    hasChanges = true;
+                    if (!local) console.log('📥 New note synced from server:', remote.title);
+                  }
+                }
               }
             }
+
+            if (hasChanges) {
+              const [refreshedNotes, refreshedFolders] = await Promise.all([
+                getNotesByDashboard(activeDashboard.id),
+                getFoldersByDashboard(activeDashboard.id),
+              ]);
+              setNotes(refreshedNotes);
+              setFolders(refreshedFolders);
+              console.log('🔄 Background refresh: updated data from server');
+            }
           } catch (e) {
-            console.log('⚠️ Background folder refresh failed:', e);
+            console.log('⚠️ Background refresh failed:', e);
           }
         })();
       }
