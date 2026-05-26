@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, getLastSyncTime, setLastSyncTime } from '../lib/db';
 import { reconcileFromServer } from '../lib/syncHealth';
+import { repairOutboxPayloads, sanitizeSyncPayload } from '../lib/syncPayloads';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -21,6 +22,9 @@ export const useOfflineSync = () => {
     console.log('🔄 Starting sync to server...');
 
     try {
+      // Fix any outbox payloads with fields Supabase doesn't accept (e.g. position)
+      await repairOutboxPayloads();
+
       // 1. Push outbox items to server
       const outboxItems = await db.outbox.toArray();
       
@@ -28,9 +32,10 @@ export const useOfflineSync = () => {
         try {
           if (item.operation === 'upsert') {
             const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const payload = sanitizeSyncPayload(item.entityType, item.payload);
             const { error } = await supabase
               .from(table)
-              .upsert(item.payload);
+              .upsert(payload);
             
             if (error) throw error;
             
@@ -55,9 +60,9 @@ export const useOfflineSync = () => {
             await db.outbox.delete(item.id);
             console.log('✅ Deleted', item.entityType, item.entityId);
           }
-        } catch (error) {
-          console.error('❌ Failed to sync item:', item.id, error);
-          // Increment attempts
+        } catch (error: any) {
+          const message = error?.message || error?.code || String(error);
+          console.error(`❌ Failed to upload ${item.entityType} ${item.entityId} to Supabase:`, message, error);
           await db.outbox.update(item.id, { attempts: item.attempts + 1 });
         }
       }

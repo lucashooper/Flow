@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock, Cloud } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
 import { SyncDiagnostics } from './SyncDiagnostics';
 
-type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security';
+type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security' | 'sync';
 
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -282,6 +282,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     { id: 'profile' as SettingsSection, label: 'Profile', icon: User },
     { id: 'editor' as SettingsSection, label: 'Editor', icon: Type },
     { id: 'security' as SettingsSection, label: 'Security', icon: Lock },
+    { id: 'sync' as SettingsSection, label: 'Data & Sync', icon: Cloud },
     { id: 'plugins' as SettingsSection, label: 'Plugins', icon: Layers },
     { id: 'features' as SettingsSection, label: 'Features', icon: Layers },
   ];
@@ -1058,9 +1059,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Features</h2>
 
                 <div className="space-y-6">
-                  <SyncDiagnostics />
-
-                  <div className="flex items-center justify-between py-4 border-t border-b" style={{ borderColor: 'var(--divider)' }}>
+                  <div className="flex items-center justify-between py-4 border-b" style={{ borderColor: 'var(--divider)' }}>
                     <div>
                       <label className="block text-sm font-medium" style={{ color: 'var(--text)' }}>Note Tabs</label>
                       <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
@@ -1088,6 +1087,13 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeSection === 'sync' && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Data & Sync</h2>
+                <SyncDiagnostics />
               </div>
             )}
           </div>

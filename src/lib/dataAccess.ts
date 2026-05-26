@@ -1,5 +1,6 @@
 import { db, generateUUID, type Note, type Folder, type OutboxItem } from './db';
 import { supabase } from './supabase';
+import { sanitizeFolderPayload, sanitizeNotePayload, sanitizeSyncPayload } from './syncPayloads';
 
 /**
  * Data access layer - all CRUD operations go through IndexedDB
@@ -34,7 +35,7 @@ export async function createNote(
   console.log('📝 Created note in IndexedDB:', note.id);
 
   // Queue for sync
-  await queueSync('note', note.id, 'upsert', {
+  await queueSync('note', note.id, 'upsert', sanitizeNotePayload({
     id: note.id,
     title: note.title,
     content: note.content,
@@ -46,7 +47,7 @@ export async function createNote(
     is_starred: note.is_starred,
     created_at: note.created_at,
     updated_at: note.updated_at,
-  });
+  }));
 
   return note;
 }
@@ -64,7 +65,7 @@ export async function updateNote(noteId: string, updates: Partial<Note>): Promis
   if (!note) return;
 
   // Queue for sync (only sync fields that Supabase expects)
-  await queueSync('note', noteId, 'upsert', {
+  await queueSync('note', noteId, 'upsert', sanitizeNotePayload({
     id: note.id,
     title: note.title,
     content: note.content,
@@ -75,7 +76,7 @@ export async function updateNote(noteId: string, updates: Partial<Note>): Promis
     drawing_data: note.drawing_data,
     is_starred: note.is_starred,
     updated_at: note.updated_at,
-  });
+  }));
 }
 
 export async function deleteNote(noteId: string): Promise<void> {
@@ -141,17 +142,16 @@ export async function createFolder(
   console.log('📁 Created folder in IndexedDB:', folder.id);
 
   // Queue for sync (include all fields so Supabase gets a complete row)
-  await queueSync('folder', folder.id, 'upsert', {
+  await queueSync('folder', folder.id, 'upsert', sanitizeFolderPayload({
     id: folder.id,
     name: folder.name,
     emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
-    position: folder.position,
     created_at: folder.created_at,
     updated_at: folder.updated_at,
-  });
+  }));
 
   return folder;
 }
@@ -169,16 +169,15 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
   if (!folder) return;
 
   // Queue for sync (include all mutable fields so no data is lost)
-  await queueSync('folder', folderId, 'upsert', {
+  await queueSync('folder', folderId, 'upsert', sanitizeFolderPayload({
     id: folder.id,
     name: folder.name,
     emoji: folder.emoji,
     user_id: folder.user_id,
     parent_id: folder.parent_id,
     dashboard_id: folder.dashboard_id,
-    position: folder.position,
     updated_at: folder.updated_at,
-  });
+  }));
 }
 
 export async function deleteFolder(folderId: string): Promise<void> {
@@ -277,7 +276,8 @@ export async function initialSync(userId: string): Promise<void> {
         try {
           if (item.operation === 'upsert') {
             const table = item.entityType === 'note' ? 'notes' : 'folders';
-            const { error } = await supabase.from(table).upsert(item.payload);
+            const payload = sanitizeSyncPayload(item.entityType, item.payload);
+            const { error } = await supabase.from(table).upsert(payload);
             if (!error) {
               await db.outbox.delete(item.id);
               console.log('✅ Pushed outbox item:', item.entityType, item.entityId);
@@ -352,7 +352,8 @@ export async function forceResync(userId: string): Promise<void> {
       try {
         if (item.operation === 'upsert') {
           const table = item.entityType === 'note' ? 'notes' : 'folders';
-          await supabase.from(table).upsert(item.payload);
+          const payload = sanitizeSyncPayload(item.entityType, item.payload);
+          await supabase.from(table).upsert(payload);
         } else if (item.operation === 'delete') {
           const table = item.entityType === 'note' ? 'notes' : 'folders';
           await supabase.from(table).delete().eq('id', item.entityId);

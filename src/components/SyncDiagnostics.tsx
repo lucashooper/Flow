@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Search, AlertTriangle, CheckCircle, CloudDownload } from 'lucide-react';
+import { RefreshCw, Search, AlertTriangle, CheckCircle, CloudDownload, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { forceResync } from '../lib/dataAccess';
+import { repairOutboxPayloads } from '../lib/syncPayloads';
 import {
   getSyncHealth,
   reconcileFromServer,
@@ -35,8 +36,33 @@ export const SyncDiagnostics = () => {
   useEffect(() => {
     refreshHealth();
     const interval = setInterval(refreshHealth, 10000);
-    return () => clearInterval(interval);
+    const onSyncEnd = () => refreshHealth();
+    window.addEventListener('syncEnd', onSyncEnd);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('syncEnd', onSyncEnd);
+    };
   }, [user?.id]);
+
+  const handleRetryUploads = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setActionMessage('');
+    try {
+      const repaired = await repairOutboxPayloads();
+      window.dispatchEvent(new Event('requestSync'));
+      setActionMessage(
+        repaired > 0
+          ? `Fixed ${repaired} queued item(s) and started upload. Watch the sync indicator in the sidebar.`
+          : 'Upload started. Watch the sync indicator in the sidebar.'
+      );
+      setTimeout(refreshHealth, 3000);
+    } catch (e) {
+      setActionMessage('Retry failed. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRestoreFromCloud = async () => {
     if (!user?.id) return;
@@ -44,7 +70,11 @@ export const SyncDiagnostics = () => {
     setActionMessage('');
     try {
       const result = await reconcileFromServer(user.id);
-      setActionMessage(`Restored ${result.notesAdded} note(s) and ${result.foldersAdded} folder(s) from cloud.`);
+      setActionMessage(
+        result.notesAdded > 0 || result.foldersAdded > 0
+          ? `Restored ${result.notesAdded} note(s) and ${result.foldersAdded} folder(s) from cloud.`
+          : 'Nothing missing locally — your cloud data is already loaded. If uploads are failing, use "Retry uploads" instead.'
+      );
       window.dispatchEvent(new CustomEvent('dataReconciled', { detail: result }));
       await refreshHealth();
     } catch (e) {
@@ -85,14 +115,14 @@ export const SyncDiagnostics = () => {
     }
   };
 
+  const hasUploadIssues = health && (health.outboxPending > 0 || health.localNotes > health.serverNotes || health.localFolders > health.serverFolders);
+  const hasDownloadIssues = health && (health.missingLocally.notes > 0 || health.missingLocally.folders > 0);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--text)' }}>Data & Sync</h3>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          Notes are saved locally first, then uploaded to Supabase. Use these tools if something looks missing.
-        </p>
-      </div>
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+        Notes save locally first, then upload to Supabase. A small difference between local and cloud counts is normal while uploads are in progress.
+      </p>
 
       {health && (
         <div
@@ -118,10 +148,10 @@ export const SyncDiagnostics = () => {
               Folders: {health.localFolders} local / {health.serverFolders} cloud
             </div>
             <div style={{ color: 'var(--muted)' }}>
-              Pending upload: {health.outboxPending}
+              Queued for upload: {health.outboxPending}
             </div>
             <div style={{ color: 'var(--muted)' }}>
-              Unconfirmed: {health.unsyncedNotes + health.unsyncedFolders}
+              Unconfirmed on server: {health.unsyncedNotes + health.unsyncedFolders}
             </div>
           </div>
 
@@ -131,6 +161,22 @@ export const SyncDiagnostics = () => {
                 <li key={issue} className="text-orange-400">• {issue}</li>
               ))}
             </ul>
+          )}
+
+          {health.pendingUploads.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>Waiting to upload:</p>
+              <ul className="text-sm space-y-0.5">
+                {health.pendingUploads.map(item => (
+                  <li key={item.entityId} style={{ color: 'var(--text)' }}>
+                    {item.entityType === 'folder' ? '📁' : '📝'} {item.name}
+                    {item.attempts > 0 && (
+                      <span className="text-orange-400 text-xs ml-2">({item.attempts} failed attempt{item.attempts > 1 ? 's' : ''})</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <button
@@ -145,16 +191,53 @@ export const SyncDiagnostics = () => {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={handleRestoreFromCloud}
-          disabled={loading || !navigator.onLine}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
-        >
-          <CloudDownload className="w-4 h-4" />
-          Restore missing from cloud
-        </button>
+      <div className="space-y-3">
+        {hasUploadIssues && (
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+              Upload issues — local changes not yet saved to Supabase
+            </p>
+            <button
+              onClick={handleRetryUploads}
+              disabled={loading || !navigator.onLine}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+            >
+              <Upload className="w-4 h-4" />
+              Retry uploads to cloud
+            </button>
+          </div>
+        )}
+
+        {hasDownloadIssues && (
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+              Download issues — cloud has data missing from this device
+            </p>
+            <button
+              onClick={handleRestoreFromCloud}
+              disabled={loading || !navigator.onLine}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+            >
+              <CloudDownload className="w-4 h-4" />
+              Restore missing from cloud
+            </button>
+          </div>
+        )}
+
+        {!hasUploadIssues && !hasDownloadIssues && (
+          <button
+            onClick={handleRetryUploads}
+            disabled={loading || !navigator.onLine}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            style={{ backgroundColor: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--divider)' }}
+          >
+            <Upload className="w-4 h-4" />
+            Sync now
+          </button>
+        )}
+
         <button
           onClick={handleForceResync}
           disabled={loading || !navigator.onLine}
@@ -220,7 +303,7 @@ export const SyncDiagnostics = () => {
             </div>
             {searchResults.length === 0 && searchQuery && !loading && (
               <p className="text-sm mt-2 text-orange-400">
-                No matches on Supabase — this content was likely never uploaded and may be unrecoverable unless you have another device or a Supabase backup.
+                No matches on Supabase — this content was likely never uploaded.
               </p>
             )}
             {searchResults.length > 0 && (

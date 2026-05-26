@@ -12,6 +12,7 @@ export interface SyncHealthReport {
   missingLocally: { notes: number; folders: number };
   healthy: boolean;
   issues: string[];
+  pendingUploads: Array<{ entityType: 'note' | 'folder'; entityId: string; name: string; attempts: number }>;
   dashboardBreakdown: Array<{
     dashboardId: string | null;
     dashboardName: string;
@@ -114,13 +115,13 @@ export async function getSyncHealth(userId: string): Promise<SyncHealthReport> {
   const missingNotes = Math.max(0, remoteNoteCount - localNotes);
   const missingFolders = Math.max(0, remoteFolderCount - localFolders);
 
-  if (outboxPending > 0) issues.push(`${outboxPending} change(s) waiting to upload`);
-  if (unsyncedNotes > 0) issues.push(`${unsyncedNotes} note(s) not confirmed on server`);
-  if (unsyncedFolders > 0) issues.push(`${unsyncedFolders} folder(s) not confirmed on server`);
-  if (missingNotes > 0) issues.push(`${missingNotes} note(s) on server missing locally`);
-  if (missingFolders > 0) issues.push(`${missingFolders} folder(s) on server missing locally`);
-  if (localNotes > remoteNoteCount) issues.push(`${localNotes - remoteNoteCount} note(s) only exist locally`);
-  if (localFolders > remoteFolderCount) issues.push(`${localFolders - remoteFolderCount} folder(s) only exist locally`);
+  if (outboxPending > 0) issues.push(`${outboxPending} change(s) waiting to upload to Supabase`);
+  if (unsyncedNotes > 0) issues.push(`${unsyncedNotes} note(s) not yet confirmed on server`);
+  if (unsyncedFolders > 0) issues.push(`${unsyncedFolders} folder(s) not yet confirmed on server`);
+  if (missingNotes > 0) issues.push(`${missingNotes} note(s) on cloud missing locally — use "Restore missing from cloud"`);
+  if (missingFolders > 0) issues.push(`${missingFolders} folder(s) on cloud missing locally — use "Restore missing from cloud"`);
+  if (localNotes > remoteNoteCount) issues.push(`${localNotes - remoteNoteCount} note(s) exist locally but not on cloud — use "Retry uploads"`);
+  if (localFolders > remoteFolderCount) issues.push(`${localFolders - remoteFolderCount} folder(s) exist locally but not on cloud — use "Retry uploads"`);
 
   const { data: dashboards } = await supabase
     .from('dashboards')
@@ -155,6 +156,28 @@ export async function getSyncHealth(userId: string): Promise<SyncHealthReport> {
     })
   );
 
+  const outboxItems = await db.outbox.toArray();
+  const pendingUploads = await Promise.all(
+    outboxItems.map(async (item) => {
+      let name = item.entityId.slice(0, 8);
+      if (item.entityType === 'note') {
+        const note = await db.notes.get(item.entityId);
+        if (note) name = note.title || name;
+        else if (item.payload?.title) name = item.payload.title;
+      } else {
+        const folder = await db.folders.get(item.entityId);
+        if (folder) name = folder.name || name;
+        else if (item.payload?.name) name = item.payload.name;
+      }
+      return {
+        entityType: item.entityType,
+        entityId: item.entityId,
+        name,
+        attempts: item.attempts,
+      };
+    })
+  );
+
   const healthy = issues.length === 0;
 
   return {
@@ -168,6 +191,7 @@ export async function getSyncHealth(userId: string): Promise<SyncHealthReport> {
     missingLocally: { notes: missingNotes, folders: missingFolders },
     healthy,
     issues,
+    pendingUploads,
     dashboardBreakdown,
   };
 }

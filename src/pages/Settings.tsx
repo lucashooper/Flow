@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { ArrowLeft, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock, Cloud } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { SyncDiagnostics } from '../components/SyncDiagnostics';
 
-type SettingsSection = 'profile' | 'appearance' | 'editor' | 'features' | 'security';
+type SettingsSection = 'profile' | 'appearance' | 'editor' | 'features' | 'security' | 'sync';
 
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -225,6 +226,7 @@ export const Settings = () => {
     { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
     { id: 'editor' as SettingsSection, label: 'Editor', icon: Type },
     { id: 'security' as SettingsSection, label: 'Security', icon: Lock },
+    { id: 'sync' as SettingsSection, label: 'Data & Sync', icon: Cloud },
     { id: 'features' as SettingsSection, label: 'Features', icon: Layers },
   ];
 
@@ -680,6 +682,13 @@ export const Settings = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeSection === 'sync' && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-6">Data & Sync</h2>
+                <SyncDiagnostics />
               </div>
             )}
           </div>

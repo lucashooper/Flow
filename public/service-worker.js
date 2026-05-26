@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flow-notes-v2'; // Increment version to force cache refresh
+const CACHE_NAME = 'flow-notes-v3'; // Increment version to force cache refresh
 const urlsToCache = [
   '/',
   '/index.html',
@@ -35,21 +35,13 @@ self.addEventListener('fetch', (event) => {
                         event.request.headers.get('accept')?.includes('text/html');
   
   if (isApiCall || isHtmlRequest) {
-    // Network-first: Try network, fallback to cache only if offline
+    // Network-first for API/HTML — never cache POST/HEAD/PATCH/DELETE (Cache API is GET-only)
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
-          // Update cache with fresh response
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          return response;
-        })
         .catch(() => {
-          // Network failed, try cache as fallback
+          if (event.request.method !== 'GET') {
+            return Response.error();
+          }
           return caches.match(event.request).then((cachedResponse) => {
             return cachedResponse || caches.match('/index.html');
           });
