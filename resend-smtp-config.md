@@ -26,7 +26,7 @@ Based on your Resend domain verification (flow-notes.app), here are the SMTP set
 ## Steps to Configure
 
 1. Go to Supabase SMTP settings:
-   https://supabase.com/dashboard/project/oetxqcyktahczrqrxlds/settings/auth
+   https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/auth
 
 2. Scroll to "SMTP Settings" section
 

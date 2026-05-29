@@ -23,7 +23,7 @@ export interface SyncHealthReport {
   }>;
 }
 
-export const ADMIN_EMAIL = 'edwardsjonny547@gmail.com';
+export const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL ?? '';
 
 export function isSyncAdmin(email: string | undefined): boolean {
   return email === ADMIN_EMAIL;

@@ -20,11 +20,11 @@
 
 ## Step 3: Configure Environment Variables
 
-Your `.env` file has already been created with your credentials:
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```
-VITE_SUPABASE_URL=https://oetxqcyktahczrqrxlds.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ldHhxY3lrdGFoY3pycXJ4bGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MDU4ODYsImV4cCI6MjA3NjE4MTg4Nn0.mMXaaN3eNP3G1ROpO3mf_TDjOjIxGsYSQrQrTvgG2-E
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
 ⚠️ **Important**: Never commit the `.env` file to version control!
