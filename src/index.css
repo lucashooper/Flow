@@ -327,3 +327,38 @@ body { background-color: var(--bg-panel) !important; }
 /* Make headings/links reflect accent subtly */
 .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { color: var(--text); }
 .ProseMirror a { color: var(--accent); text-decoration-color: var(--accent); }
+
+/* KaTeX math (Gemini / LaTeX paste) */
+.tiptap-mathematics-render {
+  color: var(--text, #e0e0e0);
+  cursor: default;
+}
+
+.tiptap-mathematics-render--editable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.tiptap-mathematics-render--editable:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.tiptap-mathematics-render[data-type='block-math'] {
+  display: block;
+  margin: 0.75rem 0;
+  padding: 0.5rem 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.tiptap-mathematics-render[data-type='inline-math'] {
+  display: inline;
+  margin: 0 1px;
+  vertical-align: baseline;
+}
+
+.tiptap-mathematics-render .katex {
+  font-size: 1.05em;
+  color: inherit;
+}

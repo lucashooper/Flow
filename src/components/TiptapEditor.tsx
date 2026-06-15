@@ -1,4 +1,4 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -29,6 +29,13 @@ import { PersistentDrawingLayer } from './PersistentDrawingLayer';
 import { WordCount } from './WordCount';
 import { supabase } from '../lib/supabase';
 import { AutoItalicQuotes } from '../extensions/AutoItalicQuotes';
+import { Mathematics } from '@tiptap/extension-mathematics';
+import 'katex/dist/katex.min.css';
+import {
+  insertTextWithLatex,
+  migrateAllMathInEditor,
+  textContainsLatex,
+} from '../utils/parseLatexText';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -47,6 +54,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const isInternalUpdate = useRef(false);
+  const tiptapEditorRef = useRef<Editor | null>(null);
   const showMenuTimeout = useRef<number | null>(null);
   const lastSelectionTime = useRef<number>(0);
 
@@ -199,9 +207,20 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         },
       }),
       EmojiIconDecorator,
+      Mathematics.configure({
+        katexOptions: {
+          throwOnError: false,
+        },
+      }),
       // SpellCheck, // Disabled - using browser native spell check
     ],
     content,
+    onCreate: ({ editor: createdEditor }) => {
+      tiptapEditorRef.current = createdEditor;
+      if (textContainsLatex(createdEditor.getText())) {
+        migrateAllMathInEditor(createdEditor);
+      }
+    },
     onUpdate: ({ editor }) => {
       const newContent = editor.getHTML();
       console.log('📝 Editor onUpdate triggered, content length:', newContent.length);
@@ -230,6 +249,18 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         // Get text content first to check if this is a text paste
         const html = clipboardData.getData('text/html');
         const plainText = clipboardData.getData('text/plain');
+
+        // Gemini / ChatGPT paste LaTeX as plain text with $...$ and $$...$$ delimiters
+        if (plainText && textContainsLatex(plainText)) {
+          const ed = tiptapEditorRef.current;
+          if (ed && !ed.isDestroyed) {
+            event.preventDefault();
+            console.log('🔢 LaTeX paste detected — rendering math');
+            if (insertTextWithLatex(view, ed, plainText)) {
+              return true;
+            }
+          }
+        }
         
         // ✅ CRITICAL: Check for files/images ONLY if there's no text content
         // This fixes Snipping Tool paste while preserving PowerPoint text paste
@@ -518,6 +549,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
                 const tr = state.tr.replaceSelection(slice);
                 view.dispatch(tr);
                 console.log('✅ HTML slice inserted successfully, size:', slice.size);
+                setTimeout(() => {
+                  if (tiptapEditorRef.current) migrateAllMathInEditor(tiptapEditorRef.current);
+                }, 0);
                 
                 // Verify content was inserted
                 setTimeout(() => {
@@ -577,6 +611,10 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     },
   });
 
+  useEffect(() => {
+    if (editor) tiptapEditorRef.current = editor;
+  }, [editor]);
+
   // Track last content prop to prevent unnecessary updates
   const lastContentProp = useRef<string>('');
 
@@ -600,6 +638,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         console.log('🔄 Setting editor content from prop (note switch)');
         // Use emitUpdate:false so this doesn't trigger onChange → auto-save loop
         editor.commands.setContent(content, { emitUpdate: false });
+        if (textContainsLatex(content)) {
+          setTimeout(() => migrateAllMathInEditor(editor), 0);
+        }
         
         // CRITICAL: Clear undo history after switching notes.
         // Without this, Ctrl+Z undoes back to the previous note's content,
