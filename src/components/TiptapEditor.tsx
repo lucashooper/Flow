@@ -36,6 +36,12 @@ import {
   migrateAllMathInEditor,
   textContainsLatex,
 } from '../utils/parseLatexText';
+import {
+  htmlHasStructure,
+  isInternalFlowPaste,
+  plainTextToDocBlocks,
+  sanitizePastedHtml,
+} from '../utils/sanitizePastedHtml';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -246,21 +252,33 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
         console.log('📋 Paste event - Available formats:', Array.from(clipboardData.types));
 
-        // Get text content first to check if this is a text paste
         const html = clipboardData.getData('text/html');
         const plainText = clipboardData.getData('text/plain');
+        const hasStructuredHtml = Boolean(html && htmlHasStructure(html));
 
-        // Gemini / ChatGPT paste LaTeX as plain text with $...$ and $$...$$ delimiters
-        if (plainText && textContainsLatex(plainText)) {
-          const ed = tiptapEditorRef.current;
-          if (ed && !ed.isDestroyed) {
-            event.preventDefault();
-            console.log('🔢 LaTeX paste detected — rendering math');
-            if (insertTextWithLatex(view, ed, plainText)) {
+        const insertSanitizedHtml = (rawHtml: string, preserveColors: boolean): boolean => {
+          const processedHTML = sanitizePastedHtml(rawHtml, { preserveColors });
+          try {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
+            const { state } = view;
+            const pmParser = PMDOMParser.fromSchema(state.schema);
+            const slice = pmParser.parseSlice(htmlDoc.body);
+
+            if (slice?.size > 0) {
+              event.preventDefault();
+              view.dispatch(state.tr.replaceSelection(slice));
+              setTimeout(() => {
+                const ed = tiptapEditorRef.current;
+                if (ed) migrateAllMathInEditor(ed);
+              }, 0);
               return true;
             }
+          } catch (error) {
+            console.error('❌ Failed to parse pasted HTML:', error);
           }
-        }
+          return false;
+        };
         
         // ✅ CRITICAL: Check for files/images ONLY if there's no text content
         // This fixes Snipping Tool paste while preserving PowerPoint text paste
@@ -375,232 +393,71 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
                                      html.includes('MsoNormal')));
 
         if (isFromOffice && html) {
-          console.log('🏢 Detected Microsoft Office paste - preserving basic formatting');
-          
-          // For Office apps, clean HTML but preserve basic formatting (bold, italic, paragraphs)
-          let processedHTML = html
-            .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
-            .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
-            .replace(/<\/o:p>/g, '') // Remove closing Office tags
-            .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
-            .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
-            .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
-            .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
-            .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
-            .replace(/<style>[\s\S]*?<\/style>/g, '') // Remove style blocks
-            .replace(/<html[^>]*>/gi, '') // Remove html tags
-            .replace(/<\/html>/gi, '')
-            .replace(/<body[^>]*>/gi, '') // Remove body tags
-            .replace(/<\/body>/gi, '')
-            // Remove problematic styling but keep structure
-            .replace(/class="[^"]*"/g, '') // Remove ALL classes (MsoNormal, etc.)
-            .replace(/style="[^"]*"/g, '') // Remove ALL inline styles (colors, fonts, sizes)
-            .replace(/color="[^"]*"/g, '') // Remove color attributes
-            .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
-            .replace(/face="[^"]*"/g, '') // Remove font face
-            .replace(/size="[^"]*"/g, '') // Remove font size
-            .replace(/<font[^>]*>/g, '') // Remove font tags
-            .replace(/<\/font>/g, '')
-            // Clean up spans and divs but keep paragraphs, bold, italic
-            .replace(/<span[^>]*>/g, '') // Remove span opening tags
-            .replace(/<\/span>/g, '') // Remove span closing tags
-            .replace(/<div[^>]*>/g, '<p>') // Convert divs to paragraphs
-            .replace(/<\/div>/g, '</p>') // Convert closing divs
-            .replace(/<p[^>]*>/g, '<p>'); // Strip paragraph attributes but keep <p> tags
-          
-          console.log('🧹 Cleaned Office HTML (basic formatting preserved):', processedHTML.substring(0, 200));
-          
-          // Parse and insert the cleaned HTML
-          try {
-            const parser = new DOMParser();
-            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
-            
-            const { state } = view;
-            const pmParser = PMDOMParser.fromSchema(state.schema);
-            
-            const slice = pmParser.parseSlice(htmlDoc.body);
-            
-            if (slice && slice.size > 0) {
-              const tr = state.tr.replaceSelection(slice);
-              view.dispatch(tr);
-              console.log('✅ Office HTML inserted with formatting preserved');
-              
-              return true;
-            }
-          } catch (error) {
-            console.error('❌ Failed to parse Office HTML:', error);
+          console.log('🏢 Detected Microsoft Office paste - preserving structure');
+          if (insertSanitizedHtml(html, false)) {
+            return true;
           }
         }
 
-        // Try HTML for web sources (Google Docs, etc.) or internal Flow Notes copy-paste
+        // Prefer structured HTML (Gemini, ChatGPT, Google Docs) over plain-text LaTeX
         if (html && !isFromOffice) {
           console.log('✅ Found HTML data:', html.substring(0, 200));
-          
-          // Skip if HTML contains images - let ImagePaste extension handle it
+
           if (html.includes('<img')) {
             console.log('🖼️ HTML contains <img> tag - delegating to ImagePaste extension');
             return false;
           }
-          
-          // Check if this is internal Flow Notes content (has Tiptap/ProseMirror markers)
-          // Tiptap uses inline styles for formatting, so check for those
-          const isInternalPaste = html.includes('data-type="') || 
-                                  html.includes('class="ProseMirror') ||
-                                  html.includes('style="color:') ||
-                                  html.includes('style="font-size:') ||
-                                  html.includes('<mark ') ||
-                                  (html.includes('<span') && html.includes('style=') && 
-                                   (html.includes('color') || html.includes('font-size')));
-          
-          console.log('🔍 Internal paste check:', {
-            hasDataType: html.includes('data-type="'),
-            hasProseMirror: html.includes('class="ProseMirror'),
-            hasColorStyle: html.includes('style="color:'),
-            hasFontSizeStyle: html.includes('style="font-size:'),
-            hasMark: html.includes('<mark '),
-            hasStyledSpan: html.includes('<span') && html.includes('style='),
-            isInternal: isInternalPaste
-          });
-          
-          let processedHTML: string;
-          
-          if (isInternalPaste) {
-            console.log('🔄 Internal Flow Notes paste detected - preserving all formatting');
-            // For internal pastes, keep ALL formatting - just clean up Office artifacts
-            processedHTML = html
-              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
-              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
-              .replace(/<\/o:p>/g, '') // Remove closing Office tags
-              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
-              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
-              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
-              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
-              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
-              .replace(/<html[^>]*>/gi, '') // Remove html tags
-              .replace(/<\/html>/gi, '')
-              .replace(/<body[^>]*>/gi, '') // Remove body tags
-              .replace(/<\/body>/gi, '');
-            
-            console.log('🧹 Cleaned internal HTML (formatting preserved):', processedHTML.substring(0, 200));
-          } else {
-            console.log('🌐 External paste detected - stripping external styling');
-            // For external pastes, strip ALL styling to prevent formatting pollution
-            processedHTML = html
-              .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
-              .replace(/<o:p>[\s\S]*?<\/o:p>/g, '') // Remove Office paragraph tags
-              .replace(/<\/o:p>/g, '') // Remove closing Office tags
-              .replace(/class="[^"]*"/g, '') // Remove ALL classes
-              .replace(/style="[^"]*"/g, '') // Remove ALL inline styles
-              .replace(/color="[^"]*"/g, '') // Remove color attributes
-              .replace(/bgcolor="[^"]*"/g, '') // Remove background colors
-              .replace(/face="[^"]*"/g, '') // Remove font face
-              .replace(/size="[^"]*"/g, '') // Remove font size
-              .replace(/<font[^>]*>/g, '') // Remove font tags
-              .replace(/<\/font>/g, '')
-              .replace(/<span[^>]*>/g, '<span>') // Strip span attributes
-              .replace(/<div[^>]*>/g, '<div>') // Strip div attributes
-              .replace(/<p[^>]*>/g, '<p>') // Strip paragraph attributes
-              .replace(/<w:[\s\S]*?>/g, '') // Remove Word XML tags
-              .replace(/<m:[\s\S]*?>/g, '') // Remove Math XML tags
-              .replace(/<xml>[\s\S]*?<\/xml>/g, '') // Remove XML blocks
-              .replace(/<\?xml[\s\S]*?\?>/g, '') // Remove XML declarations
-              .replace(/<head>[\s\S]*?<\/head>/g, '') // Remove head tags
-              .replace(/<html[^>]*>/gi, '') // Remove html tags
-              .replace(/<\/html>/gi, '')
-              .replace(/<body[^>]*>/gi, '') // Remove body tags
-              .replace(/<\/body>/gi, '');
-            
-            // CRITICAL FIX: Unwrap emojis from span tags to prevent color inheritance
-            // ChatGPT wraps emojis in <span> tags, which can inherit text color from surrounding styled text
-            // Regex matches emoji characters (Unicode ranges for common emojis and symbols)
-            processedHTML = processedHTML.replace(
-              /<span>([^\x00-\x7F]+)<\/span>/g,
-              (match, content) => {
-                // Check if content is likely an emoji (non-ASCII, typically 1-4 chars)
-                // This includes emojis, symbols, and other Unicode characters
-                if (content.length <= 4 && /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2300}-\u{23FF}\u{2B50}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE0F}\u{20E3}\u{E0020}-\u{E007F}]/u.test(content)) {
-                  return content; // Unwrap emoji - return just the emoji without span
-                }
-                return match; // Keep span for other content
-              }
-            );
-            
-            console.log('🧹 Cleaned external HTML (styling stripped):', processedHTML.substring(0, 200));
-          }
 
-          // Parse HTML and insert into editor
-          try {
-            const parser = new DOMParser();
-            const htmlDoc = parser.parseFromString(processedHTML, 'text/html');
-            
-            // Extract text content as fallback
-            const textContent = htmlDoc.body.textContent || htmlDoc.body.innerText || '';
-            console.log('📝 Extracted text from HTML:', textContent.substring(0, 100));
-
-            // Try to parse as ProseMirror slice first
-            const { state } = view;
-            const pmParser = PMDOMParser.fromSchema(state.schema);
-            
-            try {
-              const slice = pmParser.parseSlice(htmlDoc.body);
-              
-              // Check if slice has actual content
-              if (slice && slice.size > 0) {
-                const tr = state.tr.replaceSelection(slice);
-                view.dispatch(tr);
-                console.log('✅ HTML slice inserted successfully, size:', slice.size);
-                setTimeout(() => {
-                  if (tiptapEditorRef.current) migrateAllMathInEditor(tiptapEditorRef.current);
-                }, 0);
-                
-                // Verify content was inserted
-                setTimeout(() => {
-                  console.log('📄 Editor content length:', editor?.getText().length);
-                }, 50);
-                
-                return true;
-              } else {
-                console.log('⚠️ Slice is empty, falling back to text extraction');
-              }
-            } catch (sliceError) {
-              console.error('❌ Slice parsing failed:', sliceError);
-            }
-
-            // Fallback: Insert extracted text content
-            if (textContent.trim()) {
-              const { from } = state.selection;
-              const tr = state.tr.insertText(textContent, from);
-              view.dispatch(tr);
-              console.log('✅ Text content inserted at position:', from);
-              
-              // Verify insertion
-              setTimeout(() => {
-                console.log('📄 Editor content after text insert:', editor?.getText().substring(0, 100));
-              }, 50);
-              
+          if (hasStructuredHtml) {
+            const internal = isInternalFlowPaste(html);
+            console.log(internal ? '🔄 Internal Flow paste' : '🌐 External paste — preserving structure, stripping color/font');
+            if (insertSanitizedHtml(html, internal)) {
               return true;
             }
-
-          } catch (error) {
-            console.error('❌ HTML parsing failed:', error);
           }
         }
 
-        // Fallback to plain text (always available)
+        // Plain-text LaTeX when HTML has no usable structure (Gemini math-only snippets)
+        if (plainText && textContainsLatex(plainText) && !hasStructuredHtml) {
+          const ed = tiptapEditorRef.current;
+          if (ed && !ed.isDestroyed) {
+            event.preventDefault();
+            console.log('🔢 LaTeX paste detected — rendering math');
+            if (insertTextWithLatex(view, ed, plainText)) {
+              return true;
+            }
+          }
+        }
+
+        // Unstructured HTML fallback (single paragraph wrappers)
+        if (html && !isFromOffice && !hasStructuredHtml) {
+          if (insertSanitizedHtml(html, isInternalFlowPaste(html))) {
+            return true;
+          }
+        }
+
+        // Fallback to plain text with paragraph / heading structure preserved
         if (plainText) {
           console.log('✅ Using plain text fallback:', plainText.substring(0, 100));
-          
-          // Insert as plain text at cursor position
+          event.preventDefault();
+
+          const ed = tiptapEditorRef.current;
+          if (ed && textContainsLatex(plainText)) {
+            if (insertTextWithLatex(view, ed, plainText)) {
+              return true;
+            }
+          }
+
+          if (ed && !ed.isDestroyed) {
+            const blocks = plainTextToDocBlocks(plainText);
+            if (ed.commands.insertContent(blocks)) {
+              setTimeout(() => migrateAllMathInEditor(ed), 0);
+              return true;
+            }
+          }
+
           const { from } = view.state.selection;
-          const tr = view.state.tr.insertText(plainText, from);
-          view.dispatch(tr);
-          console.log('✅ Plain text inserted at position:', from);
-          
-          // Verify insertion
-          setTimeout(() => {
-            console.log('📄 Final editor content:', editor?.getText().substring(0, 100));
-          }, 50);
-          
+          view.dispatch(view.state.tr.insertText(plainText, from));
           return true;
         }
 
