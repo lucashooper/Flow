@@ -89,6 +89,27 @@ export const Sidebar = ({
     return () => window.removeEventListener('folderCreated', handler as EventListener);
   }, []);
 
+  // Auto-expand folders when a subfolder is moved into them
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const folderId = (e as CustomEvent)?.detail?.folderId as string | undefined;
+      if (!folderId) return;
+      setExpandedFolders(prev => {
+        const next = new Set(prev);
+        next.add(folderId);
+        // Also expand ancestor folders so the moved folder is visible
+        let current = folders.find(f => f.id === folderId);
+        while (current?.parent_id) {
+          next.add(current.parent_id);
+          current = folders.find(f => f.id === current!.parent_id);
+        }
+        return next;
+      });
+    };
+    window.addEventListener('expandFolder', handler as EventListener);
+    return () => window.removeEventListener('expandFolder', handler as EventListener);
+  }, [folders]);
+
 
   // Persist expanded folders to localStorage
   useEffect(() => {
@@ -158,6 +179,31 @@ export const Sidebar = ({
     }
   }, [isResizing]);
 
+  // Sort folders: starred first, then by position
+  const sortFolders = (list: Folder[]) =>
+    [...list].sort((a, b) => {
+      const aStarred = a.is_starred ?? false;
+      const bStarred = b.is_starred ?? false;
+      if (aStarred && !bStarred) return -1;
+      if (!aStarred && bStarred) return 1;
+      return (a.position ?? 0) - (b.position ?? 0);
+    });
+
+  const folderIsVisible = (folderId: string): boolean => {
+    if (!showStarredOnly) return true;
+    const folder = folders.find(f => f.id === folderId);
+    if (folder?.is_starred) return true;
+    if (notes.some(n => n.folder_id === folderId && (n.is_starred ?? false))) return true;
+    return folders
+      .filter(f => f.parent_id === folderId)
+      .some(sf => folderIsVisible(sf.id));
+  };
+
+  const folderMatchesSearch = (folder: Folder) => {
+    if (!searchQuery) return false;
+    return folder.name.toLowerCase().includes(searchQuery.toLowerCase());
+  };
+
   // Check if a note matches the search query
   const noteMatchesSearch = (note: Note) => {
     if (!searchQuery) return true;
@@ -190,8 +236,11 @@ export const Sidebar = ({
     console.log('🔍 [Sidebar] filteredNotes order:', filteredNotes.map(n => `${n.title}:${n.position}`));
   }
 
-  // Check if a folder or its descendants contain matching notes
+  // Check if a folder or its descendants contain matching notes or folder name matches
   const folderHasMatches = (folderId: string): boolean => {
+    const folder = folders.find(f => f.id === folderId);
+    if (folder && folderMatchesSearch(folder)) return true;
+
     // Check direct notes in this folder
     const directNotes = notes.filter(n => n.folder_id === folderId);
     if (directNotes.some(noteMatchesSearch)) return true;
@@ -224,10 +273,13 @@ export const Sidebar = ({
     setExpandedFolders(foldersToExpand);
   }, [searchQuery, notes, folders]);
 
-  // Get root folders (no parent)
-  const rootFolders = folders
-    .filter(f => !f.parent_id)
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  // Get root folders (no parent, plus orphaned folders with missing parent)
+  const folderIds = new Set(folders.map(f => f.id));
+  const rootFolders = sortFolders(
+    folders
+      .filter(f => !f.parent_id || !folderIds.has(f.parent_id))
+      .filter(f => folderIsVisible(f.id)),
+  );
   
   // Get notes without folder
   const rootNotes = filteredNotes.filter(n => !n.folder_id);
@@ -251,15 +303,17 @@ export const Sidebar = ({
   };
 
   // Get subfolders
-  const getSubfolders = (parentId: string) => {
-    return folders
-      .filter(f => f.parent_id === parentId)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-  };
+  const getSubfolders = (parentId: string) =>
+    sortFolders(
+      folders
+        .filter(f => f.parent_id === parentId)
+        .filter(f => folderIsVisible(f.id)),
+    );
 
   // Render folder tree recursively
   const renderFolder = (folder: Folder, depth: number = 0) => {
-    const isExpanded = expandedFolders.has(folder.id);
+    const isExpanded = expandedFolders.has(folder.id) || (!!searchQuery && folderHasMatches(folder.id));
+    const isFolderNameMatch = searchQuery && folderMatchesSearch(folder);
     const subfolders = getSubfolders(folder.id);
     const folderNotes = getNotesInFolder(folder.id);
     const isOver = false;
@@ -270,6 +324,7 @@ export const Sidebar = ({
     const siblingIndex = siblingFolders.findIndex(f => f.id === folder.id);
     const canMoveUp = siblingIndex > 0;
     const canMoveDown = siblingIndex !== -1 && siblingIndex < siblingFolders.length - 1;
+    const canMoveToTop = siblingIndex > 0;
 
     const persistSiblingOrder = (ordered: Folder[]) => {
       for (let i = 0; i < ordered.length; i++) {
@@ -282,6 +337,13 @@ export const Sidebar = ({
 
     return (
       <div key={folder.id}>
+        <div
+          className={isFolderNameMatch ? 'rounded' : undefined}
+          style={isFolderNameMatch ? {
+            backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+            borderLeft: '2px solid var(--accent)',
+          } : undefined}
+        >
         <DraggableFolderItem
           folder={folder}
           depth={depth}
@@ -293,6 +355,7 @@ export const Sidebar = ({
           onCreateSubfolder={() => onFolderCreate(folder.id)}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
+          canMoveToTop={canMoveToTop}
           onMoveUp={() => {
             if (!canMoveUp) return;
             const next = siblingFolders.slice();
@@ -309,6 +372,13 @@ export const Sidebar = ({
             next[siblingIndex] = tmp;
             persistSiblingOrder(next);
           }}
+          onMoveToTop={() => {
+            if (!canMoveToTop) return;
+            const next = siblingFolders.slice();
+            const [moved] = next.splice(siblingIndex, 1);
+            next.unshift(moved);
+            persistSiblingOrder(next);
+          }}
           isOver={isOver}
           autoRenameId={autoRenameFolderId ?? undefined}
           onRenameStarted={(id: string) => {
@@ -316,6 +386,7 @@ export const Sidebar = ({
           }}
           notes={notes ?? []}
         />
+        </div>
 
         {isExpanded && (
           <div>
@@ -437,7 +508,7 @@ export const Sidebar = ({
               className={`p-1.5 rounded transition-colors ${
                 showStarredOnly ? 'bg-[#1f1f1f] text-yellow-400' : 'hover:bg-[#252525] text-[#888888]'
               }`}
-              title={showStarredOnly ? 'Show all notes' : 'Show starred only'}
+              title={showStarredOnly ? 'Show all notes & folders' : 'Show starred only'}
             >
               <Star className={`w-4 h-4 ${showStarredOnly ? 'fill-yellow-400 text-yellow-400' : ''}`} />
             </button>

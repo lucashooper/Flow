@@ -13,8 +13,10 @@ interface DraggableFolderItemProps {
   onCreateSubfolder: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  canMoveToTop?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  onMoveToTop?: () => void;
   isOver?: boolean;
   autoRenameId?: string;
   onRenameStarted?: (folderId: string) => void;

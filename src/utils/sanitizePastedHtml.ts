@@ -229,11 +229,58 @@ export function isInternalFlowPaste(html: string): boolean {
   );
 }
 
-/** Build Tiptap blocks from plain text, preserving paragraph breaks and markdown headings. */
+import {
+  injectLatexMathInHtml,
+  latexSegmentsToInlineContent,
+  splitLatexSegments,
+  textContainsLatex,
+} from './parseLatexText';
+
+/** Build Tiptap blocks from plain text, preserving paragraph breaks, headings, and LaTeX. */
 export function plainTextToDocBlocks(text: string): Array<Record<string, unknown>> {
   const normalized = text.replace(/\r\n/g, '\n');
   const chunks = normalized.split(/\n{2,}/);
   const blocks: Array<Record<string, unknown>> = [];
+
+  const pushLineAsBlocks = (trimmed: string) => {
+    if (textContainsLatex(trimmed)) {
+      const segments = splitLatexSegments(trimmed);
+      const hasBlockMath = segments.some(s => s.kind === 'block');
+
+      if (hasBlockMath) {
+        let inlineBuffer: Array<Record<string, unknown>> = [];
+        const flush = () => {
+          if (inlineBuffer.length) {
+            blocks.push({ type: 'paragraph', content: inlineBuffer });
+            inlineBuffer = [];
+          }
+        };
+        for (const seg of segments) {
+          if (seg.kind === 'text' && seg.content) {
+            inlineBuffer.push({ type: 'text', text: seg.content });
+          } else if (seg.kind === 'inline') {
+            inlineBuffer.push({ type: 'inlineMath', attrs: { latex: seg.latex } });
+          } else if (seg.kind === 'block') {
+            flush();
+            blocks.push({ type: 'blockMath', attrs: { latex: seg.latex } });
+          }
+        }
+        flush();
+        return;
+      }
+
+      const inlineContent = latexSegmentsToInlineContent(segments);
+      if (inlineContent.length) {
+        blocks.push({ type: 'paragraph', content: inlineContent });
+      }
+      return;
+    }
+
+    blocks.push({
+      type: 'paragraph',
+      content: [{ type: 'text', text: trimmed }],
+    });
+  };
 
   for (const chunk of chunks) {
     const lines = chunk.split('\n');
@@ -254,9 +301,12 @@ export function plainTextToDocBlocks(text: string): Array<Record<string, unknown
       const orderedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
       if (orderedMatch) {
         const last = blocks[blocks.length - 1];
+        const lineContent = textContainsLatex(orderedMatch[2])
+          ? latexSegmentsToInlineContent(splitLatexSegments(orderedMatch[2]))
+          : [{ type: 'text', text: orderedMatch[2] }];
         const listItem = {
           type: 'listItem',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: orderedMatch[2] }] }],
+          content: [{ type: 'paragraph', content: lineContent }],
         };
         if (last?.type === 'orderedList') {
           (last.content as Array<Record<string, unknown>>).push(listItem);
@@ -266,10 +316,7 @@ export function plainTextToDocBlocks(text: string): Array<Record<string, unknown
         continue;
       }
 
-      blocks.push({
-        type: 'paragraph',
-        content: [{ type: 'text', text: trimmed }],
-      });
+      pushLineAsBlocks(trimmed);
     }
   }
 
@@ -319,5 +366,5 @@ export function sanitizePastedHtml(
     }
   });
 
-  return body.innerHTML.trim();
+  return injectLatexMathInHtml(body.innerHTML.trim());
 }

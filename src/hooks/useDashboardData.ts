@@ -187,7 +187,9 @@ export const useDashboardData = () => {
               const localFolderMap = new Map(foldersData.map(f => [f.id, f]));
               for (const remote of remoteFolders) {
                 const local = localFolderMap.get(remote.id);
-                if (!local || local.name !== remote.name || local.emoji !== remote.emoji || local.parent_id !== remote.parent_id) {
+                if (!local || local.name !== remote.name || local.emoji !== remote.emoji ||
+                    local.parent_id !== remote.parent_id || local.is_starred !== remote.is_starred ||
+                    local.icon_url !== remote.icon_url) {
                   const pending = await db.outbox
                     .where('entityId')
                     .equals(remote.id)

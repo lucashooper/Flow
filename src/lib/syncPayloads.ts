@@ -2,7 +2,7 @@ import { db } from './db';
 
 /** Fields the Supabase `folders` table accepts (position is local-only until migrated). */
 const FOLDER_SYNC_FIELDS = [
-  'id', 'name', 'emoji', 'user_id', 'parent_id', 'dashboard_id', 'created_at', 'updated_at',
+  'id', 'name', 'emoji', 'icon_url', 'is_starred', 'user_id', 'parent_id', 'dashboard_id', 'created_at', 'updated_at',
 ] as const;
 
 /** Fields the Supabase `notes` table accepts (position is local-only until migrated). */

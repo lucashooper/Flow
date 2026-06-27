@@ -18,6 +18,8 @@ export interface Folder {
   user_id: string;
   name: string;
   emoji: string | null;
+  icon_url: string | null;
+  is_starred: boolean;
   parent_id: string | null;
   dashboard_id: string | null;
   position?: number;
