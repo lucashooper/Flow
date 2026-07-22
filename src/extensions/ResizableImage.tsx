@@ -6,20 +6,39 @@ type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
 const ResizableImageComponent = (props: any) => {
   const [isResizing, setIsResizing] = useState(false);
-  const [width, setWidth] = useState<number>(props.node.attrs.width || 500);
+  const initialWidth = props.node.attrs.width as number | null;
+  const [width, setWidth] = useState<number>(initialWidth || 320);
   const [height, setHeight] = useState<number>(props.node.attrs.height || 0);
   const startPos = useRef({ x: 0, y: 0 });
   const startSize = useRef({ width: 0, height: 0 });
   const resizeCorner = useRef<ResizeCorner | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const aspectRatio = useRef<number>(1);
+  const hasAppliedNaturalWidth = useRef(false);
 
-  // Calculate aspect ratio on mount
   useEffect(() => {
-    if (imageRef.current && imageRef.current.naturalWidth) {
-      aspectRatio.current = imageRef.current.naturalWidth / imageRef.current.naturalHeight;
-    }
+    hasAppliedNaturalWidth.current = false;
   }, [props.node.attrs.src]);
+
+  const handleImageLoad = () => {
+    const img = imageRef.current;
+    if (!img?.naturalWidth) return;
+
+    aspectRatio.current = img.naturalWidth / img.naturalHeight;
+
+    if (hasAppliedNaturalWidth.current) return;
+    hasAppliedNaturalWidth.current = true;
+
+    if (!initialWidth || initialWidth === 500) {
+      const fitted = Math.min(img.naturalWidth, 380);
+      setWidth(fitted);
+      setHeight(fitted / aspectRatio.current);
+      props.updateAttributes({
+        width: Math.round(fitted),
+        height: Math.round(fitted / aspectRatio.current),
+      });
+    }
+  };
 
   const handleResizeStart = (e: React.MouseEvent, corner: ResizeCorner) => {
     e.preventDefault();
@@ -92,17 +111,18 @@ const ResizableImageComponent = (props: any) => {
   }, [isResizing, width, height, props]);
 
   return (
-    <NodeViewWrapper 
-      className="resizable-image-wrapper" 
-      style={{ display: 'block', margin: '1rem 0' }}
+    <NodeViewWrapper
+      as="span"
+      className="resizable-image-wrapper"
       data-drag-handle
     >
-      <div
-        className="relative inline-block group"
+      <span
+        className="relative inline-block group align-top"
         style={{
           width: `${width}px`,
           maxWidth: '100%',
           userSelect: 'none',
+          verticalAlign: 'top',
         }}
       >
         <img
@@ -116,6 +136,7 @@ const ResizableImageComponent = (props: any) => {
           }}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
+          onLoad={handleImageLoad}
         />
         
         {/* Resize Handle - Top-Left (nw-resize) */}
@@ -152,13 +173,17 @@ const ResizableImageComponent = (props: any) => {
             <div className="text-white text-sm font-medium">Uploading...</div>
           </div>
         )}
-      </div>
+      </span>
     </NodeViewWrapper>
   );
 };
 
 export const ResizableImage = Image.extend({
   name: 'resizableImage',
+
+  inline: true,
+  group: 'inline',
+  atom: true,
 
   addAttributes() {
     return {
@@ -172,10 +197,10 @@ export const ResizableImage = Image.extend({
         default: null,
       },
       width: {
-        default: 500,
+        default: null,
         parseHTML: (element: HTMLElement) => {
           const width = element.getAttribute('width');
-          return width ? parseInt(width) : 500;
+          return width ? parseInt(width, 10) : null;
         },
         renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.width) return {};

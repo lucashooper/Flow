@@ -199,7 +199,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       Superscript,
       FontSize,
       ResizableImage.configure({
-        inline: false,
+        inline: true,
         allowBase64: true,
       }),
       ResizableVideo,
@@ -1275,6 +1275,26 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           -ms-overflow-style: none; /* IE/Edge */
         }
         
+        /* Inline images — hug content so multiple can sit on one row */
+        .ProseMirror .resizable-image-wrapper {
+          display: inline-block !important;
+          vertical-align: top;
+          width: auto !important;
+          max-width: 100%;
+          margin: 0.25rem 0.5rem 0.25rem 0;
+          line-height: 0;
+        }
+        .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode {
+          outline: 2px solid #8cf !important;
+          border-radius: 8px;
+          outline-offset: 2px;
+        }
+        .ProseMirror .resizable-image-wrapper img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+        }
+
         /* Remove blue border from images */
         .ProseMirror img {
           outline: none !important;
