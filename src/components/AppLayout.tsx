@@ -220,6 +220,9 @@ export const AppLayout = ({
 
   useEffect(() => {
     document.documentElement.classList.toggle('app-fullscreen', isFullscreen);
+    if (isFullscreen) {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    }
     return () => document.documentElement.classList.remove('app-fullscreen');
   }, [isFullscreen]);
 

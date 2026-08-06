@@ -42,6 +42,7 @@ import {
   plainTextToDocBlocks,
   sanitizePastedHtml,
 } from '../utils/sanitizePastedHtml';
+import { useFocusMode } from '../contexts/FocusModeContext';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -55,6 +56,7 @@ interface TiptapEditorProps {
 }
 
 export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle }: TiptapEditorProps) => {
+  const { isFullscreen } = useFocusMode();
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
@@ -471,6 +473,20 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   useEffect(() => {
     if (editor) tiptapEditorRef.current = editor;
   }, [editor]);
+
+  // Presentation fullscreen: read-only view with normal pointer (like PowerPoint)
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    editor.setEditable(!isFullscreen);
+
+    if (isFullscreen) {
+      editor.commands.blur();
+      setShowBubbleMenu(false);
+      setBubbleMenuPosition(null);
+      setContextMenu(null);
+    }
+  }, [editor, isFullscreen]);
 
   // Track last content prop to prevent unnecessary updates
   const lastContentProp = useRef<string>('');
@@ -903,6 +919,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       };
 
       const handleSelectionUpdate = () => {
+        if (isFullscreen) {
+          setShowBubbleMenu(false);
+          setBubbleMenuPosition(null);
+          return;
+        }
+
         const { from, to } = editor.state.selection;
         const hasSelection = from !== to;
         
@@ -955,7 +977,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         }
       };
     }
-  }, [editor]);
+  }, [editor, isFullscreen]);
 
   // handleContextMenu removed - using browser native context menu for spell check
   // const handleContextMenu = async (e: React.MouseEvent) => {

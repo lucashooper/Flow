@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Note } from '../types';
 import { TiptapEditor } from './TiptapEditor';
+import { useFocusMode } from '../contexts/FocusModeContext';
 
 interface EditorPanelProps {
   note: Note | undefined;
@@ -9,6 +10,7 @@ interface EditorPanelProps {
 }
 
 export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProps) => {
+  const { isFullscreen } = useFocusMode();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
@@ -126,7 +128,10 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
           type="text"
           value={title || ''}
           onChange={(e) => setTitle(e.target.value)}
+          readOnly={isFullscreen}
+          tabIndex={isFullscreen ? -1 : 0}
           onKeyDown={(e) => {
+            if (isFullscreen) return;
             if (e.key === 'Enter') {
               e.preventDefault();
               // Focus the editor content

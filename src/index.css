@@ -157,6 +157,25 @@
     display: none !important;
   }
 
+  /* PowerPoint-style pointer in presentation mode (no text I-beam) */
+  html.app-fullscreen,
+  html.app-fullscreen .editor-background,
+  html.app-fullscreen .editor-root,
+  html.app-fullscreen .editor-header,
+  html.app-fullscreen .ProseMirror,
+  html.app-fullscreen .ProseMirror * {
+    cursor: default !important;
+    caret-color: transparent !important;
+    user-select: none;
+  }
+
+  html.app-fullscreen a[href],
+  html.app-fullscreen button,
+  html.app-fullscreen [role="button"],
+  html.app-fullscreen .cursor-pointer {
+    cursor: pointer !important;
+  }
+
   .fullscreen-mode .editor-background {
     background: var(--bg-editor);
   }
