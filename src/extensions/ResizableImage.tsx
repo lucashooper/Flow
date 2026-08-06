@@ -9,12 +9,14 @@ import {
   showImageDropIndicator,
   type ImageDropPreview,
 } from '../utils/imageDropPreview';
+import { useFocusMode } from '../contexts/FocusModeContext';
 
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
 const DRAG_THRESHOLD_PX = 4;
 
 const ResizableImageComponent = (props: any) => {
+  const { isFullscreen } = useFocusMode();
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const initialWidth = props.node.attrs.width as number | null;
@@ -123,6 +125,7 @@ const ResizableImageComponent = (props: any) => {
   }, [isResizing, width, height, props]);
 
   const handleMoveStart = useCallback((e: React.MouseEvent) => {
+    if (isFullscreen) return;
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
 
@@ -213,12 +216,14 @@ const ResizableImageComponent = (props: any) => {
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [props, width]);
+  }, [props, width, isFullscreen]);
+
+  const showEditorChrome = !isFullscreen;
 
   return (
     <NodeViewWrapper
       as="span"
-      className={`resizable-image-wrapper${isDragging ? ' is-dragging' : ''}${props.selected ? ' ProseMirror-selectednode' : ''}`}
+      className={`resizable-image-wrapper${isDragging ? ' is-dragging' : ''}${showEditorChrome && props.selected ? ' ProseMirror-selectednode' : ''}`}
     >
       <span
         ref={wrapperRef}
@@ -228,12 +233,13 @@ const ResizableImageComponent = (props: any) => {
           maxWidth: '100%',
           userSelect: 'none',
           verticalAlign: 'top',
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: showEditorChrome ? (isDragging ? 'grabbing' : 'grab') : 'default',
           opacity: isDragging ? 0.55 : 1,
         }}
-        onMouseDown={handleMoveStart}
+        onMouseDown={showEditorChrome ? handleMoveStart : undefined}
       >
         {/* Drag affordance */}
+        {showEditorChrome && (
         <span
           className="absolute -top-5 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
           style={{ background: 'rgba(20,20,20,0.85)', color: 'var(--muted)' }}
@@ -242,6 +248,7 @@ const ResizableImageComponent = (props: any) => {
           <GripVertical className="w-3 h-3" />
           <span className="text-[10px]">drag</span>
         </span>
+        )}
 
         <img
           ref={imageRef}
@@ -256,6 +263,8 @@ const ResizableImageComponent = (props: any) => {
         />
 
         {/* Resize handles */}
+        {showEditorChrome && (
+        <>
         <div
           data-resize-handle
           className="absolute -left-1 -top-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
@@ -276,6 +285,8 @@ const ResizableImageComponent = (props: any) => {
           className="absolute -right-1 -bottom-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
           onMouseDown={(e) => handleResizeStart(e, 'se')}
         />
+        </>
+        )}
 
         {props.node.attrs['data-uploading'] && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg pointer-events-none">

@@ -454,6 +454,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
     if (isFullscreen) {
       editor.commands.blur();
+      editor.commands.setTextSelection(0);
       setShowBubbleMenu(false);
       setBubbleMenuPosition(null);
       setContextMenu(null);

@@ -169,6 +169,35 @@
     user-select: none;
   }
 
+  /* Cinematic presentation — no hover rings, selection, drag, or resize */
+  html.app-fullscreen .ProseMirror {
+    pointer-events: none !important;
+  }
+
+  html.app-fullscreen .ProseMirror-selectednode,
+  html.app-fullscreen .ProseMirror .ProseMirror-selectednode,
+  html.app-fullscreen .ProseMirror img.ProseMirror-selectednode,
+  html.app-fullscreen .resizable-image-wrapper.ProseMirror-selectednode {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  html.app-fullscreen .resizable-image-wrapper .group:hover img,
+  html.app-fullscreen .resizable-image-wrapper img {
+    box-shadow: none !important;
+  }
+
+  html.app-fullscreen [data-resize-handle] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  html.app-fullscreen .editor-header input {
+    pointer-events: none !important;
+    cursor: default !important;
+  }
+
   html.app-fullscreen a[href],
   html.app-fullscreen button,
   html.app-fullscreen [role="button"],
