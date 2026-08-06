@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
 import { SyncDiagnostics } from './SyncDiagnostics';
+import { writePluginSetting } from '../utils/pluginSettings';
 
 type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security' | 'sync';
 
@@ -36,6 +37,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   });
   const [focusModeEnabled, setFocusModeEnabled] = useState(() => {
     const saved = localStorage.getItem('focusModeEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [fullscreenModeEnabled, setFullscreenModeEnabled] = useState(() => {
+    const saved = localStorage.getItem('fullscreenModeEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [pomodoroEnabled, setPomodoroEnabled] = useState(() => {
@@ -636,24 +641,45 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     </p>
                     
                     <div className="space-y-3">
-                      {/* Focus Mode Plugin */}
+                      {/* Dim mode plugin — dims sidebar/tabs while editing */}
                       <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
                         <div className="flex-1">
-                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Focus Mode</h4>
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Dim mode</h4>
                           <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                            Minimize distractions by dimming the sidebar and inactive tabs
+                            Dim the sidebar and inactive tabs while you write. Toggle from the toolbar with the sun icon.
                           </p>
                         </div>
                         <button
                           onClick={() => {
                             const newValue = !focusModeEnabled;
                             setFocusModeEnabled(newValue);
-                            localStorage.setItem('focusModeEnabled', JSON.stringify(newValue));
+                            writePluginSetting('focusModeEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                           style={{ backgroundColor: focusModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
+                        </button>
+                      </div>
+
+                      {/* Fullscreen presentation plugin */}
+                      <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-elev)', borderColor: 'var(--border)', border: '1px solid' }}>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Fullscreen mode</h4>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Hide all navbars for a PowerPoint-style view. Press Esc to exit.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !fullscreenModeEnabled;
+                            setFullscreenModeEnabled(newValue);
+                            writePluginSetting('fullscreenModeEnabled', newValue);
+                          }}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: fullscreenModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                        >
+                          <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: fullscreenModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
                       </div>
 

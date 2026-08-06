@@ -5,6 +5,7 @@ import { EditorHeader } from './EditorHeader';
 import type { Note, Folder, Dashboard } from '../types';
 import FocusFloat from '../../landing/components/FocusFloat';
 import { FocusModeContext } from '../contexts/FocusModeContext';
+import { FullscreenControls } from './FullscreenControls';
 import { PlannerDrawer } from './PlannerDrawer';
 
 interface AppLayoutProps {
@@ -74,8 +75,28 @@ export const AppLayout = ({
   isStatsVisible = false,
   setIsStatsVisible = () => {},
 }: AppLayoutProps) => {
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const toggleFocusMode = () => setIsFocusMode(prev => !prev);
+  const [isDimMode, setIsDimMode] = useState(false);
+  const toggleDimMode = () => setIsDimMode(prev => !prev);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+  const enterFullscreen = async () => {
+    setIsFullscreen(true);
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Browser may block — app chrome is still hidden
+    }
+  };
+  const toggleFullscreen = () => {
+    if (isFullscreen) exitFullscreen();
+    else void enterFullscreen();
+  };
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
@@ -168,19 +189,72 @@ export const AppLayout = ({
     }
   }, [isMobile, isSidebarOpen]);
 
+  const activeNote = notes.find(n => n.id === selectedNoteId);
+
+  const handleExitFullscreen = exitFullscreen;
+  const handleEnterFullscreen = enterFullscreen;
+
+  // Esc exits presentation fullscreen only (not dim mode)
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      handleExitFullscreen();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('app-fullscreen', isFullscreen);
+    return () => document.documentElement.classList.remove('app-fullscreen');
+  }, [isFullscreen]);
+
   return (
     <>
-      <FocusModeContext.Provider value={{ isFocusMode, toggleFocusMode }}>
-      <div className={`flex h-screen overflow-hidden select-none ${isFocusMode ? 'focus-mode' : ''}`} style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}>
+      <FocusModeContext.Provider value={{
+        isDimMode,
+        toggleDimMode,
+        isFullscreen,
+        toggleFullscreen,
+        enterFullscreen: handleEnterFullscreen,
+        exitFullscreen: handleExitFullscreen,
+      }}>
+      <div
+        className={`flex h-screen overflow-hidden select-none${isDimMode ? ' focus-mode' : ''}${isFullscreen ? ' fullscreen-mode' : ''}`}
+        style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text)' }}
+      >
+        {isFullscreen && (
+          <FullscreenControls
+            onExit={handleExitFullscreen}
+            onOpenSettings={() => window.dispatchEvent(new Event('openSettings'))}
+            noteTitle={activeNote?.title || undefined}
+          />
+        )}
+
         {/* Mobile Backdrop Overlay */}
-        {isMobile && isSidebarOpen && (
+        {!isFullscreen && isMobile && isSidebarOpen && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar - Desktop or Mobile Drawer */}
+        {/* Sidebar - hidden in fullscreen */}
+        {!isFullscreen && (
         <div
           id="mobile-sidebar"
           className={`${
@@ -217,12 +291,12 @@ export const AppLayout = ({
             onCloseMobile={isMobile ? () => setIsSidebarOpen(false) : undefined}
           />
         </div>
+        )}
 
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {/* Header with Tabs (optional) */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {showHeader && tabsEnabled && (
+            {!isFullscreen && showHeader && tabsEnabled && (
               <EditorHeader
                 openNotes={openNotes}
                 activeNoteId={selectedNoteId || null}
@@ -249,13 +323,13 @@ export const AppLayout = ({
             </div>
           </div>
 
-          {!isMobile && isPlannerOpen ? (
+          {!isFullscreen && !isMobile && isPlannerOpen ? (
             <div className="w-[360px] max-w-[38vw] h-full flex-shrink-0">
               <PlannerDrawer isOpen={isPlannerOpen} onClose={() => setIsPlannerOpen(false)} />
             </div>
           ) : null}
 
-          {isMobile && isPlannerOpen ? (
+          {!isFullscreen && isMobile && isPlannerOpen ? (
             <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setIsPlannerOpen(false)}>
               <div
                 className="absolute top-0 right-0 h-full w-[88vw] max-w-[380px]"
@@ -269,7 +343,7 @@ export const AppLayout = ({
       </div>
 
       {/* Floating focus timer toggle */}
-      <FocusFloat />
+      {!isFullscreen && <FocusFloat />}
       </FocusModeContext.Provider>
     </>
   );

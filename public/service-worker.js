@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flow-notes-v3'; // Increment version to force cache refresh
+const CACHE_NAME = 'flow-notes-v4'; // Increment version to force cache refresh
 const urlsToCache = [
   '/',
   '/index.html',

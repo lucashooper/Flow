@@ -1,12 +1,13 @@
-import { Minimize2, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Minimize2, Maximize2, SunDim, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { SyncStatus } from './SyncStatus';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Note } from '../types';
 import { DraggableTab } from './DraggableTab';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { CardsModal } from './CardsModal';
 import { useTimerStore } from '../stores/timerStore';
+import { readPluginSetting } from '../utils/pluginSettings';
 
 interface EditorHeaderProps {
   openNotes: Note[];
@@ -48,53 +49,41 @@ export const EditorHeader = ({
   onTogglePlanner,
 }: EditorHeaderProps) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const { isFocusMode, toggleFocusMode } = useFocusMode();
-  
-  // Check plugin states from localStorage
-  const focusModeEnabled = (() => {
-    const saved = localStorage.getItem('focusModeEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
-  
-  const pomodoroEnabled = (() => {
-    const saved = localStorage.getItem('pomodoroEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
+  const { isDimMode, toggleDimMode, isFullscreen, toggleFullscreen } = useFocusMode();
 
-  const wordCountEnabled = (() => {
-    const saved = localStorage.getItem('wordCountEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
+  const syncPluginFlags = useCallback(() => {
+    setFocusModeEnabled(readPluginSetting('focusModeEnabled', true));
+    setFullscreenModeEnabled(readPluginSetting('fullscreenModeEnabled', true));
+    setPomodoroEnabled(readPluginSetting('pomodoroEnabled', true));
+    setWordCountEnabled(readPluginSetting('wordCountEnabled', true));
+    setDrawingModeEnabled(readPluginSetting('drawingModeEnabled', true));
+    setCardsEnabled(readPluginSetting('cardsEnabled', false));
+    setSyncIndicatorEnabled(readPluginSetting('syncIndicatorEnabled', false));
+    setAmbientSoundsEnabled(readPluginSetting('ambientSoundsEnabled', true));
+    setFocusStatsEnabled(readPluginSetting('focusStatsEnabled', true));
+    setPlannerEnabled(readPluginSetting('plannerEnabled', true));
+  }, []);
 
-  const drawingModeEnabled = (() => {
-    const saved = localStorage.getItem('drawingModeEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
+  const [focusModeEnabled, setFocusModeEnabled] = useState(() => readPluginSetting('focusModeEnabled', true));
+  const [fullscreenModeEnabled, setFullscreenModeEnabled] = useState(() => readPluginSetting('fullscreenModeEnabled', true));
+  const [pomodoroEnabled, setPomodoroEnabled] = useState(() => readPluginSetting('pomodoroEnabled', true));
+  const [wordCountEnabled, setWordCountEnabled] = useState(() => readPluginSetting('wordCountEnabled', true));
+  const [drawingModeEnabled, setDrawingModeEnabled] = useState(() => readPluginSetting('drawingModeEnabled', true));
+  const [cardsEnabled, setCardsEnabled] = useState(() => readPluginSetting('cardsEnabled', false));
+  const [syncIndicatorEnabled, setSyncIndicatorEnabled] = useState(() => readPluginSetting('syncIndicatorEnabled', false));
+  const [ambientSoundsEnabled, setAmbientSoundsEnabled] = useState(() => readPluginSetting('ambientSoundsEnabled', true));
+  const [focusStatsEnabled, setFocusStatsEnabled] = useState(() => readPluginSetting('focusStatsEnabled', true));
+  const [plannerEnabled, setPlannerEnabled] = useState(() => readPluginSetting('plannerEnabled', true));
 
-  const cardsEnabled = (() => {
-    const saved = localStorage.getItem('cardsEnabled');
-    return saved !== null ? JSON.parse(saved) : false;
-  })();
-
-  const syncIndicatorEnabled = (() => {
-    const saved = localStorage.getItem('syncIndicatorEnabled');
-    return saved !== null ? JSON.parse(saved) : false;
-  })();
-
-  const ambientSoundsEnabled = (() => {
-    const saved = localStorage.getItem('ambientSoundsEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
-
-  const focusStatsEnabled = (() => {
-    const saved = localStorage.getItem('focusStatsEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
-
-  const plannerEnabled = (() => {
-    const saved = localStorage.getItem('plannerEnabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  })();
+  useEffect(() => {
+    syncPluginFlags();
+    window.addEventListener('pluginSettingsChanged', syncPluginFlags);
+    window.addEventListener('storage', syncPluginFlags);
+    return () => {
+      window.removeEventListener('pluginSettingsChanged', syncPluginFlags);
+      window.removeEventListener('storage', syncPluginFlags);
+    };
+  }, [syncPluginFlags]);
 
   const [showCardsModal, setShowCardsModal] = useState(false);
   const { resetSession } = useTimerStore();
@@ -190,14 +179,30 @@ export const EditorHeader = ({
             <>
               {focusModeEnabled && (
                 <button
-                  onClick={toggleFocusMode}
-                  className={`nav-item p-2 rounded transition-colors ${
-                    isFocusMode ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
+                  onClick={toggleDimMode}
+                  className={`focus-toggle nav-item p-2 rounded transition-colors ${
+                    isDimMode ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
                   }`}
-                  style={{ color: isFocusMode ? 'var(--accent)' : 'var(--muted)' }}
-                  title="Toggle Focus Mode"
+                  style={{ color: isDimMode ? 'var(--accent)' : 'var(--muted)' }}
+                  title="Dim sidebar & inactive tabs"
                 >
-                  <Minimize2 className="w-4 h-4" />
+                  <SunDim className="w-4 h-4" />
+                </button>
+              )}
+              {fullscreenModeEnabled && (
+                <button
+                  onClick={toggleFullscreen}
+                  className={`fullscreen-toggle nav-item p-2 rounded transition-colors ${
+                    isFullscreen ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'
+                  }`}
+                  style={{ color: isFullscreen ? 'var(--accent)' : 'var(--muted)' }}
+                  title="Fullscreen presentation (Esc to exit)"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
                 </button>
               )}
               {drawingModeEnabled && (
@@ -294,7 +299,7 @@ export const EditorHeader = ({
                   {focusModeEnabled && (
                     <button
                       onClick={() => {
-                        toggleFocusMode();
+                        toggleDimMode();
                         setShowMobileMenu(false);
                       }}
                       className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
@@ -302,8 +307,23 @@ export const EditorHeader = ({
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <Minimize2 className="w-5 h-5" />
-                      <span>Focus Mode</span>
+                      <SunDim className="w-5 h-5" />
+                      <span>{isDimMode ? 'Exit dim mode' : 'Dim sidebar'}</span>
+                    </button>
+                  )}
+                  {fullscreenModeEnabled && (
+                    <button
+                      onClick={() => {
+                        toggleFullscreen();
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
+                      style={{ color: 'var(--text)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-elev)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                      <span>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
                     </button>
                   )}
                   <button

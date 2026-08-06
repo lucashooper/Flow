@@ -1,8 +1,14 @@
 import { createContext, useContext } from 'react';
 
-interface FocusModeContextValue {
-  isFocusMode: boolean;
-  toggleFocusMode: () => void;
+export interface FocusModeContextValue {
+  /** Dims sidebar and inactive tabs while editing */
+  isDimMode: boolean;
+  toggleDimMode: () => void;
+  /** Hides all chrome for presentation-style fullscreen */
+  isFullscreen: boolean;
+  toggleFullscreen: () => void;
+  enterFullscreen: () => void;
+  exitFullscreen: () => void;
 }
 
 export const FocusModeContext = createContext<FocusModeContextValue | undefined>(undefined);

@@ -30,21 +30,24 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Register service worker for offline support
+      // Register service worker for offline support (production only — skip on localhost to avoid stale dev caches)
       if ('serviceWorker' in navigator) {
-        console.log('🔍 Service Worker API available');
-        window.addEventListener('load', () => {
-          console.log('🚀 Attempting to register service worker...');
-          navigator.serviceWorker.register('/service-worker.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registered successfully:', registration);
-            })
-            .catch((error) => {
-              console.error('❌ Service Worker registration failed:', error);
-            });
-        });
-      } else {
-        console.warn('⚠️ Service Worker API not available in this browser');
+        const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (isLocalDev) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            registrations.forEach((registration) => registration.unregister());
+          });
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+              .then((registration) => {
+                console.log('Service Worker registered:', registration);
+              })
+              .catch((error) => {
+                console.error('Service Worker registration failed:', error);
+              });
+          });
+        }
       }
     </script>
   </body>

@@ -114,7 +114,7 @@
     scrollbar-color: rgba(255,255,255,0.18) transparent;
   }
 
-  /* Focus Mode */
+  /* Focus mode — dim sidebar & inactive tabs while editing */
   .focus-mode .sidebar {
     opacity: 0.15;
     transition: 0.25s ease;
@@ -137,7 +137,6 @@
     );
   }
 
-  /* Navbar dimming in Focus Mode - fade only, no color change */
   .focus-mode .top-nav {
     opacity: 0.4;
     transition: 0.25s ease;
@@ -148,8 +147,22 @@
     transition: 0.25s ease;
   }
 
-  .focus-mode .top-nav .focus-toggle {
+  .focus-mode .top-nav .focus-toggle,
+  .focus-mode .top-nav .fullscreen-toggle {
     opacity: 1;
+  }
+
+  /* Presentation fullscreen — hide floating panels outside AppLayout */
+  html.app-fullscreen [data-floating-panel] {
+    display: none !important;
+  }
+
+  .fullscreen-mode .editor-background {
+    background: var(--bg-editor);
+  }
+
+  .fullscreen-mode .editor-root {
+    max-width: none;
   }
 
   .nav-actions {

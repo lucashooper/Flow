@@ -436,28 +436,36 @@ export const NewDashboard = () => {
       </DndContext>
 
     {/* Simple floating timer for dashboard */}
+    <div data-floating-panel>
     <FloatingTimer
       isVisible={isTimerVisible}
       onClose={() => setIsTimerVisible(false)}
     />
+    </div>
 
     {/* Floating tasks modal */}
+    <div data-floating-panel>
     <FloatingTasks
       isVisible={isTasksVisible}
       onClose={() => setIsTasksVisible(false)}
     />
+    </div>
 
     {/* Ambient sounds */}
+    <div data-floating-panel>
     <AmbientSounds
       isVisible={isAmbientVisible}
       onClose={() => setIsAmbientVisible(false)}
     />
+    </div>
 
     {/* Focus stats */}
+    <div data-floating-panel>
     <FocusStats
       isVisible={isStatsVisible}
       onClose={() => setIsStatsVisible(false)}
     />
+    </div>
 
     {/* Break reminders */}
     <BreakReminder enabled={breakRemindersEnabled} />
