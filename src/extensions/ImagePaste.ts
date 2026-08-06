@@ -1,5 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey, TextSelection } from 'prosemirror-state';
+import { insertImageFast } from '../utils/insertImageFast';
+import { pasteImagesFromHtml } from '../utils/imageDropDebug';
 
 export interface ImagePasteOptions {
   uploadImage: (file: File) => Promise<string | null>;
@@ -22,83 +24,47 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
     // Shared helper: insert image or video file into editor with upload
     const insertMediaFile = (view: any, file: File) => {
       const isVideo = file.type.startsWith('video/');
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        const { schema, tr } = view.state;
-        
-        // Determine node type based on file type
-        let nodeType;
-        if (isVideo) {
-          nodeType = schema.nodes.resizableVideo;
-          if (!nodeType) {
-            console.error('❌ No video node type found in schema');
-            return;
-          }
-        } else {
-          // Use resizableImage node (custom extension) or fallback to image
-          nodeType = schema.nodes.resizableImage || schema.nodes.image;
-          if (!nodeType) {
-            console.error('❌ No image node type found in schema');
-            return;
-          }
-        }
-        
-        const tempNode = nodeType.create({ 
-          src: base64,
-          'data-uploading': 'true'
-        });
-        view.dispatch(tr.replaceSelectionWith(tempNode));
-        
-        // Upload actual file in background
-        uploadImage(file).then((url: string | null) => {
-          console.log('✅ Upload complete, URL:', url);
-          if (url) {
-            const { state, dispatch } = view;
-            let tempImagePos: number | null = null;
-            
-            state.doc.descendants((node: any, pos: number) => {
-              if ((node.type.name === 'resizableImage' || node.type.name === 'image' || node.type.name === 'resizableVideo') && 
-                  node.attrs['data-uploading'] === 'true') {
-                tempImagePos = pos;
-                return false;
-              }
-            });
-            
-            if (tempImagePos !== null) {
-              // Determine correct node type for replacement
-              const nodeType = state.schema.nodes.resizableVideo || 
-                              state.schema.nodes.resizableImage || 
-                              state.schema.nodes.image;
-              if (!nodeType) {
-                console.error('❌ No media node type found in schema for replacement');
-                return;
-              }
-              
-              const finalNode = nodeType.create({ src: url });
-              const replaceTr = state.tr.replaceRangeWith(
-                tempImagePos,
-                tempImagePos + 1,
-                finalNode
-              );
-              dispatch(replaceTr);
-              console.log('✅ Media replaced with uploaded URL');
-            }
-          }
-        }).catch((error: any) => {
-          console.error('❌ Upload failed:', error);
+
+      if (!isVideo) {
+        insertImageFast(view, file, uploadImage);
+        return;
+      }
+
+      const blobUrl = URL.createObjectURL(file);
+      const nodeType = view.state.schema.nodes.resizableVideo;
+      if (!nodeType) {
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      view.dispatch(
+        view.state.tr.replaceSelectionWith(
+          nodeType.create({ src: blobUrl, 'data-uploading': 'true' }),
+        ),
+      );
+
+      uploadImage(file)
+        .then((url: string | null) => {
+          if (!url) return;
           const { state, dispatch } = view;
           state.doc.descendants((node: any, pos: number) => {
-            if ((node.type.name === 'resizableImage' || node.type.name === 'image' || node.type.name === 'resizableVideo') && 
-                node.attrs['data-uploading'] === 'true') {
-              dispatch(state.tr.delete(pos, pos + node.nodeSize));
+            if (
+              node.type.name === 'resizableVideo' &&
+              node.attrs.src === blobUrl
+            ) {
+              dispatch(
+                state.tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  src: url,
+                  'data-uploading': null,
+                }),
+              );
+              URL.revokeObjectURL(blobUrl);
               return false;
             }
           });
-        });
-      };
-      
-      reader.readAsDataURL(file);
+        })
+        .catch(() => {});
     };
 
     return [
@@ -157,6 +123,14 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
             }
           },
           handlePaste: (view, event) => {
+            const html = event.clipboardData?.getData('text/html') ?? '';
+            if (html && html.includes('<img')) {
+              if (pasteImagesFromHtml(html, view)) {
+                event.preventDefault();
+                return true;
+              }
+            }
+
             console.log('🎯 ImagePaste Extension: Paste detected');
             const items = event.clipboardData?.items;
             

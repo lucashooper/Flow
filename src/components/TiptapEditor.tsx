@@ -42,6 +42,8 @@ import {
   plainTextToDocBlocks,
   sanitizePastedHtml,
 } from '../utils/sanitizePastedHtml';
+import { insertImageFast, insertImageFastInEditor } from '../utils/insertImageFast';
+import { pasteImagesFromHtml, extractImagesFromHtml, logImageDrop } from '../utils/imageDropDebug';
 import { useFocusMode } from '../contexts/FocusModeContext';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
@@ -258,6 +260,17 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         const plainText = clipboardData.getData('text/plain');
         const hasStructuredHtml = Boolean(html && htmlHasStructure(html));
 
+        // Internal or external image copy (Ctrl+C on canvas image) — HTML has <img>, no file blob
+        if (html && (html.includes('<img') || html.includes('resizable-image-wrapper'))) {
+          const extracted = extractImagesFromHtml(html);
+          if (extracted.length > 0) {
+            logImageDrop('paste: image HTML from clipboard', extracted);
+            event.preventDefault();
+            pasteImagesFromHtml(html, view);
+            return true;
+          }
+        }
+
         const insertSanitizedHtml = (rawHtml: string, preserveColors: boolean): boolean => {
           const processedHTML = sanitizePastedHtml(rawHtml, { preserveColors });
           try {
@@ -295,49 +308,13 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           
           if (imageFiles.length > 0) {
             console.log('🖼️ Processing', imageFiles.length, 'image(s) from clipboard');
-            event.preventDefault(); // Block default handling
-            
-            imageFiles.forEach(file => {
-              console.log('📸 Reading image:', file.name || 'clipboard-image', file.type);
-              
-              const reader = new FileReader();
-              reader.onload = async (e) => {
-                const dataUrl = e.target?.result as string;
-                console.log('✅ Image loaded, size:', Math.round(dataUrl.length / 1024), 'KB');
-                
-                // Upload to Supabase if available, otherwise use data URL
-                let imageUrl = dataUrl;
-                if (uploadImage) {
-                  console.log('☁️ Uploading to Supabase...');
-                  const uploaded = await uploadImage(file);
-                  if (uploaded) {
-                    imageUrl = uploaded;
-                    console.log('✅ Uploaded to Supabase:', imageUrl);
-                  }
-                }
-                
-                // Insert image into editor (use resizableImage node name)
-                const imageNode = view.state.schema.nodes.resizableImage || view.state.schema.nodes.image;
-                if (imageNode) {
-                  view.dispatch(
-                    view.state.tr.replaceSelectionWith(
-                      imageNode.create({ src: imageUrl })
-                    )
-                  );
-                  console.log('✅ Image inserted into editor');
-                } else {
-                  console.error('❌ Image node not found in schema');
-                }
-              };
-              
-              reader.onerror = (error) => {
-                console.error('❌ Image read failed:', error);
-              };
-              
-              reader.readAsDataURL(file);
+            event.preventDefault();
+
+            imageFiles.forEach((file) => {
+              insertImageFast(view, file, uploadImage);
             });
-            
-            return true; // We handled it
+
+            return true;
           }
           
           if (videoFiles.length > 0) {
@@ -404,11 +381,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         // Prefer structured HTML (Gemini, ChatGPT, Google Docs) over plain-text LaTeX
         if (html && !isFromOffice) {
           console.log('✅ Found HTML data:', html.substring(0, 200));
-
-          if (html.includes('<img')) {
-            console.log('🖼️ HTML contains <img> tag - delegating to ImagePaste extension');
-            return false;
-          }
 
           if (hasStructuredHtml) {
             const internal = isInternalFlowPaste(html);
@@ -594,60 +566,32 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           editor.chain().focus().setTextSelection(endPos).run();
           
           // Process each media file
-          mediaFiles.forEach(file => {
-            console.log('📸 [TiptapEditor] Processing file:', file.name, file.type);
-            
-            // Create temporary base64 preview
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-              const base64 = event.target?.result as string;
-              const isVideo = file.type.startsWith('video/');
-              const nodeType = isVideo ? 'resizableVideo' : 'resizableImage';
-              
-              // Insert temporary media
+          mediaFiles.forEach((file) => {
+            if (file.type.startsWith('image/')) {
+              insertImageFastInEditor(editor, file, uploadImage);
+            } else {
+              const blobUrl = URL.createObjectURL(file);
               editor.chain().focus().insertContent({
-                type: nodeType,
-                attrs: {
-                  src: base64,
-                  'data-uploading': true,
-                },
+                type: 'resizableVideo',
+                attrs: { src: blobUrl, 'data-uploading': true },
               }).run();
-              
-              // Upload to Supabase
-              try {
-                const uploadedUrl = await uploadImage(file);
-                if (uploadedUrl) {
-                  // Replace temporary media with uploaded URL
-                  const { state } = editor;
-                  const { doc } = state;
-                  let found = false;
-                  
-                  doc.descendants((node, pos) => {
-                    if ((node.type.name === 'resizableImage' || node.type.name === 'resizableVideo') && 
-                        node.attrs.src === base64) {
-                      const tr = state.tr.setNodeMarkup(pos, undefined, {
+              void uploadImage(file).then((url) => {
+                if (!url) return;
+                editor.state.doc.descendants((node, pos) => {
+                  if (node.type.name === 'resizableVideo' && node.attrs.src === blobUrl) {
+                    editor.view.dispatch(
+                      editor.state.tr.setNodeMarkup(pos, undefined, {
                         ...node.attrs,
-                        src: uploadedUrl,
-                        'data-uploading': false,
-                      });
-                      editor.view.dispatch(tr);
-                      found = true;
-                      console.log('✅ [TiptapEditor] Replaced temp media with uploaded URL');
-                      return false;
-                    }
-                  });
-                  
-                  if (!found) {
-                    console.warn('⚠️ [TiptapEditor] Could not find temp media to replace');
+                        src: url,
+                        'data-uploading': null,
+                      }),
+                    );
+                    URL.revokeObjectURL(blobUrl);
+                    return false;
                   }
-                } else {
-                  console.error('❌ [TiptapEditor] Upload failed');
-                }
-              } catch (error) {
-                console.error('❌ [TiptapEditor] Upload error:', error);
-              }
-            };
-            reader.readAsDataURL(file);
+                });
+              });
+            }
           });
           
           return;
@@ -1299,12 +1243,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         
         /* Inline images — hug content so multiple can sit on one row */
         .ProseMirror .resizable-image-wrapper {
-          display: inline-block !important;
+          display: block;
           vertical-align: top;
           width: auto !important;
           max-width: 100%;
-          margin: 0.25rem 0.5rem 0.25rem 0;
+          margin: 0;
           line-height: 0;
+          flex-shrink: 0;
+        }
+        .ProseMirror .resizable-image-wrapper.is-dragging {
+          z-index: 30;
         }
         .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode {
           outline: 2px solid #8cf !important;
@@ -1330,13 +1278,32 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           outline: none !important;
         }
         
-        /* Make images resizable by dragging */
-        .ProseMirror img {
-          cursor: nwse-resize;
-          position: relative;
-        }
-        .ProseMirror img:hover {
+        /* Subtle hover ring — grab cursor comes from the node view wrapper */
+        .ProseMirror .resizable-image-wrapper .group:hover img {
           box-shadow: 0 0 0 2px #A0522D40;
+        }
+
+        /* Side-by-side images live in the same paragraph */
+        .ProseMirror p:has(.resizable-image-wrapper) {
+          line-height: 0 !important;
+          display: flex !important;
+          flex-direction: row !important;
+          flex-wrap: wrap !important;
+          gap: 12px !important;
+          align-items: flex-start !important;
+          margin: 0.5rem 0 !important;
+        }
+        
+        /* Hide ProseMirror separator that breaks inline layout */
+        .ProseMirror p:has(.resizable-image-wrapper) .ProseMirror-separator {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+        
+        /* Hide trailing break in image paragraphs */
+        .ProseMirror p:has(.resizable-image-wrapper) .ProseMirror-trailingBreak {
+          display: none !important;
         }
         
         /* Tiptap Styles */
