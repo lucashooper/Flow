@@ -39,6 +39,7 @@ export const Settings = () => {
   const [pinError, setPinError] = useState('');
   const [pinSuccess, setPinSuccess] = useState('');
   const [savingPin, setSavingPin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -221,7 +222,13 @@ export const Settings = () => {
     }
   };
 
-  const isAdmin = user?.email === 'edwardsjonny547@gmail.com';
+  // Update isAdmin when user changes (forces re-render)
+  useEffect(() => {
+    const adminStatus = user?.email === 'edwardsjonny547@gmail.com';
+    console.log('[Settings] User email:', user?.email);
+    console.log('[Settings] Is admin:', adminStatus);
+    setIsAdmin(adminStatus);
+  }, [user?.email]);
 
   const menuItems = [
     { id: 'profile' as SettingsSection, label: 'My Profile', icon: User },
