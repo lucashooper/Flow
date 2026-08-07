@@ -261,10 +261,25 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         const hasStructuredHtml = Boolean(html && htmlHasStructure(html));
 
         // Internal or external image copy (Ctrl+C on canvas image) — HTML has <img>, no file blob
+        // Only handle as image-only paste if there's no meaningful text content
         if (html && (html.includes('<img') || html.includes('resizable-image-wrapper'))) {
           const extracted = extractImagesFromHtml(html);
-          if (extracted.length > 0) {
-            logImageDrop('paste: image HTML from clipboard', extracted);
+          
+          // Check if this is ONLY images (no paragraphs, headings, or other content)
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+          const textContent = tempDiv.textContent?.trim() || '';
+          const hasRichContent = html.includes('<p>') || html.includes('<h1>') || 
+                                 html.includes('<h2>') || html.includes('<h3>') || 
+                                 html.includes('<ul>') || html.includes('<ol>');
+          
+          // If there's text or rich formatting, handle as full HTML paste
+          if (textContent.length > 0 || hasRichContent) {
+            console.log('📋 Mixed content detected (text + images) - using full HTML paste');
+            // Fall through to normal HTML paste below
+          } else if (extracted.length > 0) {
+            // Pure image paste
+            logImageDrop('paste: image-only HTML from clipboard', extracted);
             event.preventDefault();
             pasteImagesFromHtml(html, view);
             return true;
@@ -1246,11 +1261,15 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         .ProseMirror .resizable-image-wrapper {
           display: block;
           vertical-align: top;
-          width: auto !important;
-          max-width: 100%;
+          max-width: 100% !important;
           margin: 0;
           line-height: 0;
           flex-shrink: 0;
+        }
+        
+        /* Ensure images shrink when editor width is constrained */
+        .ProseMirror .resizable-image-wrapper > span {
+          max-width: 100% !important;
         }
         .ProseMirror .resizable-image-wrapper.is-dragging {
           z-index: 30;

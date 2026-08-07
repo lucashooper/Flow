@@ -25,10 +25,15 @@ export const useOfflineSync = () => {
       // Fix any outbox payloads with fields Supabase doesn't accept (e.g. position)
       await repairOutboxPayloads();
 
-      // 1. Push outbox items to server
+      // 1. Push outbox items to server (folders first, then notes)
       const outboxItems = await db.outbox.toArray();
       
-      for (const item of outboxItems) {
+      // Separate folders and notes, sync folders first to satisfy foreign keys
+      const folderItems = outboxItems.filter(item => item.entityType === 'folder');
+      const noteItems = outboxItems.filter(item => item.entityType === 'note');
+      const orderedItems = [...folderItems, ...noteItems];
+      
+      for (const item of orderedItems) {
         try {
           if (item.operation === 'upsert') {
             const table = item.entityType === 'note' ? 'notes' : 'folders';
@@ -37,7 +42,15 @@ export const useOfflineSync = () => {
               .from(table)
               .upsert(payload);
             
-            if (error) throw error;
+            if (error) {
+              // If foreign key error, skip for now (folder will sync on next attempt)
+              if (error.code === '23503') {
+                console.warn(`⏭️ Skipping ${item.entityType} ${item.entityId} - parent folder not synced yet`);
+                await db.outbox.update(item.id, { attempts: item.attempts + 1 });
+                continue;
+              }
+              throw error;
+            }
             
             // Mark as synced in local DB
             if (item.entityType === 'note') {
@@ -62,8 +75,19 @@ export const useOfflineSync = () => {
           }
         } catch (error: any) {
           const message = error?.message || error?.code || String(error);
-          console.error(`❌ Failed to upload ${item.entityType} ${item.entityId} to Supabase:`, message, error);
-          await db.outbox.update(item.id, { attempts: item.attempts + 1 });
+          
+          // Don't spam console with repeated errors for same item
+          if (item.attempts < 3) {
+            console.error(`❌ Failed to upload ${item.entityType} ${item.entityId} to Supabase:`, message, error);
+          }
+          
+          // Stop retrying after 10 attempts to prevent infinite loops
+          if (item.attempts >= 10) {
+            console.error(`🛑 Giving up on ${item.entityType} ${item.entityId} after 10 attempts`);
+            await db.outbox.delete(item.id);
+          } else {
+            await db.outbox.update(item.id, { attempts: item.attempts + 1 });
+          }
         }
       }
 

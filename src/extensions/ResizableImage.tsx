@@ -229,8 +229,7 @@ const ResizableImageComponent = (props: any) => {
         ref={wrapperRef}
         className="relative inline-block group align-top"
         style={{
-          width: `${width}px`,
-          maxWidth: '100%',
+          width: width ? `min(${width}px, 100%)` : '100%',
           userSelect: 'none',
           verticalAlign: 'top',
           cursor: showEditorChrome ? (isDragging ? 'grabbing' : 'grab') : 'default',
