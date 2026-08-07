@@ -7,6 +7,7 @@ import { NewDashboard } from './pages/NewDashboard';
 import { Settings } from './pages/Settings';
 import { Tasks } from './pages/Tasks';
 import { Calendar } from './pages/Calendar';
+import { AdminDashboard } from './components/AdminDashboard';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -58,6 +59,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Calendar />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />

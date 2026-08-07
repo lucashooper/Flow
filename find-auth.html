@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Find Auth Token</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e5e5e5;
+        }
+        .result {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #2a2a2a;
+            background: #151515;
+        }
+        .success { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .error { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #10b981;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Find Supabase Auth Token</h1>
+    <p>Searching all localStorage keys for Supabase auth...</p>
+
+    <div id="results"></div>
+
+    <script>
+        const ADMIN_EMAIL = 'edwardsjonny547@gmail.com';
+        const resultsDiv = document.getElementById('results');
+        let html = '';
+
+        // Search all localStorage keys
+        const allKeys = Object.keys(localStorage);
+        const supabaseKeys = allKeys.filter(k => 
+            k.includes('supabase') || 
+            k.includes('auth') || 
+            k.includes('sb-')
+        );
+
+        html += `<div class="result">`;
+        html += `<h2>📋 Found ${supabaseKeys.length} Supabase-related keys:</h2>`;
+        html += `<ul>`;
+        supabaseKeys.forEach(key => {
+            html += `<li><code>${key}</code></li>`;
+        });
+        html += `</ul>`;
+        html += `</div>`;
+
+        // Try to find user email in each key
+        let foundUser = false;
+        let userEmail = null;
+
+        for (const key of supabaseKeys) {
+            try {
+                const value = localStorage.getItem(key);
+                const parsed = JSON.parse(value);
+                
+                // Try different possible paths
+                const possibleEmails = [
+                    parsed?.currentSession?.user?.email,
+                    parsed?.user?.email,
+                    parsed?.session?.user?.email,
+                    parsed?.access_token ? 'Has access token' : null,
+                    parsed?.email
+                ];
+
+                for (const email of possibleEmails) {
+                    if (email && typeof email === 'string' && email.includes('@')) {
+                        foundUser = true;
+                        userEmail = email;
+                        
+                        html += `<div class="result ${email === ADMIN_EMAIL ? 'success' : 'warning'}">`;
+                        html += `<h2>${email === ADMIN_EMAIL ? '✅' : '⚠️'} Found User!</h2>`;
+                        html += `<p><strong>Key:</strong> <code>${key}</code></p>`;
+                        html += `<p><strong>Your email:</strong> <code>${email}</code></p>`;
+                        html += `<p><strong>Admin email:</strong> <code>${ADMIN_EMAIL}</code></p>`;
+                        html += `<p><strong>Match:</strong> ${email === ADMIN_EMAIL ? 
+                            '✅ YES - You ARE admin!' : 
+                            '❌ NO - Email does not match'
+                        }</p>`;
+                        
+                        if (email === ADMIN_EMAIL) {
+                            html += `<p style="color: #10b981; font-weight: bold;">Admin Dashboard should be visible in Settings!</p>`;
+                            html += `<p>If you still don't see it, the app might not be using the latest code.</p>`;
+                        } else {
+                            html += `<p style="color: #f59e0b;">To see Admin Dashboard, log out and log in as: <code>${ADMIN_EMAIL}</code></p>`;
+                        }
+                        
+                        html += `<details style="margin-top: 15px;">`;
+                        html += `<summary>Full token structure</summary>`;
+                        html += `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+                        html += `</details>`;
+                        html += `</div>`;
+                        break;
+                    }
+                }
+                
+                if (foundUser) break;
+                
+            } catch (e) {
+                // Not JSON or can't parse, skip
+            }
+        }
+
+        if (!foundUser) {
+            html += `<div class="result error">`;
+            html += `<h2>❌ No User Found</h2>`;
+            html += `<p>Found Supabase keys but couldn't extract user email from any of them.</p>`;
+            html += `<p><strong>Possible reasons:</strong></p>`;
+            html += `<ol>`;
+            html += `<li>Not logged in to Flow</li>`;
+            html += `<li>Auth token structure is different than expected</li>`;
+            html += `<li>Opening this HTML from wrong browser/profile</li>`;
+            html += `</ol>`;
+            html += `<p><strong>To fix:</strong></p>`;
+            html += `<ol>`;
+            html += `<li>Make sure Flow app is open in THIS browser window/tab</li>`;
+            html += `<li>Log in to Flow if not already logged in</li>`;
+            html += `<li>Refresh this page</li>`;
+            html += `</ol>`;
+            html += `</div>`;
+
+            // Show contents of keys for debugging
+            html += `<div class="result">`;
+            html += `<h3>🔍 Debug: Raw localStorage contents</h3>`;
+            for (const key of supabaseKeys) {
+                const value = localStorage.getItem(key);
+                html += `<details style="margin: 10px 0;">`;
+                html += `<summary><code>${key}</code></summary>`;
+                html += `<pre>${value}</pre>`;
+                html += `</details>`;
+            }
+            html += `</div>`;
+        }
+
+        // Show all localStorage keys for debugging
+        html += `<div class="result">`;
+        html += `<h3>📦 All localStorage Keys (${allKeys.length} total)</h3>`;
+        html += `<details>`;
+        html += `<summary>Click to view all keys</summary>`;
+        html += `<pre>${allKeys.join('\n')}</pre>`;
+        html += `</details>`;
+        html += `</div>`;
+
+        resultsDiv.innerHTML = html;
+    </script>
+</body>
+</html>

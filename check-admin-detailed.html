@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flow Admin Diagnostic</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e5e5e5;
+        }
+        .result {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #2a2a2a;
+            background: #151515;
+        }
+        .success { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .error { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        .info { border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        code {
+            background: #1a1a1a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #10b981;
+            font-size: 13px;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        h1 { color: #e5e5e5; margin-bottom: 10px; }
+        h2 { margin-top: 0; }
+        ol, ul { line-height: 1.8; }
+        .copy-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Flow Admin Status Diagnostic</h1>
+    <p style="color: #888;">This page will tell you exactly why the Admin Dashboard isn't showing.</p>
+
+    <div id="results">Analyzing...</div>
+
+    <script>
+        const ADMIN_EMAIL = 'edwardsjonny547@gmail.com';
+        const resultsDiv = document.getElementById('results');
+        let html = '';
+
+        // Step 1: Find all Supabase localStorage keys
+        const allKeys = Object.keys(localStorage);
+        const supabaseKeys = allKeys.filter(k => 
+            k.startsWith('sb-') || 
+            k.includes('supabase') || 
+            k.includes('auth-token')
+        );
+
+        html += `<div class="result info">`;
+        html += `<h2>Step 1: Searching localStorage</h2>`;
+        html += `<p>Found <strong>${supabaseKeys.length}</strong> Supabase-related keys:</p>`;
+        if (supabaseKeys.length > 0) {
+            html += `<ul>`;
+            supabaseKeys.forEach(k => html += `<li><code>${k}</code></li>`);
+            html += `</ul>`;
+        } else {
+            html += `<p style="color: #ef4444;">❌ No Supabase keys found! This means you're not logged in.</p>`;
+        }
+        html += `</div>`;
+
+        // Step 2: Extract user email from Supabase auth
+        let userEmail = null;
+        let authTokenKey = null;
+
+        for (const key of supabaseKeys) {
+            try {
+                const value = localStorage.getItem(key);
+                if (!value) continue;
+                
+                const parsed = JSON.parse(value);
+                
+                // Supabase stores session in different formats
+                const session = parsed.currentSession || parsed.session || parsed;
+                const user = session?.user || parsed?.user;
+                
+                if (user?.email) {
+                    userEmail = user.email;
+                    authTokenKey = key;
+                    break;
+                }
+            } catch (e) {
+                // Skip non-JSON values
+            }
+        }
+
+        // Step 3: Show results and diagnosis
+        if (!userEmail) {
+            html += `<div class="result error">`;
+            html += `<h2>❌ Diagnosis: NOT LOGGED IN</h2>`;
+            html += `<p><strong>Problem:</strong> No user email found in any Supabase auth token.</p>`;
+            html += `<p><strong>This means you are not logged in to Flow.</strong></p>`;
+            html += `<h3>To fix:</h3>`;
+            html += `<ol>`;
+            html += `<li>Open Flow in THIS SAME BROWSER window</li>`;
+            html += `<li>Log in with: <code>${ADMIN_EMAIL}</code></li>`;
+            html += `<li>Refresh this page</li>`;
+            html += `</ol>`;
+            html += `</div>`;
+            
+            // Debug info
+            html += `<div class="result">`;
+            html += `<h3>🔍 Debug: Raw localStorage data</h3>`;
+            html += `<p style="color: #888;">Showing all Supabase keys for debugging:</p>`;
+            for (const key of supabaseKeys) {
+                const value = localStorage.getItem(key);
+                html += `<details style="margin: 10px 0;">`;
+                html += `<summary><code>${key}</code> (${value?.length || 0} chars)</summary>`;
+                html += `<pre>${value || '(empty)'}</pre>`;
+                html += `</details>`;
+            }
+            html += `</div>`;
+            
+        } else {
+            // User is logged in
+            const isAdmin = userEmail === ADMIN_EMAIL;
+            
+            html += `<div class="result ${isAdmin ? 'success' : 'warning'}">`;
+            html += `<h2>${isAdmin ? '✅' : '⚠️'} Logged In</h2>`;
+            html += `<p><strong>Your email:</strong> <code>${userEmail}</code></p>`;
+            html += `<p><strong>Admin email:</strong> <code>${ADMIN_EMAIL}</code></p>`;
+            html += `<p><strong>Token key:</strong> <code>${authTokenKey}</code></p>`;
+            html += `</div>`;
+
+            if (isAdmin) {
+                // They ARE admin but still don't see dashboard
+                html += `<div class="result error">`;
+                html += `<h2>❌ Diagnosis: Code Not Deployed</h2>`;
+                html += `<p>You're logged in as the admin email, but the Admin Dashboard still doesn't show.</p>`;
+                html += `<p><strong>This means your live app doesn't have the updated Settings.tsx code yet.</strong></p>`;
+                html += `<h3>To fix:</h3>`;
+                html += `<ol>`;
+                html += `<li><strong>Rebuild the app:</strong>`;
+                html += `<pre>cd "c:\\Users\\lucas\\OneDrive\\Desktop\\Flow\\Flow"
+npm run build</pre>`;
+                html += `</li>`;
+                html += `<li><strong>Deploy the new <code>dist/</code> folder to your hosting</strong></li>`;
+                html += `<li><strong>Hard refresh the app:</strong> <code>Ctrl+Shift+R</code></li>`;
+                html += `</ol>`;
+                html += `<h3>Or run locally to test:</h3>`;
+                html += `<pre>npm run dev</pre>`;
+                html += `<p>Then go to <code>http://localhost:5173</code> and you should see Admin Dashboard in Settings.</p>`;
+                html += `</div>`;
+
+                html += `<div class="result info">`;
+                html += `<h2>📋 What the Code Does</h2>`;
+                html += `<p>In <code>Settings.tsx</code>, line 224:</p>`;
+                html += `<pre>const isAdmin = user?.email === 'edwardsjonny547@gmail.com';
+
+// ...later in the JSX:
+{isAdmin && (
+  &lt;button onClick={() => navigate('/admin')}&gt;
+    Admin Dashboard
+  &lt;/button&gt;
+)}</pre>`;
+                html += `<p>This checks if the logged-in user's email matches yours. <strong>No SQL or database changes needed.</strong></p>`;
+                html += `</div>`;
+                
+            } else {
+                // Wrong email
+                html += `<div class="result error">`;
+                html += `<h2>❌ Diagnosis: Wrong Email</h2>`;
+                html += `<p>You're logged in as <code>${userEmail}</code>, but admin requires <code>${ADMIN_EMAIL}</code>.</p>`;
+                html += `<h3>To fix:</h3>`;
+                html += `<ol>`;
+                html += `<li>Log out of Flow</li>`;
+                html += `<li>Log back in with: <code>${ADMIN_EMAIL}</code></li>`;
+                html += `<li>Admin Dashboard will then appear in Settings</li>`;
+                html += `</ol>`;
+                html += `</div>`;
+            }
+        }
+
+        // Step 4: SQL option (if they really want it)
+        html += `<div class="result info">`;
+        html += `<h2>💡 Do You Need SQL?</h2>`;
+        html += `<p><strong>Short answer: No.</strong></p>`;
+        html += `<p>The admin check happens in the React code, not the database. There's no "admin" column or table.</p>`;
+        html += `<p>The code simply checks: <code>user?.email === 'edwardsjonny547@gmail.com'</code></p>`;
+        html += `<p>However, if you want to verify your user exists in the database, run this SQL in Supabase:</p>`;
+        html += `<pre>-- Check all registered users
+SELECT id, email, created_at 
+FROM auth.users 
+ORDER BY created_at DESC;</pre>`;
+        html += `<p>You should see <code>${ADMIN_EMAIL}</code> in the list if you've signed up.</p>`;
+        html += `</div>`;
+
+        resultsDiv.innerHTML = html;
+    </script>
+</body>
+</html>

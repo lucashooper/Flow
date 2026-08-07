@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flow Admin Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e5e5e5;
+        }
+        .result {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #2a2a2a;
+            background: #151515;
+        }
+        .success { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .error { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        h1 { color: #e5e5e5; }
+        code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #10b981;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Flow Admin Status Check</h1>
+    <p>This will check if you're logged in as the admin user.</p>
+
+    <div id="results"></div>
+
+    <script>
+        const ADMIN_EMAIL = 'edwardsjonny547@gmail.com';
+        const resultsDiv = document.getElementById('results');
+
+        // Check Supabase auth
+        const authToken = localStorage.getItem('supabase.auth.token');
+        
+        if (!authToken) {
+            resultsDiv.innerHTML = `
+                <div class="result error">
+                    <h2>❌ Not Logged In</h2>
+                    <p>No Supabase auth token found in localStorage.</p>
+                    <p><strong>Action:</strong> Go to your Flow app and log in first.</p>
+                </div>
+            `;
+        } else {
+            try {
+                const parsed = JSON.parse(authToken);
+                const userEmail = parsed?.currentSession?.user?.email;
+                
+                if (!userEmail) {
+                    resultsDiv.innerHTML = `
+                        <div class="result warning">
+                            <h2>⚠️ Token Found But No Email</h2>
+                            <p>Auth token exists but couldn't extract email.</p>
+                            <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    const isAdmin = userEmail === ADMIN_EMAIL;
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="result ${isAdmin ? 'success' : 'warning'}">
+                            <h2>${isAdmin ? '✅' : '⚠️'} Logged In</h2>
+                            <p><strong>Your email:</strong> <code>${userEmail}</code></p>
+                            <p><strong>Admin email:</strong> <code>${ADMIN_EMAIL}</code></p>
+                            <p><strong>Status:</strong> ${isAdmin ? 
+                                '✅ You ARE an admin' : 
+                                `❌ You are NOT an admin (email doesn't match)`
+                            }</p>
+                        </div>
+
+                        ${!isAdmin ? `
+                            <div class="result error">
+                                <h2>Why Admin Dashboard Isn't Showing</h2>
+                                <p>You're logged in as <code>${userEmail}</code> but admin access requires <code>${ADMIN_EMAIL}</code>.</p>
+                                <p><strong>To fix:</strong></p>
+                                <ol>
+                                    <li>Log out of Flow</li>
+                                    <li>Log in with <code>${ADMIN_EMAIL}</code></li>
+                                    <li>Refresh the app</li>
+                                </ol>
+                            </div>
+                        ` : `
+                            <div class="result success">
+                                <h2>✅ You Should See Admin Dashboard</h2>
+                                <p>Your email matches! Admin link should appear in Settings.</p>
+                                <p><strong>If you still don't see it:</strong></p>
+                                <ol>
+                                    <li>Hard refresh: <code>Ctrl+Shift+R</code></li>
+                                    <li>Clear cache: <code>Ctrl+Shift+Delete</code></li>
+                                    <li>Check you're on the latest deployed version</li>
+                                    <li>Check browser console for errors</li>
+                                </ol>
+                                <button onclick="window.location.href='/admin'">
+                                    Go to Admin Dashboard
+                                </button>
+                            </div>
+                        `}
+
+                        <div class="result">
+                            <h3>📋 Full Auth Token</h3>
+                            <details>
+                                <summary>Click to expand</summary>
+                                <pre style="font-size: 12px; overflow-x: auto;">${JSON.stringify(parsed, null, 2)}</pre>
+                            </details>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                resultsDiv.innerHTML = `
+                    <div class="result error">
+                        <h2>❌ Invalid Auth Token</h2>
+                        <p>Token exists but couldn't parse it: ${e.message}</p>
+                        <p><strong>Action:</strong> Log out and log back in.</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

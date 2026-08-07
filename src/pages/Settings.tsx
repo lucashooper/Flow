@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock, Cloud } from 'lucide-react';
+import { ArrowLeft, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock, Cloud, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SyncDiagnostics } from '../components/SyncDiagnostics';
@@ -221,6 +221,8 @@ export const Settings = () => {
     }
   };
 
+  const isAdmin = user?.email === 'edwardsjonny547@gmail.com';
+
   const menuItems = [
     { id: 'profile' as SettingsSection, label: 'My Profile', icon: User },
     { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
@@ -266,6 +268,19 @@ export const Settings = () => {
                 </button>
               );
             })}
+            
+            {isAdmin && (
+              <>
+                <div className="my-4 border-t border-[#2a2a2a]" />
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-orange-400 hover:bg-[#151515]"
+                >
+                  <Shield className="w-5 h-5" />
+                  <span className="text-sm font-medium">Admin Dashboard</span>
+                </button>
+              </>
+            )}
           </nav>
         </div>
 
