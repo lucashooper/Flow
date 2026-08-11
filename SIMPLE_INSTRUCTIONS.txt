@@ -1,0 +1,67 @@
+====================================
+ONE-SCRIPT IMPORT - SIMPLE VERSION
+====================================
+
+STEP 1: Open TWO files in Notepad
+-------------------------------------
+
+File 1: 
+c:\Users\lucas\OneDrive\Desktop\Flow\Flow\PASTE_THIS.js
+
+File 2:
+c:\Users\lucas\Downloads\flow-indexeddb-backup-1786112234195.json
+
+
+STEP 2: Copy JSON into Script
+-------------------------------------
+
+In File 2 (JSON backup):
+- Select ALL (Ctrl+A)
+- Copy (Ctrl+C)
+
+In File 1 (PASTE_THIS.js):
+- Find line 9: const YOUR_JSON_HERE = {};
+- Select the {} 
+- Paste your JSON (Ctrl+V)
+- Save (Ctrl+S)
+
+
+STEP 3: Run in Browser
+-------------------------------------
+
+In File 1 (PASTE_THIS.js):
+- Select ALL (Ctrl+A)
+- Copy (Ctrl+C)
+
+In your browser (http://localhost:5174):
+- Press F12 (open console)
+- Paste the entire script (Ctrl+V)
+- Press Enter
+
+Wait 1-2 minutes while it imports.
+
+
+STEP 4: Refresh
+-------------------------------------
+
+When you see "✅ IMPORT COMPLETE!":
+- Press F5 to refresh the page
+- Your 1,029 notes will appear!
+
+
+====================================
+TROUBLESHOOTING
+====================================
+
+"No JSON data found"
+→ You didn't replace the {} with your JSON
+→ Go back to Step 2
+
+"IndexedDB error"
+→ Make sure you're logged in as edwardsjonny547@gmail.com
+→ Reload page and try again
+
+"Notes still don't appear"
+→ Check console for errors
+→ Try logging out and back in
+→ Make sure you're on http://localhost:5174 (not production)
