@@ -38,6 +38,27 @@ desktop.ini
 # Supabase CLI local state
 .supabase/
 
+# Backup / migration scripts (contain user data & secrets — never commit)
+READY_TO_PASTE.js
+RESTORE_LAVA_BROWSER.js
+PASTE_THIS.js
+IMPORT_SCRIPT.js
+import-data.sql
+import-from-json.sql
+*-backup.json
+flow-indexeddb-backup*.json
+lava-note-backup.json
+restore-*.cjs
+generate-browser-restore.cjs
+check-*-lava.cjs
+check-lava-folder.cjs
+check-production-lava.cjs
+make-import-script.cjs
+json-to-sql.cjs
+split-sql.cjs
+backup-images.mjs
+list-buckets.mjs
+
 # Optional: local-only subprojects with their own env
 Lucas-Orbit/
 Lucas's Orbit/

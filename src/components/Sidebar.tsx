@@ -222,14 +222,8 @@ export const Sidebar = ({
       const bStarred = b.is_starred ?? false;
       if (aStarred && !bStarred) return -1;
       if (!aStarred && bStarred) return 1;
-      // Then sort by position (for drag-and-drop reordering)
-      // If either note has a position, treat missing position as "after" all positioned notes.
-      const aPos = a.position;
-      const bPos = b.position;
-      if (aPos !== undefined || bPos !== undefined) {
-        return (aPos ?? Number.POSITIVE_INFINITY) - (bPos ?? Number.POSITIVE_INFINITY);
-      }
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      // Then sort by creation date (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   
   if (import.meta.env.DEV) {
