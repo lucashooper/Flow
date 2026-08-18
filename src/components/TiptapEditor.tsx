@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { DOMParser as PMDOMParser } from 'prosemirror-model';
+import { TextSelection } from 'prosemirror-state';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -43,6 +44,11 @@ import {
   sanitizePastedHtml,
 } from '../utils/sanitizePastedHtml';
 import { insertImageFast, insertImageFastInEditor } from '../utils/insertImageFast';
+import {
+  ensureParagraphAfterPos,
+  ensureTrailingParagraph,
+  focusEditorAtEnd,
+} from '../utils/ensureEditableSpaceAroundImages';
 import { pasteImagesFromHtml, extractImagesFromHtml, logImageDrop } from '../utils/imageDropDebug';
 import { useFocusMode } from '../contexts/FocusModeContext';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
@@ -67,6 +73,11 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   const tiptapEditorRef = useRef<Editor | null>(null);
   const showMenuTimeout = useRef<number | null>(null);
   const lastSelectionTime = useRef<number>(0);
+  const isFullscreenRef = useRef(isFullscreen);
+
+  useEffect(() => {
+    isFullscreenRef.current = isFullscreen;
+  }, [isFullscreen]);
 
   // Spell checker initialization removed - using browser native spell check
   // useEffect(() => {
@@ -454,6 +465,69 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         console.log('⚠️ No compatible paste format found');
         return false;
       },
+      handleDOMEvents: {
+        mousedown(view, event) {
+          if (isFullscreenRef.current) return false;
+
+          const target = event.target as HTMLElement;
+          if (!view.dom.contains(target)) return false;
+
+          const coords = { left: event.clientX, top: event.clientY };
+          const posAt = view.posAtCoords(coords);
+
+          // Clicked empty padding below content
+          if (!posAt) {
+            focusEditorAtEnd(view);
+            event.preventDefault();
+            return true;
+          }
+
+          const resolvedPos = posAt.inside >= 0 ? posAt.inside : posAt.pos;
+          const $pos = view.state.doc.resolve(resolvedPos);
+          const parent = $pos.parent;
+
+          if (
+            parent.type.name === 'paragraph' &&
+            parent.childCount === 1 &&
+            (parent.firstChild?.type.name === 'resizableImage' ||
+              parent.firstChild?.type.name === 'image')
+          ) {
+            const dom = view.nodeDOM($pos.before($pos.depth));
+            if (dom instanceof HTMLElement) {
+              const rect = dom.getBoundingClientRect();
+              const edgeThreshold = 14;
+
+              if (event.clientY < rect.top + edgeThreshold) {
+                const beforePos = $pos.before($pos.depth);
+                const nodeBefore = view.state.doc.resolve(beforePos).nodeBefore;
+                if (
+                  !nodeBefore ||
+                  nodeBefore.type.name !== 'paragraph' ||
+                  nodeBefore.content.size > 0
+                ) {
+                  const paragraph = view.state.schema.nodes.paragraph;
+                  if (paragraph) {
+                    const tr = view.state.tr.insert(beforePos, paragraph.create());
+                    tr.setSelection(TextSelection.create(tr.doc, beforePos + 1));
+                    view.dispatch(tr);
+                    view.focus();
+                    event.preventDefault();
+                    return true;
+                  }
+                }
+              }
+
+              if (event.clientY > rect.bottom - edgeThreshold) {
+                ensureParagraphAfterPos(view, $pos.after($pos.depth), true);
+                event.preventDefault();
+                return true;
+              }
+            }
+          }
+
+          return false;
+        },
+      },
     },
   });
 
@@ -609,7 +683,8 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
               });
             }
           });
-          
+
+          ensureTrailingParagraph(editor.view, true);
           return;
         }
       }
@@ -1304,7 +1379,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         }
 
         /* Side-by-side images live in the same paragraph */
-        .ProseMirror p:has(.resizable-image-wrapper) {
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) {
           line-height: 0 !important;
           display: flex !important;
           flex-direction: row !important;
@@ -1313,22 +1388,32 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           align-items: flex-start !important;
           margin: 0.5rem 0 !important;
         }
+
+        /* Single-image paragraphs keep normal line height so you can click above/below */
+        .ProseMirror p:has(.resizable-image-wrapper):not(:has(.resizable-image-wrapper + .resizable-image-wrapper)) {
+          line-height: 1.7 !important;
+          display: block !important;
+          margin: 0.75rem 0 !important;
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+        }
         
-        /* Hide ProseMirror separator that breaks inline layout */
-        .ProseMirror p:has(.resizable-image-wrapper) .ProseMirror-separator {
+        /* Hide ProseMirror separator that breaks inline layout (multi-image rows only) */
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .ProseMirror-separator {
           display: none !important;
           width: 0 !important;
           height: 0 !important;
         }
         
-        /* Hide trailing break in image paragraphs */
-        .ProseMirror p:has(.resizable-image-wrapper) .ProseMirror-trailingBreak {
+        /* Hide trailing break only in multi-image rows */
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .ProseMirror-trailingBreak {
           display: none !important;
         }
         
         /* Tiptap Styles */
         .ProseMirror {
           min-height: 100%;
+          padding-bottom: 40vh;
         }
 
         .ProseMirror p.is-editor-empty:first-child::before {

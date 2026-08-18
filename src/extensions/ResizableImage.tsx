@@ -135,9 +135,6 @@ const ResizableImageComponent = (props: any) => {
       return;
     }
 
-    e.preventDefault();
-    e.stopPropagation();
-
     console.log('[ImageDrop] drag start @', fromPos, 'width=', width);
 
     const originX = e.clientX;
@@ -157,6 +154,7 @@ const ResizableImageComponent = (props: any) => {
         hasMoved = true;
         setIsDragging(true);
         document.body.style.cursor = 'grabbing';
+        moveEvent.preventDefault();
         console.log('[ImageDrop] threshold passed — now dragging');
       }
 

@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/react';
 import type { EditorView } from 'prosemirror-view';
+import { ensureTrailingParagraph } from './ensureEditableSpaceAroundImages';
 
 type UploadFn = (file: File) => Promise<string | null>;
 
@@ -27,6 +28,9 @@ export function insertImageFast(
       }),
     ),
   );
+
+  // Leave an empty paragraph below so users can click and type after the image.
+  ensureTrailingParagraph(view, true);
 
   void uploadImage(file)
     .then((uploadedUrl) => {
