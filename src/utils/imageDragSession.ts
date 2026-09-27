@@ -26,6 +26,35 @@ type PointerDragSession = {
 
 let activeSession: PointerDragSession | null = null;
 
+/** Force move semantics — never copy/link cursors during image repositioning. */
+function forceMoveDropEffect(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.effectAllowed = 'move';
+  }
+}
+
+function blockNativeDragStart(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function installHtml5DragGuards(): void {
+  document.addEventListener('dragover', forceMoveDropEffect, true);
+  document.addEventListener('dragenter', forceMoveDropEffect, true);
+  document.addEventListener('drop', forceMoveDropEffect, true);
+  document.addEventListener('dragstart', blockNativeDragStart, true);
+}
+
+function removeHtml5DragGuards(): void {
+  document.removeEventListener('dragover', forceMoveDropEffect, true);
+  document.removeEventListener('dragenter', forceMoveDropEffect, true);
+  document.removeEventListener('drop', forceMoveDropEffect, true);
+  document.removeEventListener('dragstart', blockNativeDragStart, true);
+}
+
 function logDropTarget(preview: ImageDropPreview | null, _coords: { x: number; y: number }): void {
   logDropTargetPreview(preview);
 }
@@ -49,6 +78,7 @@ function logDropExecute(
 function clearDragUi(): void {
   hideImageDropIndicator();
   destroyImageDropOverlay();
+  removeHtml5DragGuards();
   document.body.classList.remove('flow-image-dragging');
   document.body.style.cursor = '';
 }
@@ -191,6 +221,7 @@ export function createPointerGhost(source: HTMLElement): {
   ghost.style.overflow = 'hidden';
   ghost.classList.add('flow-image-drag-ghost');
 
+  ghost.querySelectorAll('[data-resize-handle]').forEach((el) => el.remove());
   ghost.querySelectorAll('img, video').forEach((el) => {
     (el as HTMLElement).style.pointerEvents = 'none';
   });
@@ -221,6 +252,7 @@ export function startPointerDragSession(
 
   document.body.classList.add('flow-image-dragging');
   document.body.style.cursor = 'grabbing';
+  installHtml5DragGuards();
 
   document.addEventListener('mousemove', handlePointerMove, true);
   document.addEventListener('mouseup', handlePointerUp, true);

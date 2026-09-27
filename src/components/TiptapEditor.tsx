@@ -640,7 +640,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       e.dataTransfer?.types.includes('Files') ?? false;
 
     const handleDragOver = (e: DragEvent) => {
-      // Only intercept OS file drags — do not interfere with in-editor pointer drag
+      // In-editor image repositioning — always move, never copy/link cursor
+      if (document.body.classList.contains('flow-image-dragging')) {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+          e.dataTransfer.effectAllowed = 'move';
+        }
+        return;
+      }
+      // Only intercept OS file drags
       if (!isFileDrag(e)) return;
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -669,6 +678,14 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     };
 
     const handleDrop = (e: DragEvent) => {
+      if (document.body.classList.contains('flow-image-dragging')) {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+          e.dataTransfer.effectAllowed = 'move';
+        }
+        return;
+      }
       logImageDrop('[onDrop:document]', e.dataTransfer?.files.length ?? 0, 'file(s)');
       clearFileDragOverlay();
       if (isFileDrag(e)) {
@@ -1414,72 +1431,121 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           box-shadow: none;
         }
 
-        /* Subtle resize pills on inner vertical edges */
+        /* Resize handles — all 4 edges, visible on hover/select */
+        .ProseMirror .flow-image-inner {
+          overflow: visible;
+        }
         .ProseMirror .flow-resize-pill {
           position: absolute;
+          border-radius: 999px;
+          background: rgba(56, 189, 248, 0.55);
+          opacity: 0;
+          transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+          z-index: 50;
+          pointer-events: auto !important;
+          box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+        }
+        .ProseMirror .flow-resize-pill-left,
+        .ProseMirror .flow-resize-pill-right {
           top: 50%;
           transform: translateY(-50%);
-          width: 4px;
-          height: 28px;
-          border-radius: 999px;
-          background: rgba(46, 170, 220, 0.35);
-          opacity: 0;
-          transition: opacity 0.18s ease, background 0.18s ease;
+          width: 5px;
+          height: 40px;
           cursor: col-resize;
-          z-index: 20;
         }
         .ProseMirror .flow-resize-pill-left {
-          left: 4px;
+          left: -2px;
         }
         .ProseMirror .flow-resize-pill-right {
-          right: 4px;
+          right: -2px;
+        }
+        .ProseMirror .flow-resize-pill-top,
+        .ProseMirror .flow-resize-pill-bottom {
+          left: 50%;
+          transform: translateX(-50%);
+          width: 40px;
+          height: 5px;
+          cursor: row-resize;
+        }
+        .ProseMirror .flow-resize-pill-top {
+          top: -2px;
+        }
+        .ProseMirror .flow-resize-pill-bottom {
+          bottom: -2px;
         }
         .ProseMirror .resizable-image-wrapper:hover .flow-resize-pill,
+        .ProseMirror .flow-image-inner:hover .flow-resize-pill,
         .ProseMirror .resizable-image-wrapper.is-selected .flow-resize-pill,
         .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode .flow-resize-pill {
           opacity: 1;
         }
         .ProseMirror .flow-resize-pill:hover {
-          background: rgba(46, 170, 220, 0.65);
+          background: #38bdf8;
+          box-shadow: 0 0 12px rgba(56, 189, 248, 0.75);
+        }
+        .ProseMirror .flow-resize-pill-left:hover,
+        .ProseMirror .flow-resize-pill-right:hover {
+          transform: translateY(-50%) scaleX(1.15);
+        }
+        .ProseMirror .flow-resize-pill-top:hover,
+        .ProseMirror .flow-resize-pill-bottom:hover {
+          transform: translateX(-50%) scaleY(1.15);
         }
 
-        /* Side-by-side images live in the same paragraph */
+        /* Side-by-side images live in the same paragraph — mandatory 24px Notion gap */
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) {
           line-height: 0 !important;
           display: flex !important;
           flex-direction: row !important;
           flex-wrap: nowrap !important;
-          gap: 20px !important;
-          column-gap: 20px !important;
-          row-gap: 20px !important;
-          align-items: flex-start !important;
+          gap: 24px !important;
+          column-gap: 24px !important;
+          row-gap: 24px !important;
+          align-items: center !important;
           justify-content: flex-start !important;
           margin: 0.5rem 0 !important;
           width: 100%;
           max-width: 100%;
+          box-sizing: border-box;
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
           min-width: 0;
-          flex: 1 1 calc(50% - 20px);
-          max-width: calc(50% - 20px);
+          flex: 1 1 calc(50% - 12px) !important;
+          max-width: calc(50% - 12px) !important;
+          width: auto !important;
           box-sizing: border-box;
-          margin: 0 10px !important;
+          margin: 0 !important;
+          overflow: visible;
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
-          flex: 1 1 calc(33.333% - 14px);
-          max-width: calc(33.333% - 14px);
+          flex: 1 1 calc(33.333% - 16px) !important;
+          max-width: calc(33.333% - 16px) !important;
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
-          flex: 1 1 calc(25% - 15px);
-          max-width: calc(25% - 15px);
+          flex: 1 1 calc(25% - 18px) !important;
+          max-width: calc(25% - 18px) !important;
         }
 
-        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper > span {
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper > span.flow-image-inner {
           max-width: 100% !important;
-          width: 100% !important;
+          margin: 0 !important;
+        }
+
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper .flow-image-media {
+          max-width: 100% !important;
+          object-fit: contain;
+        }
+
+        /* During ACTIVE drag — move cursor, no green plus / copy mode */
+        body.flow-image-dragging,
+        body.flow-image-dragging * {
+          cursor: grabbing !important;
+        }
+        body.flow-image-dragging .flow-resize-pill {
+          pointer-events: none !important;
         }
 
         /* During ACTIVE drag — ghost + source dimming */

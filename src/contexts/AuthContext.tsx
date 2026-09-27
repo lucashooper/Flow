@@ -50,12 +50,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const cachedUser = getCachedAuthUser();
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Linear-style: hydrate from local session cache immediately so the shell renders fast.
+    if (cachedUser) {
+      setUser(cachedUser);
+      setLoading(false);
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const userData = { id: session.user.id, email: session.user.email || '' };
         setUser(userData);
         if (navigator.onLine && !readOfflineMode()) {
-          await fetchUserProfile(session.user.id);
+          void fetchUserProfile(session.user.id);
         }
       } else if (cachedUser) {
         activateOfflineSession(cachedUser);

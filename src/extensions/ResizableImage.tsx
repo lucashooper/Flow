@@ -9,30 +9,52 @@ import {
   startPointerDragSession,
 } from '../utils/imageDragSession';
 import { stripStrayDragTextNodes } from '../utils/imageSanitize';
-import { getRowImagesAtPos, resizeImageInRow } from '../utils/imageRowLayout';
+import { getRowImagesAtPos, resizeSingleImageInRow } from '../utils/imageRowLayout';
+import { DEFAULT_IMAGE_WIDTH } from '../utils/editorLayout';
 import { useFocusMode } from '../contexts/FocusModeContext';
 
 const DRAG_THRESHOLD_PX = 5;
+
+function blockNativeImageDrag(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+const MIN_IMAGE_WIDTH = 120;
+const MIN_IMAGE_HEIGHT = 80;
+const MAX_IMAGE_WIDTH = 1000;
+const MAX_IMAGE_HEIGHT = 1200;
+
+type ResizeEdge = 'left' | 'right' | 'top' | 'bottom';
+
+function logResizeAction(edge: ResizeEdge, value: number): void {
+  console.log(`[ResizeAction] Handle: ${edge}, NewDim: ${Math.round(value)}px`);
+}
 
 const ResizableImageComponent = (props: any) => {
   const { isFullscreen } = useFocusMode();
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const initialWidth = props.node.attrs.width as number | null;
-  const [width, setWidth] = useState<number>(initialWidth || 320);
-  const [height, setHeight] = useState<number>(props.node.attrs.height || 0);
+  const initialHeight = props.node.attrs.height as number | null;
+  const [width, setWidth] = useState<number>(initialWidth || DEFAULT_IMAGE_WIDTH);
+  const [height, setHeight] = useState<number>(
+    initialHeight || Math.round((initialWidth || DEFAULT_IMAGE_WIDTH) * 0.65),
+  );
   const startPos = useRef({ x: 0, y: 0 });
   const startSize = useRef({ width: 0, height: 0 });
+  const activeEdge = useRef<ResizeEdge>('right');
   const imageRef = useRef<HTMLImageElement>(null);
   const aspectRatio = useRef<number>(1);
   const hasAppliedNaturalWidth = useRef(false);
   const innerRef = useRef<HTMLSpanElement>(null);
   const liveWidth = useRef(width);
+  const liveHeight = useRef(height);
   const pointerCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     liveWidth.current = width;
-  }, [width]);
+    liveHeight.current = height;
+  }, [width, height]);
 
   useEffect(() => {
     hasAppliedNaturalWidth.current = false;
@@ -67,44 +89,53 @@ const ResizableImageComponent = (props: any) => {
     hasAppliedNaturalWidth.current = true;
 
     if (!initialWidth || initialWidth === 500) {
-      const fitted = Math.min(img.naturalWidth, 380);
+      const fitted = Math.min(img.naturalWidth, DEFAULT_IMAGE_WIDTH);
+      const fittedHeight = Math.round(fitted / aspectRatio.current);
       setWidth(fitted);
-      setHeight(fitted / aspectRatio.current);
+      setHeight(fittedHeight);
       props.updateAttributes({
         width: Math.round(fitted),
-        height: Math.round(fitted / aspectRatio.current),
+        height: fittedHeight,
       });
     }
   };
 
-  const commitWidth = useCallback(
-    (newWidth: number) => {
+  const commitDimensions = useCallback(
+    (newWidth: number, newHeight: number, edge: ResizeEdge) => {
       const fromPos = props.getPos();
       if (typeof fromPos !== 'number') return;
 
-      if (isInMultiColumnRow()) {
-        resizeImageInRow(props.editor, fromPos, newWidth);
+      const roundedW = Math.round(newWidth);
+      const roundedH = Math.round(newHeight);
+      const inRow = isInMultiColumnRow();
+
+      if (inRow && (edge === 'top' || edge === 'bottom')) {
+        props.updateAttributes({ height: roundedH });
+      } else if (inRow) {
+        resizeSingleImageInRow(props.editor, fromPos, roundedW);
       } else {
-        const newHeight = newWidth / aspectRatio.current;
         props.updateAttributes({
-          width: Math.round(newWidth),
-          height: Math.round(newHeight),
+          width: roundedW,
+          height: roundedH,
         });
       }
     },
     [props, isInMultiColumnRow],
   );
 
-  const handleEdgeResizeStart = (e: React.MouseEvent) => {
+  const handleEdgeResizeStart = (e: React.MouseEvent, edge: ResizeEdge) => {
     e.preventDefault();
     e.stopPropagation();
 
+    activeEdge.current = edge;
     setIsResizing(true);
     startPos.current = { x: e.clientX, y: e.clientY };
     startSize.current = { width, height };
 
-    if (imageRef.current) {
+    if (imageRef.current?.naturalWidth) {
       aspectRatio.current = imageRef.current.naturalWidth / imageRef.current.naturalHeight;
+    } else if (width > 0 && height > 0) {
+      aspectRatio.current = width / height;
     }
   };
 
@@ -113,18 +144,39 @@ const ResizableImageComponent = (props: any) => {
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startPos.current.x;
-      let newWidth = startSize.current.width + deltaX;
-      newWidth = Math.max(120, Math.min(1000, newWidth));
+      const deltaY = e.clientY - startPos.current.y;
+      const edge = activeEdge.current;
 
-      const newHeight = newWidth / aspectRatio.current;
+      let newWidth = startSize.current.width;
+      let newHeight = startSize.current.height;
+
+      if (edge === 'right') {
+        newWidth = startSize.current.width + deltaX;
+        newHeight = newWidth / aspectRatio.current;
+      } else if (edge === 'left') {
+        newWidth = startSize.current.width - deltaX;
+        newHeight = newWidth / aspectRatio.current;
+      } else if (edge === 'bottom') {
+        newHeight = startSize.current.height + deltaY;
+      } else if (edge === 'top') {
+        newHeight = startSize.current.height - deltaY;
+      }
+
+      newWidth = Math.max(MIN_IMAGE_WIDTH, Math.min(MAX_IMAGE_WIDTH, newWidth));
+      newHeight = Math.max(MIN_IMAGE_HEIGHT, Math.min(MAX_IMAGE_HEIGHT, newHeight));
+
       setWidth(newWidth);
       setHeight(newHeight);
       liveWidth.current = newWidth;
+      liveHeight.current = newHeight;
     };
 
     const handleMouseUp = () => {
+      const edge = activeEdge.current;
+      const dim = edge === 'left' || edge === 'right' ? liveWidth.current : liveHeight.current;
+      logResizeAction(edge, dim);
       setIsResizing(false);
-      commitWidth(liveWidth.current);
+      commitDimensions(liveWidth.current, liveHeight.current, edge);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -134,7 +186,7 @@ const ResizableImageComponent = (props: any) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, commitWidth]);
+  }, [isResizing, commitDimensions]);
 
   const finishLocalDragUi = useCallback(() => {
     setIsDragging(false);
@@ -144,12 +196,13 @@ const ResizableImageComponent = (props: any) => {
     requestAnimationFrame(() => stripStrayDragTextNodes(props.editor));
   }, [props.editor]);
 
-  /** Pointer drag — single path, no HTML5 draggable (avoids "drag" text leaks in CE). */
   const handlePointerDown = useCallback(
     (e: React.MouseEvent) => {
       if (isFullscreen || isResizing || isPointerDragActive()) return;
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
+
+      e.preventDefault();
 
       const fromPos = props.getPos();
       if (typeof fromPos !== 'number') return;
@@ -164,6 +217,7 @@ const ResizableImageComponent = (props: any) => {
       const cleanupListeners = () => {
         document.removeEventListener('mousemove', onMove, true);
         document.removeEventListener('mouseup', onUp, true);
+        document.removeEventListener('dragstart', blockNativeImageDrag, true);
         pointerCleanupRef.current = null;
       };
 
@@ -177,6 +231,9 @@ const ResizableImageComponent = (props: any) => {
         dragStarted = true;
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
+
+        // Block native HTML5 drag (prevents green + / copy cursor)
+        document.addEventListener('dragstart', blockNativeImageDrag, true);
 
         console.log('[DragStart]', {
           fromPos,
@@ -252,11 +309,14 @@ const ResizableImageComponent = (props: any) => {
         style={{
           width: width ? `${width}px` : 'auto',
           maxWidth: '100%',
+          height: height ? `${height}px` : 'auto',
+          maxHeight: `${MAX_IMAGE_HEIGHT}px`,
+          overflow: 'visible',
           userSelect: 'none',
           verticalAlign: 'top',
           cursor: showEditorChrome ? (isDragging ? 'grabbing' : 'grab') : 'default',
           opacity: isDragging ? 0.45 : 1,
-          transition: isResizing || isDragging ? 'none' : 'width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          transition: isResizing || isDragging ? 'none' : 'width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), height 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
         onMouseDown={showEditorChrome ? handlePointerDown : undefined}
       >
@@ -264,11 +324,15 @@ const ResizableImageComponent = (props: any) => {
           ref={imageRef}
           src={props.node.attrs.src}
           alt={props.node.attrs.alt || ''}
-          className="rounded-md w-full h-auto select-none flow-image-media"
+          className="rounded-md select-none flow-image-media"
           style={{
             opacity: props.node.attrs['data-uploading'] ? 0.5 : 1,
             borderRadius: 6,
-            pointerEvents: isDragging ? 'none' : 'auto',
+            width: '100%',
+            height: '100%',
+            maxWidth: '100%',
+            objectFit: 'contain',
+            pointerEvents: 'none',
           }}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
@@ -278,14 +342,28 @@ const ResizableImageComponent = (props: any) => {
         {showEditorChrome && (
           <>
             <div
-              data-resize-handle
+              data-resize-handle="left"
               className="flow-resize-pill flow-resize-pill-left"
-              onMouseDown={handleEdgeResizeStart}
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => handleEdgeResizeStart(e, 'left')}
             />
             <div
-              data-resize-handle
+              data-resize-handle="right"
               className="flow-resize-pill flow-resize-pill-right"
-              onMouseDown={handleEdgeResizeStart}
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => handleEdgeResizeStart(e, 'right')}
+            />
+            <div
+              data-resize-handle="top"
+              className="flow-resize-pill flow-resize-pill-top"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => handleEdgeResizeStart(e, 'top')}
+            />
+            <div
+              data-resize-handle="bottom"
+              className="flow-resize-pill flow-resize-pill-bottom"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => handleEdgeResizeStart(e, 'bottom')}
             />
           </>
         )}

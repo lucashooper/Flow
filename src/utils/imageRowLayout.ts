@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/react';
 import type { EditorView } from 'prosemirror-view';
 import type { Node as PMNode } from 'prosemirror-model';
-import { getEditorContentMaxWidth, IMAGE_ROW_GAP } from './editorLayout';
+import { DEFAULT_IMAGE_WIDTH, getEditorContentMaxWidth, IMAGE_ROW_GAP } from './editorLayout';
 import { logImageDrop } from './imageDropDebug';
 
 export interface RowImage {
@@ -32,7 +32,7 @@ export function getRowImagesAtPos(view: EditorView, pos: number): {
 
   $pos.parent.forEach((node, offset) => {
     if (node.type.name === 'resizableImage') {
-      const w = (node.attrs.width as number) || 320;
+      const w = (node.attrs.width as number) || DEFAULT_IMAGE_WIDTH;
       const h = (node.attrs.height as number) || Math.round(w * 0.65);
       images.push({ pos: paragraphStart + offset, node, width: w, height: h });
     }
@@ -76,8 +76,8 @@ export function autoFitImagesInParagraph(
   return true;
 }
 
-/** Resize one column; redistribute remaining width across siblings. */
-export function resizeImageInRow(
+/** Resize only the active column — siblings keep their stored widths. */
+export function resizeSingleImageInRow(
   editor: Editor,
   imagePos: number,
   newWidth: number,
@@ -85,55 +85,44 @@ export function resizeImageInRow(
   const row = getRowImagesAtPos(editor.view, imagePos);
   if (!row) return;
 
-  const { images } = row;
-  const maxWidth = getEditorContentWidthFromDom(editor.view.dom as HTMLElement);
-  const gaps = IMAGE_ROW_GAP * Math.max(0, images.length - 1);
-  const available = maxWidth - gaps;
+  const target = row.images.find((img) => img.pos === imagePos);
+  if (!target) return;
+
   const minCol = 120;
+  const maxWidth = getEditorContentWidthFromDom(editor.view.dom as HTMLElement);
+  const gaps = IMAGE_ROW_GAP * Math.max(0, row.images.length - 1);
+  const siblingWidths = row.images
+    .filter((img) => img.pos !== imagePos)
+    .map((img) => img.width);
+  const siblingsTotal = siblingWidths.reduce((sum, w) => sum + w, 0);
+  const maxForResized = Math.max(minCol, maxWidth - gaps - siblingsTotal);
+  const clamped = Math.max(minCol, Math.min(newWidth, maxForResized, 1000));
+  const ratio = target.width > 0 ? target.height / target.width : 0.65;
 
-  if (images.length === 1) {
-    const clamped = Math.max(minCol, Math.min(newWidth, available));
-    const ratio = images[0].width > 0 ? images[0].height / images[0].width : 0.65;
-    editor.view.dispatch(
-      editor.state.tr.setNodeMarkup(imagePos, undefined, {
-        ...images[0].node.attrs,
-        width: Math.round(clamped),
-        height: Math.round(clamped * ratio),
-      }),
-    );
-    return;
-  }
+  console.log('[ImageResize]', {
+    resizedId: imagePos,
+    newWidth: Math.round(clamped),
+    siblingWidths,
+  });
 
-  const resizedIndex = images.findIndex((img) => img.pos === imagePos);
-  if (resizedIndex < 0) return;
+  editor.view.dispatch(
+    editor.state.tr.setNodeMarkup(imagePos, undefined, {
+      ...target.node.attrs,
+      width: Math.round(clamped),
+      height: Math.round(clamped * ratio),
+    }),
+  );
 
-  const others = images.filter((_, i) => i !== resizedIndex);
-  const maxForResized = available - minCol * others.length;
-  const clampedNew = Math.max(minCol, Math.min(newWidth, maxForResized));
-  const remaining = available - clampedNew;
-  const otherTotal = others.reduce((s, img) => s + img.width, 0);
+  logImageDrop('single column resize', { imagePos, clamped, siblings: siblingWidths.length });
+}
 
-  let tr = editor.state.tr;
-  for (const img of images) {
-    let w: number;
-    if (img.pos === imagePos) {
-      w = clampedNew;
-    } else {
-      w =
-        otherTotal > 0
-          ? Math.round((img.width / otherTotal) * remaining)
-          : Math.round(remaining / others.length);
-      w = Math.max(minCol, w);
-    }
-    const ratio = img.width > 0 ? img.height / img.width : 0.65;
-    tr = tr.setNodeMarkup(img.pos, undefined, {
-      ...img.node.attrs,
-      width: Math.round(w),
-      height: Math.round(w * ratio),
-    });
-  }
-  editor.view.dispatch(tr);
-  logImageDrop('row resize', { imagePos, clampedNew, siblings: others.length });
+/** @deprecated Use resizeSingleImageInRow — avoids sibling snap/redistribute. */
+export function resizeImageInRow(
+  editor: Editor,
+  imagePos: number,
+  newWidth: number,
+): void {
+  resizeSingleImageInRow(editor, imagePos, newWidth);
 }
 
 /** Apply a spring snap-in animation to the dropped image DOM node. */
