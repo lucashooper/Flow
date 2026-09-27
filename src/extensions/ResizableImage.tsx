@@ -1,19 +1,18 @@
 import Image from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { GripVertical } from 'lucide-react';
+import { destroyImageDropOverlay } from '../utils/imageDropPreview';
 import {
-  getImageDropPreview,
-  hideImageDropIndicator,
-  moveImageWithPreview,
-  showImageDropIndicator,
-  type ImageDropPreview,
-} from '../utils/imageDropPreview';
+  createPointerGhost,
+  endPointerDragSession,
+  isPointerDragActive,
+  startPointerDragSession,
+} from '../utils/imageDragSession';
+import { stripStrayDragTextNodes } from '../utils/imageSanitize';
+import { getRowImagesAtPos, resizeImageInRow } from '../utils/imageRowLayout';
 import { useFocusMode } from '../contexts/FocusModeContext';
 
-type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
-
-const DRAG_THRESHOLD_PX = 4;
+const DRAG_THRESHOLD_PX = 5;
 
 const ResizableImageComponent = (props: any) => {
   const { isFullscreen } = useFocusMode();
@@ -24,24 +23,39 @@ const ResizableImageComponent = (props: any) => {
   const [height, setHeight] = useState<number>(props.node.attrs.height || 0);
   const startPos = useRef({ x: 0, y: 0 });
   const startSize = useRef({ width: 0, height: 0 });
-  const resizeCorner = useRef<ResizeCorner | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const aspectRatio = useRef<number>(1);
   const hasAppliedNaturalWidth = useRef(false);
-  const dragFromPos = useRef<number | null>(null);
-  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const liveWidth = useRef(width);
+  const pointerCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    liveWidth.current = width;
+  }, [width]);
 
   useEffect(() => {
     hasAppliedNaturalWidth.current = false;
   }, [props.node.attrs.src]);
 
-  // Sync dimensions when auto-fit or external updates change node attrs
   useEffect(() => {
     const attrW = props.node.attrs.width as number | null;
     const attrH = props.node.attrs.height as number | null;
     if (attrW && attrW > 0) setWidth(attrW);
     if (attrH && attrH > 0) setHeight(attrH);
   }, [props.node.attrs.width, props.node.attrs.height]);
+
+  const isInMultiColumnRow = useCallback(() => {
+    const fromPos = props.getPos();
+    if (typeof fromPos !== 'number') return false;
+    const row = getRowImagesAtPos(props.editor.view, fromPos);
+    return (row?.images.length ?? 0) > 1;
+  }, [props]);
+
+  const getWrapperEl = useCallback(
+    () => innerRef.current?.closest('.resizable-image-wrapper') as HTMLElement | null,
+    [],
+  );
 
   const handleImageLoad = () => {
     const img = imageRef.current;
@@ -63,12 +77,29 @@ const ResizableImageComponent = (props: any) => {
     }
   };
 
-  const handleResizeStart = (e: React.MouseEvent, corner: ResizeCorner) => {
+  const commitWidth = useCallback(
+    (newWidth: number) => {
+      const fromPos = props.getPos();
+      if (typeof fromPos !== 'number') return;
+
+      if (isInMultiColumnRow()) {
+        resizeImageInRow(props.editor, fromPos, newWidth);
+      } else {
+        const newHeight = newWidth / aspectRatio.current;
+        props.updateAttributes({
+          width: Math.round(newWidth),
+          height: Math.round(newHeight),
+        });
+      }
+    },
+    [props, isInMultiColumnRow],
+  );
+
+  const handleEdgeResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     setIsResizing(true);
-    resizeCorner.current = corner;
     startPos.current = { x: e.clientX, y: e.clientY };
     startSize.current = { width, height };
 
@@ -81,38 +112,19 @@ const ResizableImageComponent = (props: any) => {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!resizeCorner.current) return;
-
       const deltaX = e.clientX - startPos.current.x;
+      let newWidth = startSize.current.width + deltaX;
+      newWidth = Math.max(120, Math.min(1000, newWidth));
 
-      let newWidth = startSize.current.width;
-
-      switch (resizeCorner.current) {
-        case 'se':
-        case 'ne':
-          newWidth = startSize.current.width + deltaX;
-          break;
-        case 'sw':
-        case 'nw':
-          newWidth = startSize.current.width - deltaX;
-          break;
-      }
-
-      newWidth = Math.max(150, Math.min(1000, newWidth));
       const newHeight = newWidth / aspectRatio.current;
-
       setWidth(newWidth);
       setHeight(newHeight);
+      liveWidth.current = newWidth;
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
-      resizeCorner.current = null;
-
-      props.updateAttributes({
-        width: Math.round(width),
-        height: Math.round(height),
-      });
+      commitWidth(liveWidth.current);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -122,171 +134,164 @@ const ResizableImageComponent = (props: any) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, width, height, props]);
+  }, [isResizing, commitWidth]);
 
-  const handleMoveStart = useCallback((e: React.MouseEvent) => {
-    if (isFullscreen) return;
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
+  const finishLocalDragUi = useCallback(() => {
+    setIsDragging(false);
+    destroyImageDropOverlay();
+    document.body.classList.remove('flow-image-dragging');
+    document.body.style.cursor = '';
+    requestAnimationFrame(() => stripStrayDragTextNodes(props.editor));
+  }, [props.editor]);
 
-    const fromPos = props.getPos();
-    if (typeof fromPos !== 'number') {
-      console.warn('[ImageDrop] drag aborted — getPos() returned', fromPos);
-      return;
-    }
+  /** Pointer drag — single path, no HTML5 draggable (avoids "drag" text leaks in CE). */
+  const handlePointerDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (isFullscreen || isResizing || isPointerDragActive()) return;
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
 
-    console.log('[ImageDrop] drag start @', fromPos, 'width=', width);
+      const fromPos = props.getPos();
+      if (typeof fromPos !== 'number') return;
 
-    const originX = e.clientX;
-    const originY = e.clientY;
-    dragFromPos.current = fromPos;
-    let hasMoved = false;
-    let hasHandledDrop = false; // Prevent duplicate drop handling
-    let lastPreview: ImageDropPreview | null = null;
-    const draggedWrapper = () =>
-      wrapperRef.current?.closest('.resizable-image-wrapper') as HTMLElement | null;
+      const wrapper = getWrapperEl();
+      if (!wrapper) return;
 
-    const onMove = (moveEvent: MouseEvent) => {
-      if (!hasMoved) {
+      const originX = e.clientX;
+      const originY = e.clientY;
+      let dragStarted = false;
+
+      const cleanupListeners = () => {
+        document.removeEventListener('mousemove', onMove, true);
+        document.removeEventListener('mouseup', onUp, true);
+        pointerCleanupRef.current = null;
+      };
+
+      const onMove = (moveEvent: MouseEvent) => {
+        if (dragStarted) return;
+
         const dx = moveEvent.clientX - originX;
         const dy = moveEvent.clientY - originY;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-        hasMoved = true;
-        setIsDragging(true);
-        document.body.style.cursor = 'grabbing';
+
+        dragStarted = true;
         moveEvent.preventDefault();
-        console.log('[ImageDrop] threshold passed — now dragging');
-      }
+        moveEvent.stopPropagation();
 
-      lastPreview = getImageDropPreview(
-        props.editor,
-        moveEvent.clientX,
-        moveEvent.clientY,
-        fromPos,
-        width,
-        draggedWrapper(),
-      );
-      showImageDropIndicator(lastPreview);
-    };
-
-    const onUp = (upEvent: MouseEvent) => {
-      if (hasHandledDrop) {
-        console.log('[ImageDrop] mouseup ignored — already handled this drag');
-        return;
-      }
-      hasHandledDrop = true;
-
-      console.log('[ImageDrop] mouseup — hasMoved=', hasMoved, 'fromPos=', fromPos);
-      
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      setIsDragging(false);
-      hideImageDropIndicator();
-      dragFromPos.current = null;
-
-      if (!hasMoved) {
-        console.log('[ImageDrop] drop aborted — no movement');
-        props.editor.chain().focus().setNodeSelection(fromPos).run();
-        return;
-      }
-
-      const preview =
-        lastPreview ??
-        getImageDropPreview(
-          props.editor,
-          upEvent.clientX,
-          upEvent.clientY,
+        console.log('[DragStart]', {
           fromPos,
           width,
-          draggedWrapper(),
-        );
+          mode: 'pointer',
+          clientX: moveEvent.clientX,
+          clientY: moveEvent.clientY,
+        });
 
-      console.log('[ImageDrop] computed preview:', preview?.kind, preview?.label);
+        const { ghost, offsetX, offsetY } = createPointerGhost(wrapper);
+        setIsDragging(true);
 
-      if (preview) {
-        console.log('[ImageDrop] drop', preview.kind, preview.label);
-        moveImageWithPreview(props.editor, fromPos, preview, props.node);
-      } else {
-        console.warn('[ImageDrop] drop aborted — no valid preview at release');
-      }
-    };
+        startPointerDragSession({
+          editor: props.editor,
+          fromPos,
+          node: props.node,
+          width,
+          draggedEl: wrapper,
+          ghost,
+          ghostOffsetX: offsetX,
+          ghostOffsetY: offsetY,
+          onFinish: finishLocalDragUi,
+        });
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [props, width, isFullscreen]);
+        cleanupListeners();
+      };
+
+      const onUp = (upEvent: MouseEvent) => {
+        cleanupListeners();
+        if (!dragStarted) {
+          props.editor.chain().focus().setNodeSelection(fromPos).run();
+          return;
+        }
+        upEvent.preventDefault();
+      };
+
+      pointerCleanupRef.current = cleanupListeners;
+      document.addEventListener('mousemove', onMove, true);
+      document.addEventListener('mouseup', onUp, true);
+    },
+    [props, width, isFullscreen, isResizing, getWrapperEl, finishLocalDragUi],
+  );
+
+  useEffect(
+    () => () => {
+      pointerCleanupRef.current?.();
+      endPointerDragSession();
+      destroyImageDropOverlay();
+      document.body.classList.remove('flow-image-dragging');
+      document.body.style.cursor = '';
+    },
+    [],
+  );
 
   const showEditorChrome = !isFullscreen;
+  const isSelected = showEditorChrome && props.selected;
 
   return (
     <NodeViewWrapper
       as="span"
-      className={`resizable-image-wrapper${isDragging ? ' is-dragging' : ''}${showEditorChrome && props.selected ? ' ProseMirror-selectednode' : ''}`}
+      className={`resizable-image-wrapper${isDragging ? ' is-dragging' : ''}${isSelected ? ' ProseMirror-selectednode is-selected' : ''}`}
+      style={{
+        display: 'inline-block',
+        width: 'fit-content',
+        maxWidth: '100%',
+        verticalAlign: 'top',
+        transition: isResizing || isDragging ? 'none' : 'width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+      }}
     >
       <span
-        ref={wrapperRef}
-        className="relative inline-block group align-top"
+        ref={innerRef}
+        className="relative inline-block group align-top flow-image-inner"
         style={{
-          width: width ? `min(${width}px, 100%)` : '100%',
+          width: width ? `${width}px` : 'auto',
+          maxWidth: '100%',
           userSelect: 'none',
           verticalAlign: 'top',
           cursor: showEditorChrome ? (isDragging ? 'grabbing' : 'grab') : 'default',
-          opacity: isDragging ? 0.55 : 1,
+          opacity: isDragging ? 0.45 : 1,
+          transition: isResizing || isDragging ? 'none' : 'width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
-        onMouseDown={showEditorChrome ? handleMoveStart : undefined}
+        onMouseDown={showEditorChrome ? handlePointerDown : undefined}
       >
-        {/* Drag affordance */}
-        {showEditorChrome && (
-        <span
-          className="absolute -top-5 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
-          style={{ background: 'rgba(20,20,20,0.85)', color: 'var(--muted)' }}
-          aria-hidden
-        >
-          <GripVertical className="w-3 h-3" />
-          <span className="text-[10px]">drag</span>
-        </span>
-        )}
-
         <img
           ref={imageRef}
           src={props.node.attrs.src}
           alt={props.node.attrs.alt || ''}
-          className="rounded-lg w-full h-auto select-none pointer-events-none"
+          className="rounded-md w-full h-auto select-none flow-image-media"
           style={{
             opacity: props.node.attrs['data-uploading'] ? 0.5 : 1,
+            borderRadius: 6,
+            pointerEvents: isDragging ? 'none' : 'auto',
           }}
           draggable={false}
+          onDragStart={(e) => e.preventDefault()}
           onLoad={handleImageLoad}
         />
 
-        {/* Resize handles */}
         {showEditorChrome && (
-        <>
-        <div
-          data-resize-handle
-          className="absolute -left-1 -top-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          onMouseDown={(e) => handleResizeStart(e, 'nw')}
-        />
-        <div
-          data-resize-handle
-          className="absolute -right-1 -top-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          onMouseDown={(e) => handleResizeStart(e, 'ne')}
-        />
-        <div
-          data-resize-handle
-          className="absolute -left-1 -bottom-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-sw-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          onMouseDown={(e) => handleResizeStart(e, 'sw')}
-        />
-        <div
-          data-resize-handle
-          className="absolute -right-1 -bottom-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          onMouseDown={(e) => handleResizeStart(e, 'se')}
-        />
-        </>
+          <>
+            <div
+              data-resize-handle
+              className="flow-resize-pill flow-resize-pill-left"
+              onMouseDown={handleEdgeResizeStart}
+            />
+            <div
+              data-resize-handle
+              className="flow-resize-pill flow-resize-pill-right"
+              onMouseDown={handleEdgeResizeStart}
+            />
+          </>
         )}
 
         {props.node.attrs['data-uploading'] && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-md pointer-events-none">
             <div className="text-white text-sm font-medium">Uploading...</div>
           </div>
         )}
@@ -303,6 +308,10 @@ export const ResizableImage = Image.extend({
   atom: true,
   draggable: false,
   selectable: true,
+
+  onCreate() {
+    requestAnimationFrame(() => stripStrayDragTextNodes(this.editor));
+  },
 
   addAttributes() {
     return {
@@ -330,7 +339,7 @@ export const ResizableImage = Image.extend({
         default: null,
         parseHTML: (element: HTMLElement) => {
           const h = element.getAttribute('height');
-          return h ? parseInt(h) : null;
+          return h ? parseInt(h, 10) : null;
         },
         renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.height) return {};

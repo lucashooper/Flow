@@ -406,6 +406,7 @@ export const useDashboardData = () => {
       console.log('✅ Updated note:', noteId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error updating note:', error);
+      throw error;
     }
   };
 

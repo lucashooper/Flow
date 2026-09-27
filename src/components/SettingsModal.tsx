@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FeedbackModal } from './FeedbackModal';
 import { SyncDiagnostics } from './SyncDiagnostics';
-import { writePluginSetting } from '../utils/pluginSettings';
+import { readPluginSetting, writePluginSetting } from '../utils/pluginSettings';
 
 type SettingsSection = 'profile' | 'appearance' | 'editor' | 'plugins' | 'features' | 'security' | 'sync';
 
@@ -75,6 +75,9 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const saved = localStorage.getItem('plannerEnabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [wideCanvasEnabled, setWideCanvasEnabled] = useState(() =>
+    readPluginSetting('wideCanvasEnabled', false),
+  );
   const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(() => {
     const saved = localStorage.getItem('breakRemindersEnabled');
     return saved !== null ? JSON.parse(saved) : false;
@@ -618,8 +621,37 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               <div>
                 <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Editor</h2>
                 <p className="mb-6" style={{ color: 'var(--muted)' }}>Customize your text editing experience.</p>
-                <div className="text-sm" style={{ color: 'var(--muted)' }}>
-                  More editor customization options coming soon...
+
+                <div className="space-y-3">
+                  <div
+                    className="flex items-center justify-between p-4 rounded-lg"
+                    style={{ backgroundColor: 'var(--bg-elev)', border: '1px solid var(--border)' }}
+                  >
+                    <div className="flex-1 pr-4">
+                      <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>
+                        Wide canvas mode
+                      </h4>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                        Expands the note editor to 1200px so side-by-side images and comparisons have more room.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = !wideCanvasEnabled;
+                        setWideCanvasEnabled(newValue);
+                        writePluginSetting('wideCanvasEnabled', newValue);
+                      }}
+                      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                      style={{ backgroundColor: wideCanvasEnabled ? 'var(--accent)' : 'var(--border)' }}
+                      aria-pressed={wideCanvasEnabled}
+                    >
+                      <span
+                        className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        style={{ transform: wideCanvasEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

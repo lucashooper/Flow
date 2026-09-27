@@ -43,14 +43,17 @@ import {
   plainTextToDocBlocks,
   sanitizePastedHtml,
 } from '../utils/sanitizePastedHtml';
-import { insertImageFast, insertImageFastInEditor } from '../utils/insertImageFast';
+import { insertImageFast } from '../utils/insertImageFast';
+import { stripStrayDragTextNodes } from '../utils/imageSanitize';
 import {
   ensureParagraphAfterPos,
-  ensureTrailingParagraph,
   focusEditorAtEnd,
 } from '../utils/ensureEditableSpaceAroundImages';
 import { pasteImagesFromHtml, extractImagesFromHtml, logImageDrop } from '../utils/imageDropDebug';
+import { getEditorContentMaxWidth } from '../utils/editorLayout';
 import { useFocusMode } from '../contexts/FocusModeContext';
+import { MultiColumnGutterControls } from './MultiColumnGutterControls';
+import { insertMediaAtPos } from '../utils/insertMediaAtDrop';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -192,6 +195,11 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         },
         bold: false, // Disable default bold to use our custom one
         link: false, // Disable built-in link to avoid duplicates
+        dropcursor: {
+          color: '#38bdf8',
+          width: 3,
+          class: 'flow-dropcursor',
+        },
       }),
       ColoredBold,
       AutoItalicQuotes,
@@ -241,6 +249,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       if (textContainsLatex(createdEditor.getText())) {
         migrateAllMathInEditor(createdEditor);
       }
+      requestAnimationFrame(() => stripStrayDragTextNodes(createdEditor));
     },
     onUpdate: ({ editor }) => {
       const newContent = editor.getHTML();
@@ -255,7 +264,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     editorProps: {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-full',
-        style: 'line-height: 1.7; color: #e0e0e0; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;',
+        style: `line-height: 1.7; color: #e0e0e0; max-width: ${getEditorContentMaxWidth()}px; margin: 0 auto; padding: 1.5rem 2rem; width: 100%;`,
         spellcheck: 'true',
       },
       handlePaste: (view, event) => {
@@ -590,104 +599,113 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   // Track drag state for visual feedback
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const dragCounterRef = useRef(0);
+  const isDraggingFileRef = useRef(false);
+  const [editorMaxWidth, setEditorMaxWidth] = useState(() => getEditorContentMaxWidth());
+
+  useEffect(() => {
+    isDraggingFileRef.current = isDraggingFile;
+  }, [isDraggingFile]);
+
+  const clearFileDragOverlay = useCallback(() => {
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    document.body.classList.remove('dragging-file');
+  }, []);
+
+  const showFileDragOverlay = useCallback(() => {
+    setIsDraggingFile(true);
+    document.body.classList.add('dragging-file');
+  }, []);
+
+  useEffect(() => {
+    const syncWidth = () => setEditorMaxWidth(getEditorContentMaxWidth());
+    window.addEventListener('pluginSettingsChanged', syncWidth);
+    window.addEventListener('storage', syncWidth);
+    return () => {
+      window.removeEventListener('pluginSettingsChanged', syncWidth);
+      window.removeEventListener('storage', syncWidth);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const prose = editor.view.dom as HTMLElement;
+    prose.style.maxWidth = `${editorMaxWidth}px`;
+  }, [editor, editorMaxWidth]);
 
   // Prevent browser's default drag-and-drop behavior (opening files in new tab)
   useEffect(() => {
+    const isFileDrag = (e: DragEvent) =>
+      e.dataTransfer?.types.includes('Files') ?? false;
+
     const handleDragOver = (e: DragEvent) => {
-      // Always prevent default to allow drop
+      // Only intercept OS file drags — do not interfere with in-editor pointer drag
+      if (!isFileDrag(e)) return;
       e.preventDefault();
-      console.log('🎯 [TiptapEditor] dragover on:', e.target);
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      logImageDrop('[onDragOver]', e.target);
     };
 
     const handleDragEnter = (e: DragEvent) => {
-      console.log('🎯 [TiptapEditor] dragenter on:', e.target, 'types:', e.dataTransfer?.types);
-      // Check if dragging files (not text)
-      if (e.dataTransfer?.types.includes('Files')) {
-        setIsDraggingFile(true);
-        document.body.classList.add('dragging-file');
-      }
+      if (!isFileDrag(e)) return;
+      dragCounterRef.current += 1;
+      logImageDrop('[onDragEnter]', dragCounterRef.current, e.target);
+      showFileDragOverlay();
     };
 
     const handleDragLeave = (e: DragEvent) => {
-      console.log('🎯 [TiptapEditor] dragleave from:', e.target);
-      // Only hide overlay if leaving the document entirely
-      if (e.target === document.body || e.relatedTarget === null) {
-        setIsDraggingFile(false);
-        document.body.classList.remove('dragging-file');
+      if (!isFileDrag(e)) return;
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      logImageDrop('[onDragLeave]', dragCounterRef.current, e.target);
+      if (dragCounterRef.current === 0) {
+        clearFileDragOverlay();
       }
+    };
+
+    const handleDragEnd = () => {
+      logImageDrop('[onDragEnd]');
+      clearFileDragOverlay();
     };
 
     const handleDrop = (e: DragEvent) => {
-      console.log('🎯 [TiptapEditor] drop on:', e.target, 'files:', e.dataTransfer?.files.length);
-      setIsDraggingFile(false);
-      document.body.classList.remove('dragging-file');
-      
-      // Check if this is a media file drop
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        const mediaFiles = Array.from(files).filter(f => 
-          f.type.startsWith('image/') || f.type.startsWith('video/')
-        );
-        
-        if (mediaFiles.length > 0 && editor) {
-          console.log('🎯 [TiptapEditor] Media files detected, handling drop');
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Insert at end of document
-          const endPos = editor.state.doc.content.size;
-          editor.chain().focus().setTextSelection(endPos).run();
-          
-          // Process each media file
-          mediaFiles.forEach((file) => {
-            if (file.type.startsWith('image/')) {
-              insertImageFastInEditor(editor, file, uploadImage);
-            } else {
-              const blobUrl = URL.createObjectURL(file);
-              editor.chain().focus().insertContent({
-                type: 'resizableVideo',
-                attrs: { src: blobUrl, 'data-uploading': true },
-              }).run();
-              void uploadImage(file).then((url) => {
-                if (!url) return;
-                editor.state.doc.descendants((node, pos) => {
-                  if (node.type.name === 'resizableVideo' && node.attrs.src === blobUrl) {
-                    editor.view.dispatch(
-                      editor.state.tr.setNodeMarkup(pos, undefined, {
-                        ...node.attrs,
-                        src: url,
-                        'data-uploading': null,
-                      }),
-                    );
-                    URL.revokeObjectURL(blobUrl);
-                    return false;
-                  }
-                });
-              });
-            }
-          });
-
-          ensureTrailingParagraph(editor.view, true);
-          return;
-        }
+      logImageDrop('[onDrop:document]', e.dataTransfer?.files.length ?? 0, 'file(s)');
+      clearFileDragOverlay();
+      if (isFileDrag(e)) {
+        e.preventDefault();
       }
-      
-      console.log('✅ [TiptapEditor] No media files, allowing default behavior');
     };
 
-    // Prevent browser from opening dropped files in a new tab
+    const handleFileDropComplete = () => clearFileDragOverlay();
+
+    const handlePointerDown = (e: MouseEvent) => {
+      if (!isDraggingFileRef.current) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.ProseMirror') || target?.closest('.editor-root')) {
+        logImageDrop('[onPointerDown] dismiss overlay');
+        clearFileDragOverlay();
+      }
+    };
+
     document.addEventListener('dragover', handleDragOver);
     document.addEventListener('dragenter', handleDragEnter);
     document.addEventListener('dragleave', handleDragLeave);
+    document.addEventListener('dragend', handleDragEnd);
     document.addEventListener('drop', handleDrop);
+    document.addEventListener('mousedown', handlePointerDown, true);
+    window.addEventListener('flow:fileDropComplete', handleFileDropComplete);
 
     return () => {
       document.removeEventListener('dragover', handleDragOver);
       document.removeEventListener('dragenter', handleDragEnter);
       document.removeEventListener('dragleave', handleDragLeave);
+      document.removeEventListener('dragend', handleDragEnd);
       document.removeEventListener('drop', handleDrop);
+      document.removeEventListener('mousedown', handlePointerDown, true);
+      window.removeEventListener('flow:fileDropComplete', handleFileDropComplete);
+      clearFileDragOverlay();
     };
-  }, []);
+  }, [clearFileDragOverlay, showFileDragOverlay]);
 
   // Store search query in a ref to use in editor update callback
   const searchQueryRef = useRef(searchQuery);
@@ -1036,6 +1054,21 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     return () => window.removeEventListener('toggleDrawingMode', handler as EventListener);
   }, []);
 
+  // Insert media at a specific doc position (from gutter + menu)
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleInsertAtPos = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; file: File }>).detail;
+      if (!detail?.file) return;
+
+      insertMediaAtPos(editor.view, detail.file, uploadImage, detail.pos);
+    };
+
+    window.addEventListener('flow:insertMediaAtPos', handleInsertAtPos);
+    return () => window.removeEventListener('flow:insertMediaAtPos', handleInsertAtPos);
+  }, [editor]);
+
   return (
     <div ref={editorRef} className={`h-full flex flex-col editor-root relative editor-bullets-${bulletStyle}`}>
       {/* Persistent Drawing Layer */}
@@ -1050,6 +1083,8 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           }
         }}
       />
+
+      <MultiColumnGutterControls editor={editor} isFullscreen={isFullscreen} />
 
       {/* Bubble Menu - appears on text selection */}
       {editor && showBubbleMenu && bubbleMenuPosition && (
@@ -1284,7 +1319,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         editor={editor} 
         className="min-h-full prose prose-invert max-w-none editor-scrollbar"
         style={{ 
-          maxWidth: '800px', 
+          maxWidth: `${editorMaxWidth}px`, 
           margin: '0 auto',
           padding: '2rem',
           paddingBottom: '50vh', // Large bottom padding for breathing room
@@ -1317,7 +1352,8 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         
         /* Inline images — hug content so multiple can sit on one row */
         .ProseMirror .resizable-image-wrapper {
-          display: block;
+          display: inline-block;
+          width: fit-content;
           vertical-align: top;
           max-width: 100% !important;
           margin: 0;
@@ -1328,37 +1364,83 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         /* Ensure images shrink when editor width is constrained */
         .ProseMirror .resizable-image-wrapper > span {
           max-width: 100% !important;
+          width: fit-content;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
         }
         .ProseMirror .resizable-image-wrapper.is-dragging {
           z-index: 30;
         }
-        .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode {
-          outline: 2px solid #8cf !important;
-          border-radius: 8px;
-          outline-offset: 2px;
+
+        /* Notion-style selection ring */
+        .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode,
+        .ProseMirror .resizable-image-wrapper.is-selected {
+          outline: none !important;
+          border-radius: 6px;
+          box-shadow: 0 0 0 2px rgba(46, 170, 220, 0.4), 0 2px 8px rgba(0, 0, 0, 0.12);
         }
-        .ProseMirror .resizable-image-wrapper img {
+
+        .ProseMirror .resizable-image-wrapper .flow-image-media {
           display: block;
           max-width: 100%;
           height: auto;
+          margin-left: auto;
+          margin-right: auto;
+          object-fit: contain;
+          border-radius: 6px;
         }
 
-        /* Remove blue border from images */
+        /* No outline on raw img — wrapper owns the focus ring */
         .ProseMirror img {
           outline: none !important;
           border: none !important;
         }
-        .ProseMirror img.ProseMirror-selectednode {
-          outline: 2px solid #A0522D !important;
-          border-radius: 8px;
+        .ProseMirror .resizable-image-wrapper img.ProseMirror-selectednode {
+          outline: none !important;
+          box-shadow: none !important;
         }
         .ProseMirror img:focus {
           outline: none !important;
         }
-        
-        /* Subtle hover ring — grab cursor comes from the node view wrapper */
-        .ProseMirror .resizable-image-wrapper .group:hover img {
-          box-shadow: 0 0 0 2px #A0522D40;
+
+        /* Subtle hover ring */
+        .ProseMirror .resizable-image-wrapper .group:hover .flow-image-media {
+          box-shadow: 0 0 0 2px rgba(46, 170, 220, 0.2);
+        }
+        .ProseMirror .resizable-image-wrapper.is-selected .flow-image-media,
+        .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode .flow-image-media {
+          box-shadow: none;
+        }
+
+        /* Subtle resize pills on inner vertical edges */
+        .ProseMirror .flow-resize-pill {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 28px;
+          border-radius: 999px;
+          background: rgba(46, 170, 220, 0.35);
+          opacity: 0;
+          transition: opacity 0.18s ease, background 0.18s ease;
+          cursor: col-resize;
+          z-index: 20;
+        }
+        .ProseMirror .flow-resize-pill-left {
+          left: 4px;
+        }
+        .ProseMirror .flow-resize-pill-right {
+          right: 4px;
+        }
+        .ProseMirror .resizable-image-wrapper:hover .flow-resize-pill,
+        .ProseMirror .resizable-image-wrapper.is-selected .flow-resize-pill,
+        .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode .flow-resize-pill {
+          opacity: 1;
+        }
+        .ProseMirror .flow-resize-pill:hover {
+          background: rgba(46, 170, 220, 0.65);
         }
 
         /* Side-by-side images live in the same paragraph */
@@ -1366,16 +1448,83 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           line-height: 0 !important;
           display: flex !important;
           flex-direction: row !important;
-          flex-wrap: wrap !important;
-          gap: 12px !important;
+          flex-wrap: nowrap !important;
+          gap: 24px !important;
+          column-gap: 24px !important;
+          row-gap: 24px !important;
           align-items: flex-start !important;
+          justify-content: flex-start !important;
           margin: 0.5rem 0 !important;
+          width: 100%;
+          max-width: 100%;
+        }
+
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
+          min-width: 0;
+          flex: 1 1 calc(50% - 12px);
+          max-width: calc(50% - 12px);
+          box-sizing: border-box;
+          margin: 0 !important;
+        }
+
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
+          flex: 1 1 calc(33.333% - 16px);
+          max-width: calc(33.333% - 16px);
+        }
+
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
+          flex: 1 1 calc(25% - 18px);
+          max-width: calc(25% - 18px);
+        }
+
+        .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper > span {
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+
+        /* During ACTIVE drag — ghost + source dimming */
+        body.flow-image-dragging .resizable-image-wrapper.is-dragging {
+          opacity: 0.35 !important;
+          pointer-events: none !important;
+        }
+        body.flow-image-dragging .flow-image-drag-ghost,
+        body.flow-image-dragging .flow-image-drag-ghost img {
+          pointer-events: none !important;
+        }
+        .flow-image-drag-ghost img {
+          max-width: 100%;
+          height: auto;
+          pointer-events: none !important;
+        }
+
+        @keyframes flowDropLinePulse {
+          from { opacity: 0.75; transform: scale(0.98); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        /* ProseMirror drop cursor for block-level drops */
+        .ProseMirror .flow-dropcursor,
+        .ProseMirror-dropcursor {
+          border-left: 3px solid #38bdf8 !important;
+          box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Spring snap-in after drop */
+        @keyframes flowImageSnap {
+          0% { transform: scale(0.94); opacity: 0.55; }
+          60% { transform: scale(1.02); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .ProseMirror .resizable-image-wrapper.flow-image-snap {
+          animation: flowImageSnap 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
         }
 
         /* Single-image paragraphs keep normal line height so you can click above/below */
         .ProseMirror p:has(.resizable-image-wrapper):not(:has(.resizable-image-wrapper + .resizable-image-wrapper)) {
           line-height: 1.7 !important;
           display: block !important;
+          width: fit-content;
+          max-width: 100%;
           margin: 0.75rem 0 !important;
           padding-top: 0.5rem;
           padding-bottom: 0.5rem;

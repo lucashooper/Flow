@@ -1,10 +1,21 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey, TextSelection } from 'prosemirror-state';
+import { Plugin, PluginKey } from 'prosemirror-state';
 import { insertImageFast } from '../utils/insertImageFast';
-import { pasteImagesFromHtml } from '../utils/imageDropDebug';
+import { insertMediaAtDrop } from '../utils/insertMediaAtDrop';
+import { pasteImagesFromHtml, logImageDrop } from '../utils/imageDropDebug';
+import { ensureTrailingParagraph } from '../utils/ensureEditableSpaceAroundImages';
 
 export interface ImagePasteOptions {
   uploadImage: (file: File) => Promise<string | null>;
+}
+
+let lastFileDropKey = '';
+
+function shouldHandleFileDrop(event: DragEvent): boolean {
+  const key = `${event.timeStamp}:${event.clientX}:${event.clientY}:${event.dataTransfer?.files.length ?? 0}`;
+  if (key === lastFileDropKey) return false;
+  lastFileDropKey = key;
+  return true;
 }
 
 export const ImagePaste = Extension.create<ImagePasteOptions>({
@@ -73,52 +84,29 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
         props: {
           handleDOMEvents: {
             drop: (view, event) => {
-              console.log('🎯 [MediaPaste] DOM drop event intercepted!', {
-                target: event.target,
-                files: event.dataTransfer?.files.length
-              });
-              
               const dataTransfer = event.dataTransfer;
-              if (!dataTransfer) {
-                console.log('❌ [MediaPaste] No dataTransfer in DOM event');
-                return false;
-              }
+              if (!dataTransfer) return false;
+              if (!shouldHandleFileDrop(event)) return true;
 
-              const files = Array.from(dataTransfer.files);
-              console.log('📋 [MediaPaste] Files in DOM drop:', files.length, files.map(f => f.type));
-              
-              const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-              console.log('📋 [MediaPaste] Media files filtered:', mediaFiles.length);
-              
-              if (mediaFiles.length === 0) {
-                console.log('⚠️ [MediaPaste] No media files found in DOM drop');
-                return false;
-              }
+              const mediaFiles = Array.from(dataTransfer.files).filter(
+                (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+              );
+              if (mediaFiles.length === 0) return false;
 
-              console.log('🖼️ [MediaPaste] DOM Drop detected,', mediaFiles.length, 'media file(s)');
+              logImageDrop('[onDrop:DOM]', mediaFiles.length, 'file(s)', {
+                x: event.clientX,
+                y: event.clientY,
+              });
+
               event.preventDefault();
               event.stopPropagation();
 
-              // Insert at end of document
-              const insertPos = view.state.doc.content.size;
-              console.log('📍 [MediaPaste] Inserting at end of document:', insertPos);
-
-              // Set selection to insert position
-              try {
-                const resolved = view.state.doc.resolve(insertPos);
-                const tr = view.state.tr.setSelection(TextSelection.near(resolved));
-                view.dispatch(tr);
-                console.log('✅ [MediaPaste] Selection set to position:', insertPos);
-              } catch (error) {
-                console.error('❌ [MediaPaste] Failed to set selection:', error);
-              }
-
               for (const file of mediaFiles) {
-                console.log('📸 [MediaPaste] Processing dropped media:', file.name, file.type);
-                insertMediaFile(view, file);
+                insertMediaAtDrop(view, file, uploadImage, event.clientX, event.clientY);
               }
 
-              console.log('✅ [MediaPaste] DOM drop completed successfully');
+              ensureTrailingParagraph(view, true);
+              window.dispatchEvent(new CustomEvent('flow:fileDropComplete'));
               return true;
             }
           },
@@ -265,66 +253,31 @@ export const ImagePaste = Extension.create<ImagePasteOptions>({
             return false;
           },
 
-          handleDrop: (view, event) => {
-            console.log('🎯 [MediaPaste] handleDrop called!', {
-              target: event.target,
-              clientX: event.clientX,
-              clientY: event.clientY,
-              dataTransfer: event.dataTransfer
-            });
+          handleDrop: (view, event, _slice, moved) => {
+            if (moved) return false;
 
             const dataTransfer = event.dataTransfer;
-            if (!dataTransfer) {
-              console.log('❌ [MediaPaste] No dataTransfer');
-              return false;
-            }
+            if (!dataTransfer) return false;
+            if (!shouldHandleFileDrop(event)) return true;
 
-            const files = Array.from(dataTransfer.files);
-            console.log('📋 [MediaPaste] Files in drop:', files.length, files.map(f => f.type));
-            
-            const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-            console.log('📋 [MediaPaste] Media files filtered:', mediaFiles.length);
-            
-            if (mediaFiles.length === 0) {
-              console.log('⚠️ [MediaPaste] No media files found in drop');
-              return false;
-            }
+            const mediaFiles = Array.from(dataTransfer.files).filter(
+              (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+            );
+            if (mediaFiles.length === 0) return false;
 
-            console.log('🖼️ [MediaPaste] Drop detected,', mediaFiles.length, 'media file(s)');
+            logImageDrop('[onDrop:PM]', mediaFiles.length, 'file(s)', {
+              x: event.clientX,
+              y: event.clientY,
+            });
+
             event.preventDefault();
 
-            // Try to get drop position, but if it fails (dropped outside content), insert at end
-            const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-            console.log('📍 [MediaPaste] posAtCoords result:', pos);
-            
-            let insertPos: number;
-            
-            if (pos && pos.pos >= 0 && pos.pos <= view.state.doc.content.size) {
-              // Valid drop position - use it
-              insertPos = pos.pos;
-              console.log('✅ [MediaPaste] Using drop position:', insertPos);
-            } else {
-              // Invalid position (dropped outside content area) - insert at end
-              insertPos = view.state.doc.content.size;
-              console.log('✅ [MediaPaste] Using end of document:', insertPos);
-            }
-
-            // Set selection to insert position
-            try {
-              const resolved = view.state.doc.resolve(insertPos);
-              const tr = view.state.tr.setSelection(TextSelection.near(resolved));
-              view.dispatch(tr);
-              console.log('✅ [MediaPaste] Selection set to position:', insertPos);
-            } catch (error) {
-              console.error('❌ [MediaPaste] Failed to set selection:', error);
-            }
-
             for (const file of mediaFiles) {
-              console.log('📸 [MediaPaste] Processing dropped media:', file.name, file.type);
-              insertMediaFile(view, file);
+              insertMediaAtDrop(view, file, uploadImage, event.clientX, event.clientY);
             }
 
-            console.log('✅ [MediaPaste] handleDrop completed successfully');
+            ensureTrailingParagraph(view, true);
+            window.dispatchEvent(new CustomEvent('flow:fileDropComplete'));
             return true;
           },
         },
