@@ -1,8 +1,12 @@
 import type { Editor } from '@tiptap/react';
 import type { EditorView } from 'prosemirror-view';
 import type { Node as PMNode } from 'prosemirror-model';
-import { dropPoint } from 'prosemirror-transform';
-import { moveEditorNode } from './moveEditorNode';
+import {
+  executeBlockDrop,
+  logDropTargetPreview,
+  previewBlockLevelDrop,
+  resolveBlockDropTarget,
+} from './imageBlockDrop';
 import {
   animateImageSnap,
   autoFitImagesInParagraph,
@@ -15,7 +19,6 @@ import {
   executeColumnDrop,
   findImageHitAtPointer,
   isColumnDropKind,
-  previewBlockLineDrop,
   previewColumnDropOnImage,
 } from './imageColumnDrop';
 import { findImageWrapper, getImageNodePosFromView } from './imageDomUtils';
@@ -40,6 +43,9 @@ export interface ImageDropPreview {
   dropLine: DropLineIndicator | null;
   label: string;
   autoFit: boolean;
+  /** Block-level drop metadata (above/below paragraph). */
+  blockPos?: number;
+  insertBefore?: boolean;
 }
 
 const ROW_Y_TOLERANCE = 48;
@@ -138,36 +144,54 @@ export function getImageDropPreview(
     fromPos,
     draggedEl,
   );
+
   if (targetHit) {
     const columnPreview = previewColumnDropOnImage(editor, clientX, clientY, targetHit);
     if (columnPreview) {
-      console.log('[DropTarget] column', {
-        fromPos,
-        label: columnPreview.label,
-        targetImagePos: columnPreview.targetImagePos,
-        kind: columnPreview.kind,
-      });
+      logDropTargetPreview(columnPreview);
       return columnPreview;
+    }
+
+    // Center of image / image row → block above or below the whole paragraph
+    const $hit = state.doc.resolve(targetHit.pos);
+    if ($hit.parent.type.name === 'paragraph') {
+      const blockPos = $hit.before($hit.depth);
+      const blockNode = state.doc.nodeAt(blockPos);
+      if (blockNode) {
+        const blockDom = view.nodeDOM(blockPos);
+        const insertBefore =
+          blockDom instanceof HTMLElement
+            ? clientY < blockDom.getBoundingClientRect().top + blockDom.getBoundingClientRect().height / 2
+            : true;
+        const preview = previewBlockLevelDrop(editor, clientX, clientY, {
+          blockPos,
+          blockNode,
+          insertBefore,
+        });
+        logDropTargetPreview(preview);
+        return preview;
+      }
     }
   }
 
-  const coords = view.posAtCoords({ left: clientX, top: clientY });
-  if (!coords) return null;
+  // Over text or empty canvas → always block-level above/below, never inline into text
+  const blockTarget = resolveBlockDropTarget(editor, clientX, clientY);
+  if (!blockTarget) return null;
 
-  const slice = state.doc.slice(fromPos, fromPos + nodeSize);
-  const insertPos = dropPoint(state.doc, coords.pos, slice);
-  if (insertPos == null) return null;
-  if (insertPos >= fromPos && insertPos <= fromPos + nodeSize) return null;
+  // Skip no-op: dropping immediately adjacent to own single-image paragraph
+  const $from = state.doc.resolve(fromPos);
+  const ownBlockPos = $from.before($from.depth);
+  if (
+    blockTarget.blockPos === ownBlockPos &&
+    ((blockTarget.insertBefore && fromPos === $from.start()) ||
+      (!blockTarget.insertBefore && fromPos + nodeSize === $from.end()))
+  ) {
+    return null;
+  }
 
-  console.log('[DropTarget] line', { insertPos, clientX, clientY });
-
-  return {
-    insertPos,
-    kind: 'line',
-    dropLine: previewBlockLineDrop(editor, clientX, clientY, insertPos),
-    label: 'insert-block',
-    autoFit: false,
-  };
+  const preview = previewBlockLevelDrop(editor, clientX, clientY, blockTarget);
+  logDropTargetPreview(preview);
+  return preview;
 }
 
 export function moveImageWithPreview(
@@ -204,13 +228,10 @@ export function moveImageWithPreview(
       return true;
     }
 
-    const moved = moveEditorNode(editor, fromPos, preview.insertPos, node);
+    const moved = executeBlockDrop(editor, fromPos, preview, node);
     if (moved) {
-      animateImageSnap(editor.view, preview.insertPos);
-    } else {
-      console.error('[ColumnDrop] block line move rejected by dropPoint', {
-        fromPos,
-        insertPos: preview.insertPos,
+      requestAnimationFrame(() => {
+        animateImageSnap(editor.view, preview.insertPos);
       });
     }
     return moved;

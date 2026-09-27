@@ -71,15 +71,6 @@ function buildVerticalLine(x: number, top: number, bottom: number): DropLineIndi
   };
 }
 
-function buildHorizontalLine(y: number, centerX: number, width = 96): DropLineIndicator {
-  return {
-    orientation: 'horizontal',
-    x: centerX - width / 2,
-    y,
-    length: width,
-  };
-}
-
 /**
  * Per-image drop zones:
  * - left 25%  → join column on left  (thin vertical bar on target's left edge)
@@ -125,20 +116,6 @@ export function previewColumnDropOnImage(
   }
 
   return null;
-}
-
-export function previewBlockLineDrop(
-  editor: Editor,
-  clientX: number,
-  clientY: number,
-  insertPos: number,
-): DropLineIndicator | null {
-  try {
-    const coords = editor.view.coordsAtPos(insertPos);
-    return buildHorizontalLine(coords.top, clientX, 120);
-  } catch {
-    return buildHorizontalLine(clientY, clientX, 120);
-  }
 }
 
 export function isColumnDropKind(kind: ImageDropPreview['kind']): boolean {

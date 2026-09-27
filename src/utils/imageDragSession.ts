@@ -8,6 +8,7 @@ import {
   showImageDropIndicator,
   type ImageDropPreview,
 } from './imageDropPreview';
+import { logDropTargetPreview } from './imageBlockDrop';
 import { isColumnDropKind } from './imageColumnDrop';
 
 type PointerDragSession = {
@@ -25,14 +26,8 @@ type PointerDragSession = {
 
 let activeSession: PointerDragSession | null = null;
 
-function logDropTarget(preview: ImageDropPreview | null, coords: { x: number; y: number }): void {
-  console.log('[DropTarget]', {
-    x: coords.x,
-    y: coords.y,
-    kind: preview?.kind ?? null,
-    insertPos: preview?.insertPos ?? null,
-    targetImagePos: preview?.targetImagePos ?? null,
-  });
+function logDropTarget(preview: ImageDropPreview | null, _coords: { x: number; y: number }): void {
+  logDropTargetPreview(preview);
 }
 
 function logDropExecute(
@@ -122,7 +117,7 @@ function endPointerSession(
     // If release missed the narrow side zone, honor the last column preview from drag-over
     if (
       preview &&
-      preview.kind === 'line' &&
+      preview.kind === 'block' &&
       session.lastPreview &&
       isColumnDropKind(session.lastPreview.kind)
     ) {

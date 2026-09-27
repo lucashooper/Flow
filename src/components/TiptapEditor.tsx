@@ -1449,9 +1449,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           display: flex !important;
           flex-direction: row !important;
           flex-wrap: nowrap !important;
-          gap: 24px !important;
-          column-gap: 24px !important;
-          row-gap: 24px !important;
+          gap: 20px !important;
+          column-gap: 20px !important;
+          row-gap: 20px !important;
           align-items: flex-start !important;
           justify-content: flex-start !important;
           margin: 0.5rem 0 !important;
@@ -1461,20 +1461,20 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
           min-width: 0;
-          flex: 1 1 calc(50% - 12px);
-          max-width: calc(50% - 12px);
+          flex: 1 1 calc(50% - 20px);
+          max-width: calc(50% - 20px);
           box-sizing: border-box;
-          margin: 0 !important;
+          margin: 0 10px !important;
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
-          flex: 1 1 calc(33.333% - 16px);
-          max-width: calc(33.333% - 16px);
+          flex: 1 1 calc(33.333% - 14px);
+          max-width: calc(33.333% - 14px);
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper {
-          flex: 1 1 calc(25% - 18px);
-          max-width: calc(25% - 18px);
+          flex: 1 1 calc(25% - 15px);
+          max-width: calc(25% - 15px);
         }
 
         .ProseMirror p:has(.resizable-image-wrapper + .resizable-image-wrapper) .resizable-image-wrapper > span {
@@ -1502,7 +1502,16 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
           to { opacity: 1; transform: scale(1); }
         }
 
-        /* ProseMirror drop cursor for block-level drops */
+        /* Hide native PM dropcursor during image pointer drag — custom overlay only */
+        body.flow-image-dragging .ProseMirror .ProseMirror-dropcursor,
+        body.flow-image-dragging .ProseMirror-dropcursor,
+        body.flow-image-dragging .ProseMirror .flow-dropcursor {
+          display: none !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
+        /* ProseMirror drop cursor (file drops / default editing only) */
         .ProseMirror .flow-dropcursor,
         .ProseMirror-dropcursor {
           border-left: 3px solid #38bdf8 !important;
