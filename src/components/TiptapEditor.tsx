@@ -556,43 +556,26 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   // Update editor content when prop changes (for switching notes)
   useEffect(() => {
     if (!editor) return;
-    
-    // Only update if content prop actually changed
+
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+
     if (content !== lastContentProp.current) {
       lastContentProp.current = content;
-      
-      // Don't reset content if the change came from the editor itself (e.g., paste)
-      if (isInternalUpdate.current) {
-        console.log('⏭️ Skipping setContent - internal update');
-        isInternalUpdate.current = false;
-        return;
-      }
-      
-      // Only update if editor content is different from prop
+
       if (content !== editor.getHTML()) {
-        console.log('🔄 Setting editor content from prop (note switch)');
-        // Use emitUpdate:false so this doesn't trigger onChange → auto-save loop
-        editor.commands.setContent(content, { emitUpdate: false });
+        console.log('🔄 Setting editor content from prop (note switch), length:', content.length);
+        editor.commands.setContent(content || '<p></p>', { emitUpdate: false });
         if (textContainsLatex(content)) {
           setTimeout(() => migrateAllMathInEditor(editor), 0);
         }
-        
-        // CRITICAL: Clear undo history after switching notes.
-        // Without this, Ctrl+Z undoes back to the previous note's content,
-        // which can delete/replace the current note's text.
-        // This matches Notion/Obsidian behavior — each note has fresh undo history.
-        //
-        // Find the ProseMirror history plugin and reset its state to a fresh
-        // empty HistoryState by dispatching a transaction with the plugin key's
-        // meta set to { historyState: <freshState> }.
-        // See prosemirror-history/src/history.ts applyTransaction():
-        //   let historyTr = tr.getMeta(historyKey);
-        //   if (historyTr) return historyTr.historyState;
+
         const historyPlugin = editor.state.plugins.find(
           (plugin: any) => plugin.key === 'history$'
         );
         if (historyPlugin) {
-          // Get a fresh empty HistoryState from the plugin's init()
           const freshState = (historyPlugin as any).spec.state.init();
           const tr = editor.state.tr;
           tr.setMeta(historyPlugin, { historyState: freshState });

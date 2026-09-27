@@ -1,16 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Input } from '../components/Input';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuth } from '../contexts/AuthContext';
+import { getCachedAuthUser, getLocalNoteCount } from '../lib/offlineAuth';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [offlineLoading, setOfflineLoading] = useState(false);
+  const [localNoteCount, setLocalNoteCount] = useState<number | null>(null);
+  const { signIn, signInOffline } = useAuth();
   const navigate = useNavigate();
+  const cachedUser = getCachedAuthUser();
+
+  useEffect(() => {
+    void getLocalNoteCount().then(setLocalNoteCount);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,11 +28,39 @@ export const Login = () => {
     try {
       await signIn(email, password);
       navigate('/dashboard');
-    } catch (err) {
-      setError('Failed to sign in. Please check your credentials.');
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message?: string }).message)
+          : '';
+
+      if (message.includes('exceed_egress') || message.includes('restricted')) {
+        setError(
+          'Your Supabase project is paused (egress limit). Click "Open notes offline" below to use notes saved on this device.',
+        );
+      } else {
+        setError('Failed to sign in. Please check your credentials — or use offline mode below.');
+      }
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOfflineAccess = async () => {
+    setError('');
+    setOfflineLoading(true);
+    try {
+      const ok = await signInOffline(email || undefined);
+      if (ok) {
+        navigate('/dashboard');
+        return;
+      }
+      setError(
+        'No notes found on this browser. Open flow-notes.app on the browser where you used Flow, or use the read-only viewer below with your JSON backup.',
+      );
+    } finally {
+      setOfflineLoading(false);
     }
   };
 
@@ -108,6 +144,45 @@ export const Login = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid #222' }}>
+          <p className="text-xs text-center mb-3" style={{ color: '#888' }}>
+            Supabase paused? Open notes saved on this device — no login needed.
+            {localNoteCount !== null && localNoteCount > 0 && (
+              <span style={{ color: '#4fc3f7' }}> ({localNoteCount} notes found locally)</span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={handleOfflineAccess}
+            disabled={offlineLoading}
+            className="w-full py-3 rounded-lg font-medium transition-all duration-300 hover:scale-[1.01] disabled:opacity-50"
+            style={{
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333',
+              color: '#e5e5e5',
+            }}
+          >
+            {offlineLoading ? 'Opening offline...' : 'Open notes offline on this device'}
+          </button>
+
+          {cachedUser && (
+            <p className="mt-2 text-center text-xs" style={{ color: '#666' }}>
+              Previously signed in as {cachedUser.email}
+            </p>
+          )}
+
+          <p className="mt-3 text-center text-xs">
+            <a
+              href="/view-notes-offline.html"
+              className="hover:underline"
+              style={{ color: '#4fc3f7' }}
+            >
+              Read-only notes viewer
+            </a>
+            {' '}(or load JSON backup)
+          </p>
+        </div>
 
           <p className="mt-6 text-center text-sm" style={{ color: '#888888' }}>
             Don't have an account?{' '}

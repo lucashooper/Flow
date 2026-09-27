@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, getLastSyncTime, setLastSyncTime } from '../lib/db';
+import { isOfflineMode } from '../lib/offlineAuth';
 import { reconcileFromServer } from '../lib/syncHealth';
 import { repairOutboxPayloads, sanitizeSyncPayload } from '../lib/syncPayloads';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +16,7 @@ export const useOfflineSync = () => {
   const syncInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const syncToServer = async () => {
-    if (!user?.id || !navigator.onLine || isSyncing.current) return;
+    if (!user?.id || !navigator.onLine || isSyncing.current || isOfflineMode()) return;
 
     isSyncing.current = true;
     window.dispatchEvent(new Event('syncStart'));

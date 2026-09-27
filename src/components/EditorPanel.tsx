@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { Note } from '../types';
 import { TiptapEditor } from './TiptapEditor';
 import { useFocusMode } from '../contexts/FocusModeContext';
+import { getNote } from '../lib/dataAccess';
 
 interface EditorPanelProps {
   note: Note | undefined;
@@ -14,96 +15,108 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
+  const [loadedNoteId, setLoadedNoteId] = useState<string | undefined>(undefined);
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const currentNoteIdRef = useRef<string | undefined>(undefined);
+  const isHydratedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsByNote = useRef<Map<string, number>>(new Map());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  
-  console.log('📝 [EditorPanel] Received searchQuery:', searchQuery, 'for note:', note?.title);
+
+  // Sync local editor state BEFORE child mounts (avoids empty editor flash)
+  if (note && note.id !== loadedNoteId) {
+    setLoadedNoteId(note.id);
+    setTitle(note.title);
+    setContent(note.content || '');
+    setDrawingData(note.drawing_data || '');
+    isHydratedRef.current = false;
+  }
+
+  useLayoutEffect(() => {
+    if (!note) {
+      setLoadedNoteId(undefined);
+      isHydratedRef.current = false;
+      return;
+    }
+
+    isHydratedRef.current = true;
+
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        const savedPosition = scrollPositionsByNote.current.get(note.id) || 0;
+        scrollContainerRef.current.scrollTop = savedPosition;
+      }
+    });
+
+    // Re-read from IndexedDB — source of truth
+    void getNote(note.id).then((stored) => {
+      if (!stored || stored.id !== note.id) return;
+      const storedContent = stored.content || '';
+      if (storedContent.length > (note.content?.length ?? 0)) {
+        console.log('📝 Loaded content from IndexedDB:', storedContent.length, 'chars');
+        setContent(storedContent);
+      }
+      if (stored.title !== title) setTitle(stored.title);
+      if ((stored.drawing_data || '') !== drawingData) {
+        setDrawingData(stored.drawing_data || '');
+      }
+    });
+  }, [note?.id]);
 
   // Save scroll position when scrolling
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || !currentNoteIdRef.current) return;
+    if (!container || !loadedNoteId) return;
 
     const handleScroll = () => {
-      if (currentNoteIdRef.current) {
-        scrollPositionsByNote.current.set(currentNoteIdRef.current, container.scrollTop);
+      if (loadedNoteId) {
+        scrollPositionsByNote.current.set(loadedNoteId, container.scrollTop);
       }
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [loadedNoteId]);
 
-  useEffect(() => {
-    // Only update state if the note ID actually changed (switching notes)
-    // This prevents unnecessary re-renders when tabbing away and back
-    if (note && note.id !== currentNoteIdRef.current) {
-      console.log('📝 Switching to note:', note.id);
-      currentNoteIdRef.current = note.id;
-      setTitle(note.title);
-      setContent(note.content);
-      setDrawingData(note.drawing_data || '');
-      
-      // Restore scroll position for this note after content loads
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          const savedPosition = scrollPositionsByNote.current.get(note.id) || 0;
-          scrollContainerRef.current.scrollTop = savedPosition;
-          console.log('📜 Restored scroll position:', savedPosition, 'for note:', note.id);
-        }
-      });
-    }
-  }, [note?.id]);
-
-  // Handle container resize (e.g., when split pane is created)
+  // Handle container resize
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     resizeObserverRef.current = new ResizeObserver(() => {
-      // When container resizes, restore the scroll position
-      if (currentNoteIdRef.current) {
-        const savedPosition = scrollPositionsByNote.current.get(currentNoteIdRef.current) || 0;
+      if (loadedNoteId) {
+        const savedPosition = scrollPositionsByNote.current.get(loadedNoteId) || 0;
         if (savedPosition > 0 && Math.abs(container.scrollTop - savedPosition) > 10) {
           container.scrollTop = savedPosition;
-          console.log('📐 Restored scroll after resize:', savedPosition);
         }
       }
     });
 
     resizeObserverRef.current.observe(container);
+    return () => resizeObserverRef.current?.disconnect();
+  }, [loadedNoteId]);
 
-    return () => {
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
-      }
-    };
-  }, []);
-
-  // Auto-save with debounce
+  // Auto-save (only after hydrated)
   useEffect(() => {
-    if (!note) return;
+    if (!note || !isHydratedRef.current || note.id !== loadedNoteId) return;
 
     if (title !== note.title || content !== note.content || drawingData !== (note.drawing_data || '')) {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       saveTimeoutRef.current = setTimeout(() => {
-        console.log('💾 Auto-saving note with drawing data...');
+        // Never save empty content over a note that had content
+        if (!content.trim() && (note.content?.trim()?.length ?? 0) > 0) {
+          console.warn('⏭️ Skipping save — would wipe existing note content');
+          return;
+        }
+        console.log('💾 Auto-saving note...');
         onNoteUpdate(note.id, { title, content, drawing_data: drawingData });
       }, 1000);
     }
 
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, content, drawingData, note]);
+  }, [title, content, drawingData, note, loadedNoteId, onNoteUpdate]);
 
   if (!note) {
     return (
@@ -117,52 +130,46 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   }
 
   return (
-    <div 
+    <div
       ref={scrollContainerRef}
       className="flex-1 min-h-0 flex flex-col editor-background editor-root overflow-y-auto custom-scrollbar"
     >
-      {/* Editor Header - fixed at top, scrolls with content */}
       <div className="pt-6 pb-4 editor-header flex-shrink-0 px-8">
         <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-        <input
-          type="text"
-          value={title || ''}
-          onChange={(e) => setTitle(e.target.value)}
-          readOnly={isFullscreen}
-          tabIndex={isFullscreen ? -1 : 0}
-          onKeyDown={(e) => {
-            if (isFullscreen) return;
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              // Focus the editor content
-              const editorElement = document.querySelector('.ProseMirror');
-              if (editorElement) {
-                (editorElement as HTMLElement).focus();
+          <input
+            type="text"
+            value={title || ''}
+            onChange={(e) => setTitle(e.target.value)}
+            readOnly={isFullscreen}
+            tabIndex={isFullscreen ? -1 : 0}
+            onKeyDown={(e) => {
+              if (isFullscreen) return;
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const editorElement = document.querySelector('.ProseMirror');
+                if (editorElement) (editorElement as HTMLElement).focus();
               }
-            }
-          }}
-          placeholder="Untitled"
-          className="w-full bg-transparent text-3xl font-bold focus:outline-none border-none"
-          style={{
-            color: 'var(--text)',
-            lineHeight: '1.2',
-            padding: 0,
-          }}
-        />
+            }}
+            placeholder="Untitled"
+            className="w-full bg-transparent text-3xl font-bold focus:outline-none border-none"
+            style={{ color: 'var(--text)', lineHeight: '1.2', padding: 0 }}
+          />
         </div>
       </div>
 
-      {/* Editor Content */}
       <div className="flex-shrink-0">
-        <TiptapEditor
-          content={content}
-          onChange={setContent}
-          drawingData={drawingData}
-          noteTitle={title}
-          onDrawingChange={setDrawingData}
-          placeholder="Start writing..."
-          searchQuery={searchQuery}
-        />
+        {loadedNoteId === note.id && (
+          <TiptapEditor
+            key={note.id}
+            content={content}
+            onChange={setContent}
+            drawingData={drawingData}
+            noteTitle={title}
+            onDrawingChange={setDrawingData}
+            placeholder="Start writing..."
+            searchQuery={searchQuery}
+          />
+        )}
       </div>
     </div>
   );

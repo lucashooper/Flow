@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { isOfflineMode } from '../lib/offlineAuth';
 import type { Note, Folder, Dashboard } from '../types';
 import { 
   createNote, 
@@ -112,8 +113,8 @@ export const useDashboardData = () => {
       }
     }
     
-    // Skip network request if offline
-    if (!navigator.onLine) {
+    // Skip network when offline or Supabase project is paused
+    if (!navigator.onLine || isOfflineMode()) {
       console.log('📴 Offline mode - using cached data only');
       return;
     }
@@ -159,7 +160,7 @@ export const useDashboardData = () => {
       console.log('📦 Loaded from IndexedDB:', notesData.length, 'notes,', foldersData.length, 'folders');
       
       // If IndexedDB is empty and we're online, do initial sync
-      if (notesData.length === 0 && foldersData.length === 0 && navigator.onLine) {
+      if (notesData.length === 0 && foldersData.length === 0 && navigator.onLine && !isOfflineMode()) {
         console.log('🔄 IndexedDB empty, performing initial sync...');
         await initialSync(user.id);
         
@@ -171,7 +172,7 @@ export const useDashboardData = () => {
         
         setNotes(syncedNotes);
         setFolders(syncedFolders);
-      } else if (navigator.onLine) {
+      } else if (navigator.onLine && !isOfflineMode()) {
         // Background refresh: pull latest from Supabase to catch stale cached data
         (async () => {
           try {

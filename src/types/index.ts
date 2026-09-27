@@ -76,8 +76,10 @@ export interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  isOfflineMode: boolean;
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInOffline: (email?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
   updateProfilePicture: (profilePictureUrl: string) => Promise<void>;

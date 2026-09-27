@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flow — Offline Notes Viewer</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #222;
+      background: #0f0f0f;
+    }
+    header h1 { margin: 0 0 6px; font-size: 20px; color: #4fc3f7; }
+    header p { margin: 0; color: #888; font-size: 13px; }
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 0;
+    }
+    .sidebar {
+      border-right: 1px solid #222;
+      overflow: auto;
+      padding: 12px;
+    }
+    .content {
+      overflow: auto;
+      padding: 24px;
+    }
+    input[type="search"], input[type="file"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #111;
+      color: #eee;
+      margin-bottom: 12px;
+    }
+    .folder { margin: 8px 0 4px; color: #a855f7; font-weight: 600; font-size: 13px; }
+    .note-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #ddd;
+      cursor: pointer;
+    }
+    .note-item:hover, .note-item.active {
+      background: #1a1a1a;
+      border-color: #333;
+    }
+    .note-item small { display: block; color: #666; margin-top: 4px; }
+    .note-title { font-size: 28px; margin: 0 0 16px; }
+    .note-body {
+      max-width: 800px;
+      line-height: 1.7;
+    }
+    .note-body img { max-width: 100%; border-radius: 8px; }
+    .status {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .ok { background: #10b98122; border: 1px solid #10b981; }
+    .warn { background: #f59e0b22; border: 1px solid #f59e0b; }
+    .err { background: #ef444422; border: 1px solid #ef4444; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #eee;
+      cursor: pointer;
+    }
+    button:hover { background: #222; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { max-height: 40vh; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Flow Offline Notes Viewer</h1>
+    <p>Reads notes from this browser's saved Flow data (IndexedDB) or a JSON backup file.</p>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div id="status" class="status warn">Loading...</div>
+      <div class="toolbar">
+        <button onclick="loadFromIndexedDB()">Reload from device</button>
+        <button onclick="downloadAll()">Export JSON</button>
+      </div>
+      <input type="search" id="search" placeholder="Search notes..." oninput="renderList()" />
+      <label style="display:block;font-size:12px;color:#888;margin-bottom:6px;">Or load backup JSON:</label>
+      <input type="file" id="jsonFile" accept=".json,application/json" onchange="loadJsonFile(event)" />
+      <div id="list"></div>
+    </aside>
+    <main class="content">
+      <div id="viewer"><p style="color:#666">Select a note to read it.</p></div>
+    </main>
+  </div>
+
+  <script>
+    let notes = [];
+    let folders = [];
+    let selectedId = null;
+
+    function setStatus(message, type = 'ok') {
+      document.getElementById('status').className = 'status ' + type;
+      document.getElementById('status').textContent = message;
+    }
+
+    async function openFlowDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('FlowDB');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function readStore(db, storeName) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function loadFromIndexedDB() {
+      setStatus('Reading notes from this browser...', 'warn');
+      try {
+        const db = await openFlowDB();
+        notes = await readStore(db, 'notes');
+        folders = await readStore(db, 'folders');
+        db.close();
+
+        if (!notes.length) {
+          setStatus('No notes found in IndexedDB on this browser. Try loading your JSON backup below.', 'warn');
+        } else {
+          setStatus(`Loaded ${notes.length} notes and ${folders.length} folders from this device.`, 'ok');
+        }
+        renderList();
+      } catch (err) {
+        console.error(err);
+        setStatus('Could not read IndexedDB: ' + err.message, 'err');
+      }
+    }
+
+    async function loadJsonFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      setStatus('Loading backup file...', 'warn');
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        notes = data.notes || [];
+        folders = data.folders || [];
+        if (!notes.length) throw new Error('No notes array in JSON');
+        setStatus(`Loaded ${notes.length} notes from backup file.`, 'ok');
+        renderList();
+      } catch (err) {
+        setStatus('Failed to load JSON: ' + err.message, 'err');
+      }
+    }
+
+    function folderName(folderId) {
+      const folder = folders.find(f => f.id === folderId);
+      return folder?.name || 'Unfiled';
+    }
+
+    function renderList() {
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const list = document.getElementById('list');
+      const filtered = notes
+        .filter(n => {
+          if (!q) return true;
+          return (n.title || '').toLowerCase().includes(q) ||
+                 (n.content || '').toLowerCase().includes(q);
+        })
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      const byFolder = {};
+      for (const note of filtered) {
+        const key = folderName(note.folder_id);
+        if (!byFolder[key]) byFolder[key] = [];
+        byFolder[key].push(note);
+      }
+
+      list.innerHTML = '';
+      for (const [name, folderNotes] of Object.entries(byFolder).sort(([a], [b]) => a.localeCompare(b))) {
+        const heading = document.createElement('div');
+        heading.className = 'folder';
+        heading.textContent = name;
+        list.appendChild(heading);
+
+        for (const note of folderNotes) {
+          const btn = document.createElement('button');
+          btn.className = 'note-item' + (note.id === selectedId ? ' active' : '');
+          btn.innerHTML = `<strong>${escapeHtml(note.title || 'Untitled')}</strong><small>${new Date(note.updated_at || note.created_at || Date.now()).toLocaleString()}</small>`;
+          btn.onclick = () => showNote(note.id);
+          list.appendChild(btn);
+        }
+      }
+    }
+
+    function showNote(id) {
+      selectedId = id;
+      const note = notes.find(n => n.id === id);
+      if (!note) return;
+      renderList();
+      document.getElementById('viewer').innerHTML = `
+        <h2 class="note-title">${escapeHtml(note.title || 'Untitled')}</h2>
+        <div class="note-body">${note.content || '<p style="color:#666">(empty)</p>'}</div>
+      `;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    function downloadAll() {
+      const blob = new Blob([JSON.stringify({ notes, folders, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'flow-offline-export-' + Date.now() + '.json';
+      a.click();
+    }
+
+    loadFromIndexedDB();
+  </script>
+</body>
+</html>
