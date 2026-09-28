@@ -39,6 +39,10 @@ function forceMoveDropEffect(e: DragEvent): void {
 function blockNativeDragStart(e: DragEvent): void {
   e.preventDefault();
   e.stopPropagation();
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.dropEffect = 'move';
+  }
 }
 
 function installHtml5DragGuards(): void {

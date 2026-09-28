@@ -14,6 +14,7 @@ import {
 } from '../lib/noteDrafts';
 
 const SYNC_DEBOUNCE_MS = 1500;
+const AUTOSAVE_SETTLE_MS = 250;
 
 interface EditorPanelProps {
   note: Note | undefined;
@@ -29,12 +30,15 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const [loadedNoteId, setLoadedNoteId] = useState<string | undefined>(undefined);
   const [contentReady, setContentReady] = useState(false);
   const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const [editorMaxWidth, setEditorMaxWidth] = useState(() => getEditorContentMaxWidth());
 
   const syncTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const draftWriteRef = useRef<Promise<void>>(Promise.resolve());
   const isHydratedRef = useRef(false);
   const hasUserEditedRef = useRef(false);
+  const suppressAutosaveRef = useRef(true);
+  const activeNoteIdRef = useRef<string | undefined>(undefined);
   const pendingSyncRef = useRef<{ title: string; content: string; drawing_data: string } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsByNote = useRef<Map<string, number>>(new Map());
@@ -45,7 +49,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
       if (!payload.content.trim()) {
         const stored = await getNote(noteId);
         if ((stored?.content?.trim()?.length ?? 0) > 0) {
-          console.warn('⏭️ Skipping sync — would wipe existing note content');
+          console.warn('⏭️ Skipping sync — would wipe existing note content', { noteId });
           return;
         }
       }
@@ -84,6 +88,13 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
 
   const scheduleSync = useCallback(
     (noteId: string, payload: { title: string; content: string; drawing_data: string }) => {
+      if (noteId !== activeNoteIdRef.current) {
+        console.warn('[LocalSync] Ignoring sync for inactive note', {
+          noteId,
+          active: activeNoteIdRef.current,
+        });
+        return;
+      }
       pendingSyncRef.current = payload;
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       syncTimeoutRef.current = setTimeout(() => {
@@ -96,6 +107,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
 
   const persistDraftImmediately = useCallback(
     (noteId: string, payload: { title: string; content: string; drawing_data: string }) => {
+      if (noteId !== activeNoteIdRef.current) return;
       draftWriteRef.current = draftWriteRef.current
         .then(async () => {
           await saveNoteDraft(noteId, payload);
@@ -103,6 +115,22 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
         .catch((err) => console.error('Draft save failed:', err));
     },
     [],
+  );
+
+  const flushPendingForNote = useCallback(
+    async (noteId: string) => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = undefined;
+      }
+      const pending = pendingSyncRef.current;
+      if (pending) {
+        await draftWriteRef.current;
+        await flushSync(noteId, pending);
+        pendingSyncRef.current = null;
+      }
+    },
+    [flushSync],
   );
 
   useEffect(() => {
@@ -115,70 +143,74 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     };
   }, []);
 
-  // Sync local editor state BEFORE child mounts (avoids empty editor flash)
-  if (note && note.id !== loadedNoteId) {
-    setLoadedNoteId(note.id);
-    setTitle(note.title);
-    setContent(note.content || '');
-    setDrawingData(note.drawing_data || '');
-    setContentReady(false);
-    setRestoredFromDraft(false);
-    isHydratedRef.current = false;
-    hasUserEditedRef.current = false;
-  }
-
+  // Load note on switch — flush previous note first, never setState during render
   useLayoutEffect(() => {
-    if (!note) {
+    if (!note?.id) {
       setLoadedNoteId(undefined);
       setContentReady(false);
+      setEditorReady(false);
       isHydratedRef.current = false;
+      activeNoteIdRef.current = undefined;
       return;
     }
 
+    const targetId = note.id;
+    const previousId = activeNoteIdRef.current;
     let cancelled = false;
 
     void (async () => {
-      const [draft, stored] = await Promise.all([
-        loadNoteDraft(note.id),
-        getNote(note.id),
-      ]);
+      if (previousId && previousId !== targetId) {
+        await flushPendingForNote(previousId);
+      }
 
       if (cancelled) return;
 
-      if (!hasUserEditedRef.current) {
-        const resolved = resolveNoteContent(
-          draft,
-          stored ?? null,
-          {
-            title: note.title,
-            content: note.content || '',
-            drawing_data: note.drawing_data || '',
-            updated_at: note.updated_at,
-          },
-        );
+      activeNoteIdRef.current = targetId;
+      suppressAutosaveRef.current = true;
+      isHydratedRef.current = false;
+      hasUserEditedRef.current = false;
+      setEditorReady(false);
+      setContentReady(false);
+      setLoadedNoteId(targetId);
 
-        setTitle(resolved.title);
-        setContent(resolved.content);
-        setDrawingData(resolved.drawing_data);
-        setRestoredFromDraft(resolved.restoredFromDraft);
+      const [draft, stored] = await Promise.all([
+        loadNoteDraft(targetId),
+        getNote(targetId),
+      ]);
 
-        if (resolved.restoredFromDraft && draft) {
-          console.log('📝 Restored newer local draft:', draft.savedAt);
-          scheduleSync(note.id, {
-            title: resolved.title,
-            content: resolved.content,
-            drawing_data: resolved.drawing_data,
-          });
-        }
-      }
+      if (cancelled || activeNoteIdRef.current !== targetId) return;
 
+      const resolved = resolveNoteContent(
+        draft,
+        stored ?? null,
+        {
+          title: note.title,
+          content: note.content || '',
+          drawing_data: note.drawing_data || '',
+          updated_at: note.updated_at,
+        },
+      );
+
+      setTitle(resolved.title);
+      setContent(resolved.content);
+      setDrawingData(resolved.drawing_data);
+      setRestoredFromDraft(resolved.restoredFromDraft);
       setContentReady(true);
       isHydratedRef.current = true;
+
+      if (resolved.restoredFromDraft && draft) {
+        console.log('📝 Restored newer local draft:', draft.savedAt);
+        scheduleSync(targetId, {
+          title: resolved.title,
+          content: resolved.content,
+          drawing_data: resolved.drawing_data,
+        });
+      }
     })();
 
     requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
-        const savedPosition = scrollPositionsByNote.current.get(note.id) || 0;
+        const savedPosition = scrollPositionsByNote.current.get(targetId) || 0;
         scrollContainerRef.current.scrollTop = savedPosition;
       }
     });
@@ -186,7 +218,16 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     return () => {
       cancelled = true;
     };
-  }, [note?.id, scheduleSync]);
+  }, [note?.id, flushPendingForNote, scheduleSync]);
+
+  const handleEditorReady = useCallback(() => {
+    setEditorReady(true);
+    window.setTimeout(() => {
+      if (activeNoteIdRef.current === loadedNoteId) {
+        suppressAutosaveRef.current = false;
+      }
+    }, AUTOSAVE_SETTLE_MS);
+  }, [loadedNoteId]);
 
   // Save scroll position when scrolling
   useEffect(() => {
@@ -194,9 +235,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     if (!container || !loadedNoteId) return;
 
     const handleScroll = () => {
-      if (loadedNoteId) {
-        scrollPositionsByNote.current.set(loadedNoteId, container.scrollTop);
-      }
+      scrollPositionsByNote.current.set(loadedNoteId, container.scrollTop);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -223,7 +262,17 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
 
   // Local-first auto-save: immediate draft + debounced IndexedDB/sync
   useEffect(() => {
-    if (!note || !isHydratedRef.current || note.id !== loadedNoteId || !contentReady) return;
+    if (
+      !note ||
+      !isHydratedRef.current ||
+      !contentReady ||
+      !editorReady ||
+      suppressAutosaveRef.current ||
+      note.id !== loadedNoteId ||
+      note.id !== activeNoteIdRef.current
+    ) {
+      return;
+    }
 
     const changed =
       title !== note.title ||
@@ -248,33 +297,35 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     note,
     loadedNoteId,
     contentReady,
+    editorReady,
     persistDraftImmediately,
     scheduleSync,
   ]);
 
-  // Flush pending sync on unmount or note switch
+  // Flush pending sync on unmount
   useEffect(() => {
     return () => {
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-      const pending = pendingSyncRef.current;
-      const noteId = loadedNoteId;
-      if (pending && noteId) {
-        void draftWriteRef.current.then(() => flushSync(noteId, pending));
+      const noteId = activeNoteIdRef.current;
+      if (noteId) {
+        void flushPendingForNote(noteId);
       }
     };
-  }, [loadedNoteId, flushSync]);
+  }, [flushPendingForNote]);
 
   const handleContentChange = useCallback((next: string) => {
+    if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
     setContent(next);
   }, []);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
     setTitle(e.target.value);
   }, []);
 
   const handleDrawingChange = useCallback((data: string) => {
+    if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
     setDrawingData(data);
   }, []);
@@ -339,6 +390,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             drawingData={drawingData}
             noteTitle={title}
             onDrawingChange={handleDrawingChange}
+            onEditorReady={handleEditorReady}
             placeholder="Start writing..."
             searchQuery={searchQuery}
           />

@@ -1,5 +1,6 @@
 import { db, generateUUID, type Note, type Folder, type OutboxItem } from './db';
 import { supabase } from './supabase';
+import { meaningfulContentLength } from './syncHealth';
 import { sanitizeFolderPayload, sanitizeNotePayload, sanitizeSyncPayload } from './syncPayloads';
 
 /**
@@ -53,6 +54,40 @@ export async function createNote(
 }
 
 export async function updateNote(noteId: string, updates: Partial<Note>): Promise<void> {
+  const existing = await db.notes.get(noteId);
+  if (existing) {
+    const nextContent = updates.content ?? existing.content;
+    const oldLen = meaningfulContentLength(existing.content);
+    const newLen = meaningfulContentLength(nextContent);
+
+    if (oldLen > 100 && newLen < 20) {
+      console.warn('[NoteGuard] Blocked accidental content wipe', {
+        noteId,
+        title: existing.title,
+        oldLen,
+        newLen,
+      });
+      const safeUpdates = { ...updates };
+      delete safeUpdates.content;
+      if (Object.keys(safeUpdates).length === 0) return;
+      updates = safeUpdates;
+    }
+
+    if (
+      updates.title !== undefined &&
+      updates.title !== existing.title &&
+      oldLen > 100 &&
+      newLen < 20
+    ) {
+      console.warn('[NoteGuard] Blocked suspicious title overwrite during content wipe', {
+        noteId,
+        from: existing.title,
+        to: updates.title,
+      });
+      return;
+    }
+  }
+
   const now = new Date().toISOString();
   const updatedFields = { ...updates, updated_at: now, synced: false };
 

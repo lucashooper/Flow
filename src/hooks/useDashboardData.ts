@@ -16,6 +16,7 @@ import {
   getFoldersByDashboard,
   initialSync
 } from '../lib/dataAccess';
+import { detectNotesCorruption, recoverWipedNotesFromServer } from '../lib/syncHealth';
 
 export const useDashboardData = () => {
   const { user } = useAuth();
@@ -154,10 +155,31 @@ export const useDashboardData = () => {
         getFoldersByDashboard(activeDashboard.id)
       ]);
       
-      setNotes(notesData);
+      let effectiveNotes = notesData;
       setFolders(foldersData);
-      
+
       console.log('📦 Loaded from IndexedDB:', notesData.length, 'notes,', foldersData.length, 'folders');
+
+      if (
+        navigator.onLine &&
+        !isOfflineMode() &&
+        user?.id &&
+        detectNotesCorruption(notesData)
+      ) {
+        console.warn('[Recovery] Possible note corruption detected — restoring from cloud…');
+        try {
+          const { restored } = await recoverWipedNotesFromServer(user.id);
+          if (restored > 0) {
+            effectiveNotes = await getNotesByDashboard(activeDashboard.id);
+            console.log(`[Recovery] Restored ${restored} note(s) from Supabase`);
+            window.dispatchEvent(new CustomEvent('dataReconciled', { detail: { restored } }));
+          }
+        } catch (recoveryError) {
+          console.error('[Recovery] Cloud restore failed:', recoveryError);
+        }
+      }
+
+      setNotes(effectiveNotes);
       
       // If IndexedDB is empty and we're online, do initial sync
       if (notesData.length === 0 && foldersData.length === 0 && navigator.onLine && !isOfflineMode()) {

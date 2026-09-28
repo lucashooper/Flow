@@ -6,6 +6,7 @@ import { repairOutboxPayloads } from '../lib/syncPayloads';
 import {
   getSyncHealth,
   reconcileFromServer,
+  recoverWipedNotesFromServer,
   searchServerNotes,
   isSyncAdmin,
   type SyncHealthReport,
@@ -84,9 +85,45 @@ export const SyncDiagnostics = () => {
     }
   };
 
+  const handleRecoverWipedNotes = async () => {
+    if (!user?.id) return;
+    if (
+      !confirm(
+        'Restore notes from Supabase when local copies look empty or corrupted? Pending bad uploads will be discarded.',
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    setActionMessage('');
+    try {
+      const result = await recoverWipedNotesFromServer(user.id);
+      setActionMessage(
+        result.restored > 0
+          ? `Recovered ${result.restored} note(s) from cloud. Reloading…`
+          : 'No recoverable notes found on cloud (or cloud copies are also empty).',
+      );
+      window.dispatchEvent(new CustomEvent('dataReconciled', { detail: result }));
+      await refreshHealth();
+      if (result.restored > 0) {
+        setTimeout(() => window.location.reload(), 1200);
+      }
+    } catch {
+      setActionMessage('Recovery failed. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForceResync = async () => {
     if (!user?.id) return;
-    if (!confirm('This clears local cache and re-downloads everything from Supabase. Continue?')) return;
+    if (
+      !confirm(
+        'This clears local cache and re-downloads from Supabase. If notes were wiped locally, use "Recover wiped notes" first. Continue?',
+      )
+    ) {
+      return;
+    }
     setLoading(true);
     setActionMessage('');
     try {
@@ -237,6 +274,16 @@ export const SyncDiagnostics = () => {
             Sync now
           </button>
         )}
+
+        <button
+          onClick={handleRecoverWipedNotes}
+          disabled={loading || !navigator.onLine}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+        >
+          <CloudDownload className="w-4 h-4" />
+          Recover wiped notes from cloud
+        </button>
 
         <button
           onClick={handleForceResync}

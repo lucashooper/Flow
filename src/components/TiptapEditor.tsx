@@ -64,15 +64,18 @@ interface TiptapEditorProps {
   placeholder?: string;
   searchQuery?: string;
   noteTitle?: string;
+  onEditorReady?: () => void;
 }
 
-export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle }: TiptapEditorProps) => {
+export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle, onEditorReady }: TiptapEditorProps) => {
   const { isFullscreen } = useFocusMode();
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const isInternalUpdate = useRef(false);
+  const suppressChangeRef = useRef(true);
+  const onEditorReadyRef = useRef(onEditorReady);
   const tiptapEditorRef = useRef<Editor | null>(null);
   const showMenuTimeout = useRef<number | null>(null);
   const lastSelectionTime = useRef<number>(0);
@@ -81,6 +84,14 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   useEffect(() => {
     isFullscreenRef.current = isFullscreen;
   }, [isFullscreen]);
+
+  useEffect(() => {
+    onEditorReadyRef.current = onEditorReady;
+  }, [onEditorReady]);
+
+  useEffect(() => {
+    suppressChangeRef.current = true;
+  }, [content]);
 
   // Spell checker initialization removed - using browser native spell check
   // useEffect(() => {
@@ -250,10 +261,14 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
         migrateAllMathInEditor(createdEditor);
       }
       requestAnimationFrame(() => stripStrayDragTextNodes(createdEditor));
+      window.setTimeout(() => {
+        suppressChangeRef.current = false;
+        onEditorReadyRef.current?.();
+      }, 0);
     },
     onUpdate: ({ editor }) => {
+      if (suppressChangeRef.current) return;
       const newContent = editor.getHTML();
-      console.log('📝 Editor onUpdate triggered, content length:', newContent.length);
       isInternalUpdate.current = true;
       onChange(newContent);
       // Reset flag after a short delay to allow prop update
@@ -575,8 +590,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       lastContentProp.current = content;
 
       if (content !== editor.getHTML()) {
-        console.log('🔄 Setting editor content from prop (note switch), length:', content.length);
+        suppressChangeRef.current = true;
         editor.commands.setContent(content || '<p></p>', { emitUpdate: false });
+        window.setTimeout(() => {
+          suppressChangeRef.current = false;
+          onEditorReadyRef.current?.();
+        }, 0);
         if (textContainsLatex(content)) {
           setTimeout(() => migrateAllMathInEditor(editor), 0);
         }
@@ -638,6 +657,15 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   useEffect(() => {
     const isFileDrag = (e: DragEvent) =>
       e.dataTransfer?.types.includes('Files') ?? false;
+
+    const handleDragStart = (e: DragEvent) => {
+      if (!document.body.classList.contains('flow-image-dragging')) return;
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.dropEffect = 'move';
+      }
+    };
 
     const handleDragOver = (e: DragEvent) => {
       // In-editor image repositioning — always move, never copy/link cursor
@@ -704,6 +732,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       }
     };
 
+    document.addEventListener('dragstart', handleDragStart, true);
     document.addEventListener('dragover', handleDragOver);
     document.addEventListener('dragenter', handleDragEnter);
     document.addEventListener('dragleave', handleDragLeave);
@@ -713,6 +742,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     window.addEventListener('flow:fileDropComplete', handleFileDropComplete);
 
     return () => {
+      document.removeEventListener('dragstart', handleDragStart, true);
       document.removeEventListener('dragover', handleDragOver);
       document.removeEventListener('dragenter', handleDragEnter);
       document.removeEventListener('dragleave', handleDragLeave);

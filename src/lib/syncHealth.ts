@@ -1,5 +1,93 @@
 import { db } from './db';
 import { supabase } from './supabase';
+import { clearNoteDraft } from './noteDrafts';
+
+/** Strip HTML and measure meaningful text length. */
+export function meaningfulContentLength(content: string | null | undefined): number {
+  if (!content) return 0;
+  const text = content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+  return text.length > 0 ? text.length : content.trim().length;
+}
+
+/** Heuristic: many notes share one title and are empty — likely a save race wiped them. */
+export function detectNotesCorruption(notes: Array<{ title: string; content?: string | null }>): boolean {
+  if (notes.length < 2) return false;
+
+  const groups = new Map<string, number>();
+  for (const note of notes) {
+    const title = note.title?.trim();
+    if (!title || title === 'Untitled Note') continue;
+    groups.set(title, (groups.get(title) || 0) + 1);
+  }
+
+  for (const [title, count] of groups) {
+    if (count < 2) continue;
+    const affected = notes.filter((n) => n.title?.trim() === title);
+    const mostlyEmpty = affected.filter((n) => meaningfulContentLength(n.content) < 40).length;
+    if (mostlyEmpty >= 2 && mostlyEmpty === affected.length) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Restore notes from Supabase when local copies were wiped but cloud still has content.
+ * Clears pending note outbox uploads first so bad local data is not re-pushed.
+ */
+export async function recoverWipedNotesFromServer(
+  userId: string,
+): Promise<{ restored: number; examined: number }> {
+  const pendingNoteUpserts = await db.outbox
+    .filter((item) => item.entityType === 'note' && item.operation === 'upsert')
+    .toArray();
+
+  for (const item of pendingNoteUpserts) {
+    await db.outbox.delete(item.id);
+  }
+
+  if (pendingNoteUpserts.length > 0) {
+    console.warn(
+      `[Recovery] Cleared ${pendingNoteUpserts.length} pending note upload(s) before cloud restore`,
+    );
+  }
+
+  const { data: remoteNotes, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  let restored = 0;
+
+  for (const remote of remoteNotes ?? []) {
+    const local = await db.notes.get(remote.id);
+    const remoteLen = meaningfulContentLength(remote.content);
+    const localLen = meaningfulContentLength(local?.content);
+
+    const localMissing = !local;
+    const localWiped = localLen < 40 && remoteLen > localLen + 80;
+    const serverNewerAndRicher =
+      !!local &&
+      new Date(remote.updated_at).getTime() > new Date(local.updated_at).getTime() &&
+      remoteLen > localLen + 40;
+
+    if (localMissing || localWiped || serverNewerAndRicher) {
+      await db.notes.put({ ...remote, synced: true });
+      await clearNoteDraft(remote.id);
+      restored++;
+      console.log('[Recovery] Restored note from cloud:', remote.title, {
+        noteId: remote.id,
+        remoteLen,
+        localLen,
+      });
+    }
+  }
+
+  return { restored, examined: remoteNotes?.length ?? 0 };
+}
 
 export interface SyncHealthReport {
   localNotes: number;
@@ -57,8 +145,18 @@ export async function reconcileFromServer(userId: string): Promise<{ notesAdded:
     if (!local) {
       await db.notes.put({ ...note, synced: true });
       notesAdded++;
-    } else if (new Date(note.updated_at) > new Date(local.updated_at)) {
-      await db.notes.put({ ...note, synced: true });
+    } else {
+      const remoteLen = meaningfulContentLength(note.content);
+      const localLen = meaningfulContentLength(local.content);
+      const serverNewer = new Date(note.updated_at) > new Date(local.updated_at);
+      const localWiped = localLen < 40 && remoteLen > localLen + 80;
+
+      if (serverNewer || localWiped) {
+        if (localWiped || remoteLen >= localLen) {
+          await db.notes.put({ ...note, synced: true });
+          if (localWiped) await clearNoteDraft(note.id);
+        }
+      }
     }
   }
 
