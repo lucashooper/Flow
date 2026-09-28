@@ -12,6 +12,7 @@ import {
   resolveNoteContent,
   emitNoteSaveStatus,
 } from '../lib/noteDrafts';
+import { setActiveNoteEdit, bumpActiveNoteEditRevision } from '../lib/activeNoteEdit';
 
 const SYNC_DEBOUNCE_MS = 1500;
 const AUTOSAVE_SETTLE_MS = 250;
@@ -43,6 +44,9 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsByNote = useRef<Map<string, number>>(new Map());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const flushPendingForNoteRef = useRef<(noteId: string) => Promise<void>>(async () => {});
+  const scheduleSyncRef = useRef<(noteId: string, payload: { title: string; content: string; drawing_data: string }) => void>(() => {});
+  const hydratedNoteIdRef = useRef<string | undefined>(undefined);
 
   const flushSync = useCallback(
     async (noteId: string, payload: { title: string; content: string; drawing_data: string }) => {
@@ -62,9 +66,8 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
       emitNoteSaveStatus(noteId, 'syncing', 'Syncing…');
       try {
         await onNoteUpdate(noteId, payload);
-        await clearNoteDraft(noteId);
-        console.log('[LocalSync] cloud sync complete', { noteId });
-        emitNoteSaveStatus(noteId, 'cloud', 'Saved to cloud');
+        console.log('[LocalSync] saved to IndexedDB', { noteId });
+        emitNoteSaveStatus(noteId, 'local', 'Saved locally');
       } catch (error) {
         console.error('Note sync failed:', error);
         emitNoteSaveStatus(noteId, 'failed', 'Sync failed (retrying)');
@@ -73,8 +76,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             emitNoteSaveStatus(noteId, 'syncing', 'Syncing…');
             try {
               await onNoteUpdate(noteId, payload);
-              await clearNoteDraft(noteId);
-              emitNoteSaveStatus(noteId, 'cloud', 'Saved to cloud');
+              emitNoteSaveStatus(noteId, 'local', 'Saved locally');
             } catch (retryErr) {
               console.error('Note sync retry failed:', retryErr);
               emitNoteSaveStatus(noteId, 'failed', 'Sync failed (retrying)');
@@ -133,6 +135,9 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     [flushSync],
   );
 
+  flushPendingForNoteRef.current = flushPendingForNote;
+  scheduleSyncRef.current = scheduleSync;
+
   useEffect(() => {
     const syncWidth = () => setEditorMaxWidth(getEditorContentMaxWidth());
     window.addEventListener('pluginSettingsChanged', syncWidth);
@@ -143,29 +148,39 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     };
   }, []);
 
-  // Load note on switch — flush previous note first, never setState during render
+  // Load note on switch only — never reload when parent re-renders after sync
   useLayoutEffect(() => {
     if (!note?.id) {
       setLoadedNoteId(undefined);
       setContentReady(false);
       setEditorReady(false);
       isHydratedRef.current = false;
+      hydratedNoteIdRef.current = undefined;
       activeNoteIdRef.current = undefined;
+      setActiveNoteEdit(null);
       return;
     }
 
     const targetId = note.id;
+
+    // Parent updated (sync, fetchData, etc.) but same note — keep editor mounted
+    if (hydratedNoteIdRef.current === targetId && isHydratedRef.current) {
+      return;
+    }
+
     const previousId = activeNoteIdRef.current;
     let cancelled = false;
 
     void (async () => {
       if (previousId && previousId !== targetId) {
-        await flushPendingForNote(previousId);
+        await flushPendingForNoteRef.current(previousId);
+        await clearNoteDraft(previousId);
       }
 
       if (cancelled) return;
 
       activeNoteIdRef.current = targetId;
+      setActiveNoteEdit(targetId);
       suppressAutosaveRef.current = true;
       isHydratedRef.current = false;
       hasUserEditedRef.current = false;
@@ -197,10 +212,11 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
       setRestoredFromDraft(resolved.restoredFromDraft);
       setContentReady(true);
       isHydratedRef.current = true;
+      hydratedNoteIdRef.current = targetId;
 
       if (resolved.restoredFromDraft && draft) {
         console.log('📝 Restored newer local draft:', draft.savedAt);
-        scheduleSync(targetId, {
+        scheduleSyncRef.current(targetId, {
           title: resolved.title,
           content: resolved.content,
           drawing_data: resolved.drawing_data,
@@ -218,7 +234,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
     return () => {
       cancelled = true;
     };
-  }, [note?.id, flushPendingForNote, scheduleSync]);
+  }, [note?.id]);
 
   const handleEditorReady = useCallback(() => {
     setEditorReady(true);
@@ -315,18 +331,21 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
   const handleContentChange = useCallback((next: string) => {
     if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
+    bumpActiveNoteEditRevision();
     setContent(next);
   }, []);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
+    bumpActiveNoteEditRevision();
     setTitle(e.target.value);
   }, []);
 
   const handleDrawingChange = useCallback((data: string) => {
     if (suppressAutosaveRef.current) return;
     hasUserEditedRef.current = true;
+    bumpActiveNoteEditRevision();
     setDrawingData(data);
   }, []);
 

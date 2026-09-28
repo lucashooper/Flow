@@ -1,6 +1,6 @@
 import { db, generateUUID, type Note, type Folder, type OutboxItem } from './db';
 import { supabase } from './supabase';
-import { meaningfulContentLength } from './syncHealth';
+import { fetchAllRemoteFolders, fetchAllRemoteNotes, meaningfulContentLength } from './syncHealth';
 import { sanitizeFolderPayload, sanitizeNotePayload, sanitizeSyncPayload } from './syncPayloads';
 
 /**
@@ -336,34 +336,22 @@ export async function initialSync(userId: string): Promise<void> {
       }
     }
 
-    // STEP 2: Pull fresh data from Supabase
-    const { data: notes, error: notesError } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('user_id', userId);
+    // STEP 2: Pull fresh data from Supabase (paginated — API default limit is 1000 rows)
+    const notes = await fetchAllRemoteNotes(userId);
+    const folders = await fetchAllRemoteFolders(userId);
 
-    if (notesError) throw notesError;
-
-    if (notes && notes.length > 0) {
+    if (notes.length > 0) {
       await db.notes.clear();
       for (const note of notes) {
-        await db.notes.add({ ...note, synced: true });
+        await db.notes.add({ ...(note as Note), synced: true });
       }
       console.log('✅ Synced', notes.length, 'notes from Supabase');
     }
 
-    // Fetch all folders
-    const { data: folders, error: foldersError } = await supabase
-      .from('folders')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (foldersError) throw foldersError;
-
-    if (folders && folders.length > 0) {
+    if (folders.length > 0) {
       await db.folders.clear();
       for (const folder of folders) {
-        await db.folders.add({ ...folder, synced: true });
+        await db.folders.add({ ...(folder as Folder), synced: true });
       }
       console.log('✅ Synced', folders.length, 'folders from Supabase');
     }
@@ -376,44 +364,59 @@ export async function initialSync(userId: string): Promise<void> {
 
 /**
  * Force a full re-sync: clear local IndexedDB cache and pull everything fresh from Supabase.
- * Useful when local data is stale or corrupted.
+ * Default mode downloads from cloud WITHOUT uploading local changes first (safe for recovery).
  */
-export async function forceResync(userId: string): Promise<void> {
+export async function forceResync(
+  userId: string,
+  options?: { uploadLocalFirst?: boolean },
+): Promise<void> {
   if (!navigator.onLine) {
     console.log('📴 Offline - cannot force resync');
     return;
   }
 
-  console.log('🔄 Force resync: clearing local cache...');
+  const uploadLocalFirst = options?.uploadLocalFirst ?? false;
+  console.log(`🔄 Force resync (${uploadLocalFirst ? 'upload then download' : 'download only'})...`);
 
   try {
-    // Push any pending changes first
-    const outboxItems = await db.outbox.toArray();
-    for (const item of outboxItems) {
-      try {
-        if (item.operation === 'upsert') {
-          const table = item.entityType === 'note' ? 'notes' : 'folders';
-          const payload = sanitizeSyncPayload(item.entityType, item.payload);
-          await supabase.from(table).upsert(payload);
-        } else if (item.operation === 'delete') {
-          const table = item.entityType === 'note' ? 'notes' : 'folders';
-          await supabase.from(table).delete().eq('id', item.entityId);
+    if (uploadLocalFirst) {
+      const outboxItems = await db.outbox.toArray();
+      for (const item of outboxItems) {
+        try {
+          if (item.operation === 'upsert') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            const payload = sanitizeSyncPayload(item.entityType, item.payload);
+            await supabase.from(table).upsert(payload);
+          } else if (item.operation === 'delete') {
+            const table = item.entityType === 'note' ? 'notes' : 'folders';
+            await supabase.from(table).delete().eq('id', item.entityId);
+          }
+          await db.outbox.delete(item.id);
+        } catch (e) {
+          console.error('Failed to push:', e);
         }
-        await db.outbox.delete(item.id);
-      } catch (e) {
-        console.error('Failed to push:', e);
       }
+    } else {
+      await db.outbox.clear();
     }
 
-    // Clear all local data
     await db.notes.clear();
     await db.folders.clear();
-    await db.outbox.clear();
 
-    // Pull fresh from Supabase
-    await initialSync(userId);
-    console.log('✅ Force resync complete');
+    const notes = await fetchAllRemoteNotes(userId);
+    const folders = await fetchAllRemoteFolders(userId);
+
+    for (const note of notes) {
+      await db.notes.add({ ...(note as Note), synced: true });
+    }
+
+    for (const folder of folders) {
+      await db.folders.add({ ...(folder as Folder), synced: true });
+    }
+
+    console.log('✅ Force resync complete', { notes: notes.length, folders: folders.length });
   } catch (error) {
     console.error('❌ Force resync failed:', error);
+    throw error;
   }
 }

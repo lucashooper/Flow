@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +16,7 @@ import {
   getFoldersByDashboard,
   initialSync
 } from '../lib/dataAccess';
-import { detectNotesCorruption, recoverWipedNotesFromServer } from '../lib/syncHealth';
+import { detectNotesCorruption, downloadAllFromCloud } from '../lib/syncHealth';
 
 export const useDashboardData = () => {
   const { user } = useAuth();
@@ -34,6 +34,7 @@ export const useDashboardData = () => {
   const [openNotes, setOpenNotes] = useState<Note[]>([]);
   
   const hasLoadedDashboards = useRef(false);
+  const corruptionRecoveryAttempted = useRef(false);
   const tabsEnabled = (() => {
     const saved = localStorage.getItem('tabsEnabled');
     return saved !== null ? JSON.parse(saved) : true;
@@ -164,15 +165,17 @@ export const useDashboardData = () => {
         navigator.onLine &&
         !isOfflineMode() &&
         user?.id &&
+        !corruptionRecoveryAttempted.current &&
         detectNotesCorruption(notesData)
       ) {
-        console.warn('[Recovery] Possible note corruption detected — restoring from cloud…');
+        corruptionRecoveryAttempted.current = true;
+        console.warn('[Recovery] Possible note corruption detected — downloading from cloud…');
         try {
-          const { restored } = await recoverWipedNotesFromServer(user.id);
-          if (restored > 0) {
+          const result = await downloadAllFromCloud(user.id);
+          if (result.notesAdded > 0 || result.notesUpdated > 0) {
             effectiveNotes = await getNotesByDashboard(activeDashboard.id);
-            console.log(`[Recovery] Restored ${restored} note(s) from Supabase`);
-            window.dispatchEvent(new CustomEvent('dataReconciled', { detail: { restored } }));
+            console.log('[Recovery] Cloud restore:', result);
+            window.dispatchEvent(new CustomEvent('dataReconciled', { detail: result }));
           }
         } catch (recoveryError) {
           console.error('[Recovery] Cloud restore failed:', recoveryError);
@@ -228,8 +231,10 @@ export const useDashboardData = () => {
             }
 
             if (remoteNotes) {
+              const { isActiveNote } = await import('../lib/activeNoteEdit');
               const localNoteMap = new Map(notesData.map(n => [n.id, n]));
               for (const remote of remoteNotes) {
+                if (isActiveNote(remote.id)) continue;
                 const local = localNoteMap.get(remote.id);
                 if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
                   const pending = await db.outbox
@@ -406,31 +411,28 @@ export const useDashboardData = () => {
     }
   };
 
-  const handleNoteUpdate = async (noteId: string, updates: Partial<Note>) => {
+  const handleNoteUpdate = useCallback(async (noteId: string, updates: Partial<Note>) => {
     try {
-      // Update in IndexedDB (works offline)
       await updateNote(noteId, updates);
 
-      // Update local state
-      setNotes(prev => 
-        prev ? prev.map(note => 
+      setNotes(prev =>
+        prev ? prev.map(note =>
           note.id === noteId ? { ...note, ...updates } : note
         ) : prev
       );
-      
-      // Update open notes if tabs are enabled
-      setOpenNotes(prev => 
-        prev.map(note => 
+
+      setOpenNotes(prev =>
+        prev.map(note =>
           note.id === noteId ? { ...note, ...updates } : note
         )
       );
-      
+
       console.log('✅ Updated note:', noteId, navigator.onLine ? '(will sync)' : '(offline)');
     } catch (error) {
       console.error('Error updating note:', error);
       throw error;
     }
-  };
+  }, []);
 
   const handleNoteDelete = async (noteId: string) => {
     try {

@@ -1,6 +1,7 @@
-import { db } from './db';
+import { db, type Folder, type Note } from './db';
 import { supabase } from './supabase';
 import { clearNoteDraft } from './noteDrafts';
+import { isActiveNote } from './activeNoteEdit';
 
 /** Strip HTML and measure meaningful text length. */
 export function meaningfulContentLength(content: string | null | undefined): number {
@@ -53,16 +54,12 @@ export async function recoverWipedNotesFromServer(
     );
   }
 
-  const { data: remoteNotes, error } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('user_id', userId);
-
-  if (error) throw error;
-
+  const remoteNotes = await fetchAllRemoteNotes(userId);
   let restored = 0;
 
-  for (const remote of remoteNotes ?? []) {
+  for (const remote of remoteNotes) {
+    if (isActiveNote(remote.id)) continue;
+
     const local = await db.notes.get(remote.id);
     const remoteLen = meaningfulContentLength(remote.content);
     const localLen = meaningfulContentLength(local?.content);
@@ -86,7 +83,7 @@ export async function recoverWipedNotesFromServer(
     }
   }
 
-  return { restored, examined: remoteNotes?.length ?? 0 };
+  return { restored, examined: remoteNotes.length };
 }
 
 export interface SyncHealthReport {
@@ -113,83 +110,188 @@ export interface SyncHealthReport {
 
 export const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL ?? '';
 
+const SUPABASE_PAGE_SIZE = 1000;
+
+export interface CloudRestoreResult {
+  notesAdded: number;
+  notesUpdated: number;
+  notesFetched: number;
+  foldersAdded: number;
+  foldersUpdated: number;
+  foldersFetched: number;
+}
+
 export function isSyncAdmin(email: string | undefined): boolean {
   return email === ADMIN_EMAIL;
+}
+
+/** Paginate through Supabase — default API limit is 1000 rows. */
+export async function fetchAllRemoteNotes(userId: string): Promise<Note[]> {
+  const all: Note[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data?.length) break;
+
+    all.push(...data);
+    if (data.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return all;
+}
+
+export async function fetchAllRemoteFolders(userId: string): Promise<Folder[]> {
+  const all: Folder[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('folders')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data?.length) break;
+
+    all.push(...data);
+    if (data.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return all;
+}
+
+function shouldPreferRemoteNote(
+  local: { content?: string | null; updated_at: string },
+  remote: { content?: string | null; updated_at: string },
+): boolean {
+  const remoteLen = meaningfulContentLength(remote.content);
+  const localLen = meaningfulContentLength(local.content);
+  const serverNewer = new Date(remote.updated_at).getTime() > new Date(local.updated_at).getTime();
+  const localWiped = localLen < 40 && remoteLen > localLen + 80;
+  return localWiped || (serverNewer && remoteLen >= localLen);
+}
+
+/**
+ * Download every cloud note/folder (paginated) and merge into IndexedDB.
+ * Safe recovery path — does not upload local changes first.
+ */
+export async function downloadAllFromCloud(userId: string): Promise<CloudRestoreResult> {
+  const remoteNotes = await fetchAllRemoteNotes(userId);
+  const remoteFolders = await fetchAllRemoteFolders(userId);
+
+  let notesAdded = 0;
+  let notesUpdated = 0;
+  let foldersAdded = 0;
+  let foldersUpdated = 0;
+
+  for (const note of remoteNotes) {
+    if (isActiveNote(note.id)) {
+      continue;
+    }
+
+    const local = await db.notes.get(note.id);
+
+    if (!local) {
+      await db.notes.put({ ...note, synced: true });
+      notesAdded++;
+      continue;
+    }
+
+    if (shouldPreferRemoteNote(local, note)) {
+      await db.notes.put({ ...note, synced: true });
+      await clearNoteDraft(note.id);
+      notesUpdated++;
+    }
+  }
+
+  for (const folder of remoteFolders) {
+    const local = await db.folders.get(folder.id);
+
+    if (!local) {
+      await db.folders.put({ ...folder, synced: true });
+      foldersAdded++;
+      continue;
+    }
+
+    if (new Date(folder.updated_at).getTime() > new Date(local.updated_at).getTime()) {
+      await db.folders.put({ ...folder, synced: true });
+      foldersUpdated++;
+    }
+  }
+
+  console.log('[CloudRestore]', {
+    notesFetched: remoteNotes.length,
+    notesAdded,
+    notesUpdated,
+    foldersFetched: remoteFolders.length,
+    foldersAdded,
+    foldersUpdated,
+  });
+
+  return {
+    notesAdded,
+    notesUpdated,
+    notesFetched: remoteNotes.length,
+    foldersAdded,
+    foldersUpdated,
+    foldersFetched: remoteFolders.length,
+  };
+}
+
+/**
+ * Replace local IndexedDB with a full paginated download from Supabase.
+ * Clears outbox first so corrupted local uploads are not pushed to cloud.
+ */
+export async function replaceLocalCacheFromCloud(userId: string): Promise<CloudRestoreResult> {
+  await db.outbox.clear();
+
+  const remoteNotes = await fetchAllRemoteNotes(userId);
+  const remoteFolders = await fetchAllRemoteFolders(userId);
+
+  await db.notes.clear();
+  await db.folders.clear();
+
+  for (const note of remoteNotes) {
+    await db.notes.add({ ...note, synced: true });
+  }
+
+  for (const folder of remoteFolders) {
+    await db.folders.add({ ...folder, synced: true });
+  }
+
+  console.log('[CloudRestore] Full replace from cloud', {
+    notes: remoteNotes.length,
+    folders: remoteFolders.length,
+  });
+
+  return {
+    notesAdded: remoteNotes.length,
+    notesUpdated: 0,
+    notesFetched: remoteNotes.length,
+    foldersAdded: remoteFolders.length,
+    foldersUpdated: 0,
+    foldersFetched: remoteFolders.length,
+  };
 }
 
 /**
  * Merge all server notes/folders into IndexedDB without wiping local data.
  * Adds anything missing locally; updates stale rows when server is newer.
  */
-export async function reconcileFromServer(userId: string): Promise<{ notesAdded: number; foldersAdded: number }> {
-  let notesAdded = 0;
-  let foldersAdded = 0;
-
-  const { data: remoteNotes, error: notesError } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('user_id', userId);
-
-  if (notesError) throw notesError;
-
-  for (const note of remoteNotes ?? []) {
-    const pending = await db.outbox
-      .where('entityId')
-      .equals(note.id)
-      .filter(item => item.entityType === 'note' && item.operation === 'upsert')
-      .first();
-
-    if (pending) continue;
-
-    const local = await db.notes.get(note.id);
-    if (!local) {
-      await db.notes.put({ ...note, synced: true });
-      notesAdded++;
-    } else {
-      const remoteLen = meaningfulContentLength(note.content);
-      const localLen = meaningfulContentLength(local.content);
-      const serverNewer = new Date(note.updated_at) > new Date(local.updated_at);
-      const localWiped = localLen < 40 && remoteLen > localLen + 80;
-
-      if (serverNewer || localWiped) {
-        if (localWiped || remoteLen >= localLen) {
-          await db.notes.put({ ...note, synced: true });
-          if (localWiped) await clearNoteDraft(note.id);
-        }
-      }
-    }
-  }
-
-  const { data: remoteFolders, error: foldersError } = await supabase
-    .from('folders')
-    .select('*')
-    .eq('user_id', userId);
-
-  if (foldersError) throw foldersError;
-
-  for (const folder of remoteFolders ?? []) {
-    const pending = await db.outbox
-      .where('entityId')
-      .equals(folder.id)
-      .filter(item => item.entityType === 'folder' && item.operation === 'upsert')
-      .first();
-
-    if (pending) continue;
-
-    const local = await db.folders.get(folder.id);
-    if (!local) {
-      await db.folders.put({ ...folder, synced: true });
-      foldersAdded++;
-    } else if (new Date(folder.updated_at) > new Date(local.updated_at)) {
-      await db.folders.put({ ...folder, synced: true });
-    }
-  }
-
-  if (notesAdded > 0 || foldersAdded > 0) {
-    console.log(`🔄 Reconciled from server: +${notesAdded} notes, +${foldersAdded} folders`);
-  }
-
-  return { notesAdded, foldersAdded };
+export async function reconcileFromServer(userId: string): Promise<CloudRestoreResult> {
+  return downloadAllFromCloud(userId);
 }
 
 export async function getSyncHealth(userId: string): Promise<SyncHealthReport> {
@@ -216,8 +318,8 @@ export async function getSyncHealth(userId: string): Promise<SyncHealthReport> {
   if (outboxPending > 0) issues.push(`${outboxPending} change(s) waiting to upload to Supabase`);
   if (unsyncedNotes > 0) issues.push(`${unsyncedNotes} note(s) not yet confirmed on server`);
   if (unsyncedFolders > 0) issues.push(`${unsyncedFolders} folder(s) not yet confirmed on server`);
-  if (missingNotes > 0) issues.push(`${missingNotes} note(s) on cloud missing locally — use "Restore missing from cloud"`);
-  if (missingFolders > 0) issues.push(`${missingFolders} folder(s) on cloud missing locally — use "Restore missing from cloud"`);
+  if (missingNotes > 0) issues.push(`${missingNotes} note(s) on cloud missing locally — use "Download all from cloud" or "Replace local cache"`);
+  if (missingFolders > 0) issues.push(`${missingFolders} folder(s) on cloud missing locally — use "Download all from cloud" or "Replace local cache"`);
   if (localNotes > remoteNoteCount) issues.push(`${localNotes - remoteNoteCount} note(s) exist locally but not on cloud — use "Retry uploads"`);
   if (localFolders > remoteFolderCount) issues.push(`${localFolders - remoteFolderCount} folder(s) exist locally but not on cloud — use "Retry uploads"`);
 

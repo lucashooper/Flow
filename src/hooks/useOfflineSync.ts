@@ -4,6 +4,8 @@ import { db, getLastSyncTime, setLastSyncTime } from '../lib/db';
 import { isOfflineMode } from '../lib/offlineAuth';
 import { reconcileFromServer } from '../lib/syncHealth';
 import { repairOutboxPayloads, sanitizeSyncPayload } from '../lib/syncPayloads';
+import { clearNoteDraft, emitNoteSaveStatus } from '../lib/noteDrafts';
+import { isActiveNote } from '../lib/activeNoteEdit';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -56,6 +58,10 @@ export const useOfflineSync = () => {
             // Mark as synced in local DB
             if (item.entityType === 'note') {
               await db.notes.update(item.entityId, { synced: true });
+              await clearNoteDraft(item.entityId);
+              if (isActiveNote(item.entityId)) {
+                emitNoteSaveStatus(item.entityId, 'cloud', 'Saved to cloud');
+              }
             } else {
               await db.folders.update(item.entityId, { synced: true });
             }
@@ -96,23 +102,12 @@ export const useOfflineSync = () => {
       const lastSync = await getLastSyncTime();
       const syncTime = new Date().toISOString();
 
-      // Always reconcile if server has more data than local (fixes missing folders after cache clear)
-      const [localNoteCount, localFolderCount] = await Promise.all([
-        db.notes.where('user_id').equals(user.id).count(),
-        db.folders.where('user_id').equals(user.id).count(),
-      ]);
-      const [{ count: serverNoteCount }, { count: serverFolderCount }] = await Promise.all([
-        supabase.from('notes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('folders').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      ]);
+      const outboxRemaining = await db.outbox.count();
 
-      const serverHasMore =
-        (serverNoteCount ?? 0) > localNoteCount ||
-        (serverFolderCount ?? 0) > localFolderCount;
-
-      if (!lastSync || serverHasMore) {
+      // Full reconcile only on first sync — not on every keystroke upload cycle
+      if (!lastSync && outboxRemaining === 0) {
         const result = await reconcileFromServer(user.id);
-        if (result.notesAdded > 0 || result.foldersAdded > 0) {
+        if (result.notesAdded > 0 || result.notesUpdated > 0 || result.foldersAdded > 0 || result.foldersUpdated > 0) {
           window.dispatchEvent(new CustomEvent('dataReconciled', { detail: result }));
         }
       } else if (lastSync) {
@@ -125,6 +120,8 @@ export const useOfflineSync = () => {
 
         if (remoteNotes) {
           for (const note of remoteNotes) {
+            if (isActiveNote(note.id)) continue;
+
             const pendingChange = await db.outbox
               .where('entityId')
               .equals(note.id)

@@ -89,10 +89,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     onEditorReadyRef.current = onEditorReady;
   }, [onEditorReady]);
 
-  useEffect(() => {
-    suppressChangeRef.current = true;
-  }, [content]);
-
   // Spell checker initialization removed - using browser native spell check
   // useEffect(() => {
   //   console.log('🔤 Initializing spell checker...');
@@ -271,10 +267,10 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       const newContent = editor.getHTML();
       isInternalUpdate.current = true;
       onChange(newContent);
-      // Reset flag after a short delay to allow prop update
+      // Keep guard long enough for React state + parent re-renders after sync
       setTimeout(() => {
         isInternalUpdate.current = false;
-      }, 100);
+      }, 500);
     },
     editorProps: {
       attributes: {
@@ -582,7 +578,12 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     if (!editor) return;
 
     if (isInternalUpdate.current) {
-      isInternalUpdate.current = false;
+      return;
+    }
+
+    // Never overwrite what the user is actively typing
+    if (editor.isFocused) {
+      lastContentProp.current = editor.getHTML();
       return;
     }
 
