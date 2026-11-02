@@ -24,7 +24,7 @@ interface EditorPanelProps {
 }
 
 export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProps) => {
-  const { isFullscreen } = useFocusMode();
+  const { isPresenting } = useFocusMode();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
@@ -371,10 +371,10 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             type="text"
             value={title || ''}
             onChange={handleTitleChange}
-            readOnly={isFullscreen}
-            tabIndex={isFullscreen ? -1 : 0}
+            readOnly={isPresenting}
+            tabIndex={isPresenting ? -1 : 0}
             onKeyDown={(e) => {
-              if (isFullscreen) return;
+              if (isPresenting) return;
               if (e.key === 'Enter') {
                 e.preventDefault();
                 const editorElement = document.querySelector('.ProseMirror');

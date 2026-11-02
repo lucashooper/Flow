@@ -93,6 +93,17 @@ export const AppLayout = ({
       // Browser may block — app chrome is still hidden
     }
   };
+  const [isFullscreenEditing, setIsFullscreenEditing] = useState<boolean>(() => {
+    try { return localStorage.getItem('flow-fullscreen-editing') === '1'; } catch { return false; }
+  });
+  const toggleFullscreenEditing = () => {
+    setIsFullscreenEditing(prev => {
+      const next = !prev;
+      try { localStorage.setItem('flow-fullscreen-editing', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  const isPresenting = isFullscreen && !isFullscreenEditing;
   const toggleFullscreen = () => {
     if (isFullscreen) exitFullscreen();
     else void enterFullscreen();
@@ -220,11 +231,16 @@ export const AppLayout = ({
 
   useEffect(() => {
     document.documentElement.classList.toggle('app-fullscreen', isFullscreen);
-    if (isFullscreen) {
-      (document.activeElement as HTMLElement | null)?.blur?.();
-    }
     return () => document.documentElement.classList.remove('app-fullscreen');
   }, [isFullscreen]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('app-presenting', isPresenting);
+    if (isPresenting) {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    }
+    return () => document.documentElement.classList.remove('app-presenting');
+  }, [isPresenting]);
 
   return (
     <>
@@ -235,6 +251,9 @@ export const AppLayout = ({
         toggleFullscreen,
         enterFullscreen: handleEnterFullscreen,
         exitFullscreen: handleExitFullscreen,
+        isFullscreenEditing,
+        toggleFullscreenEditing,
+        isPresenting,
       }}>
       <div
         className={`flex h-screen overflow-hidden select-none${isDimMode ? ' focus-mode' : ''}${isFullscreen ? ' fullscreen-mode' : ''}`}
@@ -243,6 +262,8 @@ export const AppLayout = ({
         {isFullscreen && (
           <FullscreenControls
             onExit={handleExitFullscreen}
+            isEditing={isFullscreenEditing}
+            onToggleEditing={toggleFullscreenEditing}
             onOpenSettings={() => window.dispatchEvent(new Event('openSettings'))}
             noteTitle={activeNote?.title || undefined}
           />

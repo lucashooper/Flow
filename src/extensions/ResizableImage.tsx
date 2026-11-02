@@ -31,7 +31,7 @@ function logResizeAction(edge: ResizeEdge, value: number): void {
 }
 
 const ResizableImageComponent = (props: any) => {
-  const { isFullscreen } = useFocusMode();
+  const { isPresenting: isFullscreen } = useFocusMode();
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const initialWidth = props.node.attrs.width as number | null;

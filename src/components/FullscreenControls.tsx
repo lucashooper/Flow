@@ -1,13 +1,15 @@
-import { Minimize2, Settings } from 'lucide-react';
+import { Minimize2, Settings, Pencil, Eye } from 'lucide-react';
 
 interface FullscreenControlsProps {
   onExit: () => void;
   onOpenSettings: () => void;
   noteTitle?: string;
+  isEditing: boolean;
+  onToggleEditing: () => void;
 }
 
 /** Minimal top-left controls shown in presentation-style fullscreen. */
-export function FullscreenControls({ onExit, onOpenSettings, noteTitle }: FullscreenControlsProps) {
+export function FullscreenControls({ onExit, onOpenSettings, noteTitle, isEditing, onToggleEditing }: FullscreenControlsProps) {
   return (
     <div
       className="fixed top-3 left-3 z-[200] flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-opacity duration-200"
@@ -28,6 +30,16 @@ export function FullscreenControls({ onExit, onOpenSettings, noteTitle }: Fullsc
         style={{ color: 'var(--muted)' }}
       >
         <Minimize2 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onToggleEditing}
+        className={`p-1.5 rounded transition-colors ${isEditing ? 'bg-white/10' : 'hover:bg-white/10'}`}
+        title={isEditing ? 'Switch to read-only view' : 'Edit mode (type in fullscreen)'}
+        aria-pressed={isEditing}
+        style={{ color: isEditing ? 'var(--accent)' : 'var(--muted)' }}
+      >
+        {isEditing ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
       </button>
       <button
         type="button"

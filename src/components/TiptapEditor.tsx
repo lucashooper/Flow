@@ -68,7 +68,7 @@ interface TiptapEditorProps {
 }
 
 export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle, onEditorReady }: TiptapEditorProps) => {
-  const { isFullscreen } = useFocusMode();
+  const { isPresenting: isFullscreen } = useFocusMode();
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; misspelledWord?: string; suggestions?: string[] } | null>(null);
@@ -555,7 +555,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     if (editor) tiptapEditorRef.current = editor;
   }, [editor]);
 
-  // Presentation fullscreen: read-only view with normal pointer (like PowerPoint)
+  // Presentation fullscreen (not in edit mode): read-only view with normal pointer (like PowerPoint)
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 

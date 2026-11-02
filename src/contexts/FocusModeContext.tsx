@@ -9,6 +9,11 @@ export interface FocusModeContextValue {
   toggleFullscreen: () => void;
   enterFullscreen: () => void;
   exitFullscreen: () => void;
+  /** Allows typing while in fullscreen (otherwise fullscreen is read-only) */
+  isFullscreenEditing: boolean;
+  toggleFullscreenEditing: () => void;
+  /** True when fullscreen is showing a read-only presentation (fullscreen && !editing) */
+  isPresenting: boolean;
 }
 
 export const FocusModeContext = createContext<FocusModeContextValue | undefined>(undefined);

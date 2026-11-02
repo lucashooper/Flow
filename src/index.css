@@ -157,51 +157,52 @@
     display: none !important;
   }
 
-  /* PowerPoint-style pointer in presentation mode (no text I-beam) */
-  html.app-fullscreen,
-  html.app-fullscreen .editor-background,
-  html.app-fullscreen .editor-root,
-  html.app-fullscreen .editor-header,
-  html.app-fullscreen .ProseMirror,
-  html.app-fullscreen .ProseMirror * {
+  /* PowerPoint-style pointer in read-only presentation (no text I-beam).
+     Scoped to .app-presenting so fullscreen edit mode behaves normally. */
+  html.app-presenting,
+  html.app-presenting .editor-background,
+  html.app-presenting .editor-root,
+  html.app-presenting .editor-header,
+  html.app-presenting .ProseMirror,
+  html.app-presenting .ProseMirror * {
     cursor: default !important;
     caret-color: transparent !important;
     user-select: none;
   }
 
   /* Cinematic presentation — no hover rings, selection, drag, or resize */
-  html.app-fullscreen .ProseMirror {
+  html.app-presenting .ProseMirror {
     pointer-events: none !important;
   }
 
-  html.app-fullscreen .ProseMirror-selectednode,
-  html.app-fullscreen .ProseMirror .ProseMirror-selectednode,
-  html.app-fullscreen .ProseMirror img.ProseMirror-selectednode,
-  html.app-fullscreen .resizable-image-wrapper.ProseMirror-selectednode {
+  html.app-presenting .ProseMirror-selectednode,
+  html.app-presenting .ProseMirror .ProseMirror-selectednode,
+  html.app-presenting .ProseMirror img.ProseMirror-selectednode,
+  html.app-presenting .resizable-image-wrapper.ProseMirror-selectednode {
     outline: none !important;
     box-shadow: none !important;
   }
 
-  html.app-fullscreen .resizable-image-wrapper .group:hover img,
-  html.app-fullscreen .resizable-image-wrapper img {
+  html.app-presenting .resizable-image-wrapper .group:hover img,
+  html.app-presenting .resizable-image-wrapper img {
     box-shadow: none !important;
   }
 
-  html.app-fullscreen [data-resize-handle] {
+  html.app-presenting [data-resize-handle] {
     display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
   }
 
-  html.app-fullscreen .editor-header input {
+  html.app-presenting .editor-header input {
     pointer-events: none !important;
     cursor: default !important;
   }
 
-  html.app-fullscreen a[href],
-  html.app-fullscreen button,
-  html.app-fullscreen [role="button"],
-  html.app-fullscreen .cursor-pointer {
+  html.app-presenting a[href],
+  html.app-presenting button,
+  html.app-presenting [role="button"],
+  html.app-presenting .cursor-pointer {
     cursor: pointer !important;
   }
 
