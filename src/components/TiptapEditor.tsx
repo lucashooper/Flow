@@ -289,6 +289,18 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
         const html = clipboardData.getData('text/html');
         const plainText = clipboardData.getData('text/plain');
+        // Copied from another Flow note: ProseMirror tags its own clipboard HTML with
+        // data-pm-slice. Let ProseMirror paste it natively so every mark (bold, colour,
+        // highlight, font size) and node survives exactly as copied.
+        if (html && html.includes('data-pm-slice')) {
+          console.log('🔄 Internal Flow paste — native ProseMirror handling');
+          setTimeout(() => {
+            const ed = tiptapEditorRef.current;
+            if (ed) migrateAllMathInEditor(ed);
+          }, 0);
+          return false;
+        }
+
         const hasStructuredHtml = Boolean(html && htmlHasStructure(html));
 
         // Internal or external image copy (Ctrl+C on canvas image) — HTML has <img>, no file blob
