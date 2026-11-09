@@ -3,11 +3,13 @@ import { db } from '../lib/db';
 import { escapeHtml, isLearningDashboard, setLearningBridge } from '../lib/learning';
 import { isVaultMode } from '../lib/platform';
 import { supabase } from '../lib/supabase';
-import type { Dashboard, LearningExplanation, LearningGap, Note } from '../types';
+import type { Dashboard, LearningCard, LearningExplanation, LearningGap, Note } from '../types';
+import { isDueToday, newCardState, review, type Rating } from '../lib/srs';
 import { useAuth } from './AuthContext';
 
 const GAPS_TABLE = 'learning_gaps';
 const EXPLANATIONS_TABLE = 'learning_explanations';
+const CARDS_TABLE = 'learning_cards';
 
 export interface NewGap {
   passage: string;
@@ -44,6 +46,16 @@ interface LearningContextValue {
   saveExplanation: (noteId: string, explanation: string, critique: unknown, model: string | null) => Promise<LearningExplanation | null>;
   /** Add [[links]] to the end of an open note. */
   appendLinks: (noteId: string, links: { id: string; title: string }[]) => void;
+
+  // Quiz me + review
+  cards: LearningCard[];
+  dueCards: LearningCard[];
+  addCards: (noteId: string, drafts: { question: string; answer: string }[]) => Promise<number>;
+  updateCard: (id: string, patch: Partial<Pick<LearningCard, 'question' | 'answer'>>) => Promise<void>;
+  deleteCard: (id: string) => Promise<void>;
+  rateCard: (id: string, rating: Rating) => Promise<LearningCard | null>;
+  reviewOpen: boolean;
+  setReviewOpen: (open: boolean) => void;
 }
 
 const LearningContext = createContext<LearningContextValue | null>(null);
@@ -88,6 +100,14 @@ export function LearningProvider({
   const [gaps, setGaps] = useState<LearningGap[]>([]);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [explanations, setExplanations] = useState<LearningExplanation[]>([]);
+  const [cards, setCards] = useState<LearningCard[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  // Re-evaluate "due today" every few minutes (cards rated Again come back after a minute).
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
   const [inboxOpen, setInboxOpen] = useState(false);
 
   // Keep a fresh list of concept notes (for [[links]], backlinks and titles).
@@ -198,6 +218,59 @@ export function LearningProvider({
     [user?.id],
   );
 
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
+    void supabase
+      .from(CARDS_TABLE)
+      .select('*')
+      .order('created_at', { ascending: true })
+      .then(({ data }) => setCards((data as LearningCard[]) ?? []));
+  }, [enabled, user?.id]);
+
+  const dueCards = useMemo(() => {
+    const now = new Date(clock);
+    return cards.filter((c) => isDueToday(c, now)).sort((a, b) => a.due_at.localeCompare(b.due_at));
+  }, [cards, clock]);
+
+  const addCards = useCallback(
+    async (noteId: string, drafts: { question: string; answer: string }[]) => {
+      if (!user?.id || !drafts.length) return 0;
+      const rows = drafts.map((d) => ({ user_id: user.id, note_id: noteId, question: d.question, answer: d.answer, ...newCardState() }));
+      const { data, error } = await supabase.from(CARDS_TABLE).insert(rows).select();
+      if (error || !data) {
+        console.error('Could not save cards', error);
+        return 0;
+      }
+      setCards((prev) => [...prev, ...(data as LearningCard[])]);
+      return data.length;
+    },
+    [user?.id],
+  );
+
+  const updateCard = useCallback(async (id: string, patch: Partial<Pick<LearningCard, 'question' | 'answer'>>) => {
+    const updated_at = new Date().toISOString();
+    await supabase.from(CARDS_TABLE).update({ ...patch, updated_at }).eq('id', id);
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch, updated_at } : c)));
+  }, []);
+
+  const deleteCard = useCallback(async (id: string) => {
+    await supabase.from(CARDS_TABLE).delete().eq('id', id);
+    setCards((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const rateCard = useCallback(async (id: string, rating: Rating) => {
+    const card = cardsRef.current.find((c) => c.id === id);
+    if (!card) return null;
+    const next = { ...card, ...review(card, rating), updated_at: new Date().toISOString() };
+    setCards((prev) => prev.map((c) => (c.id === id ? next : c)));
+    const { id: _id, user_id: _u, note_id: _n, question: _q, answer: _a, created_at: _c, ...patch } = next;
+    void [_id, _u, _n, _q, _a, _c];
+    await supabase.from(CARDS_TABLE).update(patch).eq('id', id);
+    return next;
+  }, []);
+
   const appendLinks = useCallback((noteId: string, links: { id: string; title: string }[]) => {
     window.dispatchEvent(new CustomEvent('learning:appendLinks', { detail: { noteId, links } }));
   }, []);
@@ -286,6 +359,14 @@ export function LearningProvider({
     explanations,
     saveExplanation,
     appendLinks,
+    cards,
+    dueCards,
+    addCards,
+    updateCard,
+    deleteCard,
+    rateCard,
+    reviewOpen,
+    setReviewOpen,
   };
 
   return <LearningContext.Provider value={value}>{children}</LearningContext.Provider>;

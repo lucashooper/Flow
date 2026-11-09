@@ -9,6 +9,9 @@
 # Optional repository secrets (Settings → Secrets and variables → Actions):
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — enable "Sign in to Flow Cloud"
 #   in the desktop app. Without them the app works with local vaults only.
+#   TAURI_SIGNING_PRIVATE_KEY — signs updates so installed apps can update
+#   themselves (the public key is in src-tauri/tauri.conf.json). Without it,
+#   installers are still built but no update is published.
 name: Desktop release
 
 on:
@@ -31,7 +34,7 @@ jobs:
         include:
           - name: macOS
             os: macos-latest
-            args: --target universal-apple-darwin --bundles dmg
+            args: --target universal-apple-darwin --bundles app,dmg
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
           - name: Windows
             os: windows-latest
@@ -68,24 +71,39 @@ jobs:
       - run: npm ci
 
       - name: Build app
-        run: npx tauri build ${{ matrix.args }}
+        shell: bash
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npx tauri build ${{ matrix.args }}
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: building without auto-update files"
+            npx tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
 
       - name: Collect installers with stable names
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p out
+          shopt -s nullglob
+          copy_sig() { for f in $1.sig; do cp "$f" "$2.sig"; done; }
           case "${{ runner.os }}" in
             macOS)
-              cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg out/Flow-Notes-macOS.dmg ;;
+              B=src-tauri/target/universal-apple-darwin/release/bundle
+              cp $B/dmg/*.dmg out/Flow-Notes-macOS.dmg
+              for f in $B/macos/*.app.tar.gz; do cp "$f" out/Flow-Notes-macOS.app.tar.gz; copy_sig "$f" out/Flow-Notes-macOS.app.tar.gz; done ;;
             Windows)
-              cp src-tauri/target/release/bundle/nsis/*-setup.exe out/Flow-Notes-Windows-Setup.exe ;;
+              B=src-tauri/target/release/bundle
+              for f in $B/nsis/*-setup.exe; do cp "$f" out/Flow-Notes-Windows-Setup.exe; copy_sig "$f" out/Flow-Notes-Windows-Setup.exe; done ;;
             Linux)
-              cp src-tauri/target/release/bundle/appimage/*.AppImage out/Flow-Notes-Linux.AppImage
-              cp src-tauri/target/release/bundle/deb/*.deb out/Flow-Notes-Linux.deb ;;
+              B=src-tauri/target/release/bundle
+              for f in $B/appimage/*.AppImage; do cp "$f" out/Flow-Notes-Linux.AppImage; copy_sig "$f" out/Flow-Notes-Linux.AppImage; done
+              cp $B/deb/*.deb out/Flow-Notes-Linux.deb ;;
           esac
           ls -la out
 
@@ -115,6 +133,32 @@ jobs:
           pattern: installers-*
           path: out
           merge-multiple: true
+
+      - name: Write update feed (latest.json)
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          const tag = process.env.TAG;
+          const base = `https://github.com/${process.env.REPO}/releases/download/${tag}`;
+          const entry = (file) => {
+            const sig = `out/${file}.sig`;
+            return fs.existsSync(sig) ? { signature: fs.readFileSync(sig, 'utf8').trim(), url: `${base}/${file}` } : null;
+          };
+          const platforms = {};
+          const add = (keys, file) => { const e = entry(file); if (e) keys.forEach((k) => (platforms[k] = e)); };
+          add(['windows-x86_64'], 'Flow-Notes-Windows-Setup.exe');
+          add(['darwin-aarch64', 'darwin-x86_64'], 'Flow-Notes-macOS.app.tar.gz');
+          add(['linux-x86_64'], 'Flow-Notes-Linux.AppImage');
+          if (!Object.keys(platforms).length) { console.log('No signatures: skipping latest.json'); process.exit(0); }
+          fs.writeFileSync('out/latest.json', JSON.stringify({
+            version: process.env.VERSION, notes: `Flow Notes ${process.env.VERSION}`, pub_date: new Date().toISOString(), platforms,
+          }, null, 2));
+          console.log('latest.json for', Object.keys(platforms).join(', '));
+          JS
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
 
       - uses: softprops/action-gh-release@v2
         with:

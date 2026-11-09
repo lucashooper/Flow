@@ -7,6 +7,8 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { isVaultMode } from './lib/platform'
 import { installDesktopIntegrations } from './lib/desktop'
 import { VaultOpenError } from './components/VaultOpenError'
+import { UpdateToast } from './components/UpdateToast'
+import { startAutoUpdateChecks } from './lib/updates'
 
 // Apply saved theme class to <html> before React renders
 (() => {
@@ -24,6 +26,7 @@ import { VaultOpenError } from './components/VaultOpenError'
 async function start() {
   const root = createRoot(document.getElementById('root')!);
   installDesktopIntegrations();
+  startAutoUpdateChecks();
 
   // Desktop app with a local vault: open it before anything reads data.
   if (isVaultMode()) {
@@ -42,6 +45,7 @@ async function start() {
       <ThemeProvider>
         <AuthProvider>
           <App />
+          <UpdateToast />
         </AuthProvider>
       </ThemeProvider>
     </StrictMode>,

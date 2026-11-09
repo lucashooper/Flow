@@ -19,6 +19,23 @@ export interface Note {
 
 export type LearningStatus = 'fuzzy' | 'getting' | 'clear';
 
+/** A flashcard drafted from my explanation, scheduled with SM-2 (src/lib/srs.ts). */
+export interface LearningCard {
+  id: string;
+  user_id: string;
+  note_id: string;
+  question: string;
+  answer: string;
+  ease: number;
+  interval_days: number;
+  repetitions: number;
+  lapses: number;
+  due_at: string;
+  last_reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** One "Explain it back" attempt and Claude's critique of it. */
 export interface LearningExplanation {
   id: string;

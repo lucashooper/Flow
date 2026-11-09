@@ -56,6 +56,7 @@ export const Sidebar = ({
   const navigate = useNavigate();
   const learning = useLearning();
   const inboxCount = learning?.gaps.filter((g) => !g.concept_note_id).length ?? 0;
+  const dueCount = learning?.dueCards.length ?? 0;
   const { userProfile, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
@@ -492,10 +493,18 @@ export const Sidebar = ({
             {learning?.enabled && (
               <button
                 onClick={() => void (learning.isActive ? learning.leaveSpace() : learning.openSpace())}
-                className={`p-1.5 rounded transition-colors ${learning.isActive ? 'bg-[#1f1f1f]' : 'hover:bg-[#252525]'}`}
-                title={learning.isActive ? 'Leave the Learning space' : '🧠 Learning space'}
+                className={`relative p-1.5 rounded transition-colors ${learning.isActive ? 'bg-[#1f1f1f]' : 'hover:bg-[#252525]'}`}
+                title={learning.isActive ? 'Leave the Learning space' : `🧠 Learning space${dueCount ? ` · ${dueCount} cards due` : ''}`}
               >
                 <Brain className="w-4 h-4" style={{ color: learning.isActive ? 'var(--accent)' : '#888888' }} />
+                {dueCount > 0 && !learning.isActive && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full text-[9px] leading-[14px] text-center font-semibold"
+                    style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                  >
+                    {dueCount > 99 ? '99+' : dueCount}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -555,7 +564,7 @@ export const Sidebar = ({
               style={{ border: '1px solid #2a2a2a', color: '#e5e5e5' }}
               title="Capture a gap (Ctrl/⌘ + Shift + G)"
             >
-              🕳️ ＋ Gap
+              🕳️ Gap
             </button>
             <button
               onClick={() => learning.setInboxOpen(true)}
@@ -567,6 +576,19 @@ export const Sidebar = ({
               {inboxCount > 0 && (
                 <span className="px-1.5 rounded-full text-[10px]" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
                   {inboxCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => learning.setReviewOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium hover:bg-[#252525] transition-colors"
+              style={{ border: '1px solid #2a2a2a', color: '#e5e5e5' }}
+              title="Review flashcards due today"
+            >
+              🃏 Review
+              {dueCount > 0 && (
+                <span className="px-1.5 rounded-full text-[10px]" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
+                  {dueCount}
                 </span>
               )}
             </button>

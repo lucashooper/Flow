@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Link2 } from 'lucide-react';
 import { ExplainBackModal } from './ExplainBack';
+import { QuizMeModal } from './QuizMe';
 import { useLearning } from '../../contexts/LearningContext';
 import { LEARNING_STATUSES, linkedNoteIds, statusEmoji } from '../../lib/learning';
 import type { Note } from '../../types';
@@ -15,6 +16,8 @@ export function LearningNoteHeader({ note, onNoteUpdate }: PanelProps) {
   const learning = useLearning();
   const [source, setSource] = useState(note.source ?? '');
   const [explaining, setExplaining] = useState(false);
+  const [quizzing, setQuizzing] = useState(false);
+  const cardCount = (learning?.cards ?? []).filter((c) => c.note_id === note.id).length;
   useEffect(() => setSource(note.source ?? ''), [note.id, note.source]);
   const attempts = (learning?.explanations ?? []).filter((e) => e.note_id === note.id).length;
 
@@ -66,6 +69,17 @@ export function LearningNoteHeader({ note, onNoteUpdate }: PanelProps) {
         🧑‍🏫 Explain it back{attempts > 0 && <span className="opacity-80">· {attempts}</span>}
       </button>
       {explaining && <ExplainBackModal note={note} onClose={() => setExplaining(false)} />}
+      <button
+        type="button"
+        onClick={() => setQuizzing(true)}
+        disabled={attempts === 0}
+        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+        style={{ backgroundColor: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--divider)' }}
+        title={attempts === 0 ? 'Explain it back first: cards are made from your own explanation' : 'Draft flashcards from your latest explanation'}
+      >
+        🃏 Quiz me{cardCount > 0 && <span className="opacity-70">· {cardCount}</span>}
+      </button>
+      {quizzing && <QuizMeModal note={note} onClose={() => setQuizzing(false)} />}
       <label className="flex items-center gap-1.5 flex-1 min-w-[200px]">
         <BookOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--muted)' }} />
         <input

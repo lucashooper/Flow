@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LearningProvider } from '../contexts/LearningContext';
 import { GapCaptureModal, GapInboxModal } from '../components/learning/GapModals';
+import { ReviewSession } from '../components/learning/ReviewSession';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
@@ -449,6 +450,7 @@ export const NewDashboard = () => {
         </AppLayout>
         <GapCaptureModal />
         <GapInboxModal />
+        <ReviewSession />
         </LearningProvider>
       </DndContext>
 
