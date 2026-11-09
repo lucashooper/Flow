@@ -4,6 +4,7 @@ import { Input } from '../components/Input';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuth } from '../contexts/AuthContext';
 import { getCachedAuthUser, getLocalNoteCount } from '../lib/offlineAuth';
+import { closeVaultAndReload, isDesktopApp } from '../lib/platform';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -194,6 +195,14 @@ export const Login = () => {
               Sign up
             </Link>
           </p>
+          {isDesktopApp() && (
+            <p className="mt-3 text-center text-sm" style={{ color: '#888888' }}>
+              Prefer files on your computer?{' '}
+              <button type="button" onClick={closeVaultAndReload} className="hover:underline" style={{ color: '#4fc3f7' }}>
+                Use a local vault instead
+              </button>
+            </p>
+          )}
         </div>
       </div>
 

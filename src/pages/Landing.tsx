@@ -2,8 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { FileText, Lock, Zap, Focus, Download, CheckCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { DesktopDownloadSection } from '../components/DesktopDownloadSection';
+import { detectDesktopOS, DESKTOP_DOWNLOADS } from '../lib/downloads';
 
-export const Landing = () => {
+export const Landing = ({ scrollTo }: { scrollTo?: string } = {}) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -17,6 +19,15 @@ export const Landing = () => {
       navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  // /download opens the page at the download section
+  useEffect(() => {
+    if (!scrollTo) return;
+    const t = setTimeout(() => document.getElementById(scrollTo)?.scrollIntoView({ block: 'start' }), 50);
+    return () => clearTimeout(t);
+  }, [scrollTo]);
+
+  const desktopOS = detectDesktopOS();
 
   // Rotate product images every 5 seconds
   useEffect(() => {
@@ -68,6 +79,13 @@ export const Landing = () => {
               style={{ color: '#888888' }}
             >
               How it works
+            </button>
+            <button 
+              onClick={() => scrollToSection('download')}
+              className="text-sm transition-colors hover:text-[#4fc3f7]" 
+              style={{ color: '#888888' }}
+            >
+              Download
             </button>
             <button 
               onClick={() => scrollToSection('pricing')}
@@ -137,7 +155,7 @@ export const Landing = () => {
             </p>
 
             {/* CTAs */}
-            <div className="flex gap-4 justify-center" style={{ marginBottom: '6rem' }}>
+            <div className="flex flex-wrap gap-4 justify-center" style={{ marginBottom: '1.25rem' }}>
               <button
                 onClick={() => navigate('/signup')}
                 className="px-7 py-2.5 text-base font-medium text-white rounded-lg transition-all hover:scale-[1.01]"
@@ -159,6 +177,16 @@ export const Landing = () => {
                 }}
               >
                 Sign in
+              </button>
+            </div>
+            <div style={{ marginBottom: '6rem' }}>
+              <button
+                onClick={() => scrollToSection('download')}
+                className="text-sm inline-flex items-center gap-1.5 transition-colors hover:text-[#4fc3f7]"
+                style={{ color: '#888888' }}
+              >
+                <Download className="w-4 h-4" />
+                {desktopOS ? `Download the desktop app for ${DESKTOP_DOWNLOADS[desktopOS].label}` : 'Download the desktop app'}
               </button>
             </div>
           </div>
@@ -290,6 +318,8 @@ export const Landing = () => {
           </div>
         </div>
       </section>
+
+      <DesktopDownloadSection />
 
       {/* How it Works */}
       <section id="how-it-works" className="px-6" style={{ backgroundColor: '#0a0a0a', paddingTop: '8rem', paddingBottom: '8rem' }}>

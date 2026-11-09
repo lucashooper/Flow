@@ -9,6 +9,14 @@ import { Tasks } from './pages/Tasks';
 import { Calendar } from './pages/Calendar';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { DesktopWelcome } from './pages/DesktopWelcome';
+import { getChosenStorageMode, isDesktopApp } from './lib/platform';
+
+/** The desktop app has no marketing page: send it to the right starting screen. */
+function DesktopHome() {
+  const mode = getChosenStorageMode();
+  return <Navigate to={mode === 'vault' ? '/dashboard' : mode === 'cloud' ? '/login' : '/welcome'} replace />;
+}
 
 function App() {
   // Apply saved theme and accent color on load
@@ -27,7 +35,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={isDesktopApp() ? <DesktopHome /> : <Landing />} />
+        <Route path="/download" element={isDesktopApp() ? <DesktopHome /> : <Landing scrollTo="download" />} />
+        <Route path="/welcome" element={<DesktopWelcome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route

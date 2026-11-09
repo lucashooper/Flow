@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Cloud, HardDrive, Loader2, AlertCircle } from 'lucide-react';
 import type { NoteSavePhase } from '../lib/noteDrafts';
+import { isVaultMode } from '../lib/platform';
+
+const VAULT = isVaultMode();
 
 interface NoteSaveStatusProps {
   noteId: string | undefined;
@@ -11,7 +14,7 @@ const LABELS: Record<NoteSavePhase, string> = {
   idle: '',
   local: 'Saved to local',
   syncing: 'Syncing…',
-  cloud: 'Saved to cloud',
+  cloud: VAULT ? 'Saved to vault' : 'Saved to cloud',
   failed: 'Sync failed (retrying)',
 };
 
@@ -131,7 +134,7 @@ export const NoteSaveStatus = ({ noteId, restoredFromDraft }: NoteSaveStatusProp
         >
           {phase === 'local' && <HardDrive className="w-3 h-3" />}
           {phase === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}
-          {phase === 'cloud' && <Cloud className="w-3 h-3" />}
+          {phase === 'cloud' && (VAULT ? <HardDrive className="w-3 h-3" /> : <Cloud className="w-3 h-3" />)}
           {phase === 'failed' && <AlertCircle className="w-3 h-3" />}
           {label}
         </span>

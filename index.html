@@ -31,7 +31,8 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Register service worker for offline support (production only — skip on localhost to avoid stale dev caches)
-      if ('serviceWorker' in navigator) {
+      // (not in the desktop app, which ships its files locally)
+      if ('serviceWorker' in navigator && !('__TAURI_INTERNALS__' in window)) {
         const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         if (isLocalDev) {
           navigator.serviceWorker.getRegistrations().then((registrations) => {

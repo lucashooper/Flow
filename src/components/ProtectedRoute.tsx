@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FlowLoadingScreen } from './FlowLoadingScreen';
 import { PinLockScreen } from './PinLockScreen';
+import { getChosenStorageMode, isDesktopApp } from '../lib/platform';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -25,7 +26,9 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Desktop app before a storage choice: show the vault / cloud picker.
+    const desktopUndecided = isDesktopApp() && getChosenStorageMode() === null;
+    return <Navigate to={desktopUndecided ? '/welcome' : '/login'} replace />;
   }
 
   // Show PIN lock screen if user has a PIN set and hasn't unlocked yet

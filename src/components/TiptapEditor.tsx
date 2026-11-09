@@ -54,6 +54,8 @@ import { getEditorContentMaxWidth } from '../utils/editorLayout';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { MultiColumnGutterControls } from './MultiColumnGutterControls';
 import { insertMediaAtPos } from '../utils/insertMediaAtDrop';
+import { whenEditorMounted } from '../utils/editorMount';
+import { watchStrayBlobImages } from '../utils/watchStrayBlobImages';
 // import { isWordCorrect, getSpellingSuggestionsAsync, initSpellChecker } from '../utils/spellcheck'; // Not needed - using browser native
 
 interface TiptapEditorProps {
@@ -321,6 +323,30 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
             console.log('📋 Mixed content detected (text + images) - using full HTML paste');
             // Fall through to normal HTML paste below
           } else if (extracted.length > 0) {
+            // A screenshot / copied image: WebKit (Safari, the desktop app) offers it as
+            // HTML pointing at a temporary blob: URL. Upload the real image instead of
+            // keeping a link that stops working once the app reloads.
+            const imageFiles = Array.from(clipboardData.files).filter((f) => f.type.startsWith('image/'));
+            if (imageFiles.length > 0) {
+              event.preventDefault();
+              imageFiles.forEach((file) => insertImageFast(view, file, uploadImage));
+              return true;
+            }
+            if (extracted.every((img) => img.src.startsWith('blob:'))) {
+              event.preventDefault();
+              extracted.forEach((img) => {
+                void fetch(img.src)
+                  .then((res) => res.blob())
+                  .then((blob) => {
+                    const type = blob.type || 'image/png';
+                    const file = new File([blob], `pasted-image.${type.split('/')[1] || 'png'}`, { type });
+                    insertImageFast(view, file, uploadImage);
+                  })
+                  .catch((err) => console.error('Could not read pasted image:', err));
+              });
+              return true;
+            }
+
             // Pure image paste
             logImageDrop('paste: image-only HTML from clipboard', extracted);
             event.preventDefault();
@@ -582,12 +608,19 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     }
   }, [editor, isFullscreen]);
 
+  // Images pasted natively as temporary blob: links get uploaded and saved
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    return watchStrayBlobImages(editor, uploadImage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
   // Track last content prop to prevent unnecessary updates
   const lastContentProp = useRef<string>('');
 
   // Update editor content when prop changes (for switching notes)
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
 
     if (isInternalUpdate.current) {
       return;
@@ -661,9 +694,9 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   }, []);
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-    const prose = editor.view.dom as HTMLElement;
-    prose.style.maxWidth = `${editorMaxWidth}px`;
+    return whenEditorMounted(editor, (prose) => {
+      prose.style.maxWidth = `${editorMaxWidth}px`;
+    });
   }, [editor, editorMaxWidth]);
 
   // Prevent browser's default drag-and-drop behavior (opening files in new tab)
@@ -918,18 +951,6 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
     return () => window.removeEventListener('starredFormattingActionsChanged', handleStarredFormattingActionsChange as EventListener);
   }, []);
 
-  // Debug: Verify QuoteMark extension is loaded
-  useEffect(() => {
-    if (editor) {
-      console.log('=== EDITOR DEBUG ===');
-      console.log('All extensions:', editor.extensionManager.extensions.map(ext => ext.name));
-      console.log('QuoteMark loaded?', editor.extensionManager.extensions.some(ext => ext.name === 'quoteMark'));
-      console.log('Available commands:', Object.keys(editor.commands));
-      console.log('Current quote style:', localStorage.getItem('quoteStyle'));
-      console.log('Current bullet style:', localStorage.getItem('bulletStyle'));
-      console.log('Current bold color:', localStorage.getItem('defaultBoldColor'));
-    }
-  }, [editor]);
 
 
   if (!editor) {
@@ -944,7 +965,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   };
 
   const convertLinesToBulletList = () => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
 
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, '\n');
@@ -1081,7 +1102,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   // };
 
   const increaseFontSize = () => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const currentSize = editor.getAttributes('textStyle').fontSize || '1rem';
     const sizeValue = parseFloat(currentSize);
     const newSize = `${sizeValue + 0.125}rem`;
@@ -1089,7 +1110,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
   };
 
   const decreaseFontSize = () => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const currentSize = editor.getAttributes('textStyle').fontSize || '1rem';
     const sizeValue = parseFloat(currentSize);
     const newSize = `${Math.max(0.5, sizeValue - 0.125)}rem`;
@@ -1116,7 +1137,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
 
   // Insert media at a specific doc position (from gutter + menu)
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
 
     const handleInsertAtPos = (e: Event) => {
       const detail = (e as CustomEvent<{ pos: number; file: File }>).detail;

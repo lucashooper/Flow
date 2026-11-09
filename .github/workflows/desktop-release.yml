@@ -1,0 +1,137 @@
+# Builds the Flow Notes desktop app for macOS, Windows and Linux and publishes
+# the installers to a GitHub Release with fixed file names, so the website's
+# download links (src/lib/downloads.ts) always point at the newest version:
+#   https://github.com/lucashooper/flow/releases/latest/download/<file>
+#
+# Run it from the Actions tab ("Desktop release" → Run workflow), or push a tag
+# like `desktop-v0.2.0`. Bump "version" in src-tauri/tauri.conf.json first.
+#
+# Optional repository secrets (Settings → Secrets and variables → Actions):
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — enable "Sign in to Flow Cloud"
+#   in the desktop app. Without them the app works with local vaults only.
+name: Desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles dmg
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            args: --bundles nsis
+            rust_targets: ''
+          - name: Linux
+            os: ubuntu-22.04
+            args: --bundles appimage,deb
+            rust_targets: ''
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Build app
+        run: npx tauri build ${{ matrix.args }}
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Collect installers with stable names
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          case "${{ runner.os }}" in
+            macOS)
+              cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg out/Flow-Notes-macOS.dmg ;;
+            Windows)
+              cp src-tauri/target/release/bundle/nsis/*-setup.exe out/Flow-Notes-Windows-Setup.exe ;;
+            Linux)
+              cp src-tauri/target/release/bundle/appimage/*.AppImage out/Flow-Notes-Linux.AppImage
+              cp src-tauri/target/release/bundle/deb/*.deb out/Flow-Notes-Linux.deb ;;
+          esac
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [[ "${GITHUB_REF}" == refs/tags/desktop-v* ]]; then TAG="${GITHUB_REF#refs/tags/}"; else TAG="desktop-v${VERSION}"; fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: out
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Flow Notes ${{ steps.version.outputs.version }} for desktop
+          make_latest: true
+          files: out/*
+          body: |
+            Flow Notes for desktop. Keep your notes in Flow Cloud, or as files in a local vault on your computer.
+
+            | Platform | Download |
+            | --- | --- |
+            | macOS (Apple Silicon & Intel) | [Flow-Notes-macOS.dmg](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/Flow-Notes-macOS.dmg) |
+            | Windows 10 / 11 | [Flow-Notes-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/Flow-Notes-Windows-Setup.exe) |
+            | Linux | [AppImage](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/Flow-Notes-Linux.AppImage) · [.deb](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/Flow-Notes-Linux.deb) |
+
+            **First launch:** the app isn't signed with a paid Apple / Microsoft certificate yet.
+            On Mac, right-click the app → Open (or System Settings → Privacy & Security → Open Anyway).
+            On Windows, click "More info" → "Run anyway" if SmartScreen appears.

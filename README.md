@@ -113,6 +113,34 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+## Desktop app & local vaults
+
+`src-tauri/` wraps the same web app in a [Tauri](https://tauri.app) desktop app for macOS, Windows and Linux.
+On first launch the user picks where notes live:
+
+- **Local vault** — a folder on their computer. Each note is a `.json` file under folders that mirror
+  dashboards/folders (`My Notes/Essays/V8 Feedback.json`), images go in `attachments/`, and everything
+  else (dashboards, folders, tasks…) is in `.flow/`. No account or internet needed. Copying the folder
+  (or keeping it in iCloud/Dropbox/OneDrive) moves it between computers.
+- **Flow Cloud** — the normal Supabase-backed account.
+
+How it works: in vault mode, `src/lib/supabase.ts` exports a vault-backed stand-in for the Supabase
+client (`src/lib/vault/localClient.ts`), so the rest of the app is unchanged. `src/lib/vault/store.ts`
+decides the file layout; the Rust commands in `src-tauri/src/vault.rs` only read/write files inside
+the chosen folder. Settings → Data & Sync can copy cloud notes into a vault (desktop) or download them
+as a vault `.zip` (web).
+
+```bash
+npm run desktop:dev     # run the desktop app against the Vite dev server
+npm run test:vault      # tests for the vault storage layer
+```
+
+**Releasing:** bump `version` in `src-tauri/tauri.conf.json`, then run the *Desktop release* workflow in
+GitHub Actions (or push a `desktop-vX.Y.Z` tag). It builds the installers and publishes them to a GitHub
+Release with fixed names, which the website's download links (`src/lib/downloads.ts`) point at. Add the
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` repository secrets to enable Flow Cloud sign-in in the
+desktop app; without them it offers local vaults only.
+
 ## Project Structure
 
 ```

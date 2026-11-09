@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { StorageSettings } from './StorageSettings';
+import { isVaultMode } from '../lib/platform';
 import { X, User, Palette, Type, Layers, Upload, Trash2, AlertTriangle, Lock, Cloud } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -1151,7 +1153,8 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             {activeSection === 'sync' && (
               <div>
                 <h2 className="text-2xl font-semibold mb-6" style={{ color: 'var(--text)' }}>Data & Sync</h2>
-                <SyncDiagnostics />
+                <StorageSettings />
+                {!isVaultMode() && <SyncDiagnostics />}
               </div>
             )}
           </div>

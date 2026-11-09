@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, getLastSyncTime, setLastSyncTime } from '../lib/db';
 import { isOfflineMode } from '../lib/offlineAuth';
+import { isVaultMode } from '../lib/platform';
 import { reconcileFromServer } from '../lib/syncHealth';
 import { repairOutboxPayloads, sanitizeSyncPayload } from '../lib/syncPayloads';
 import { clearNoteDraft, emitNoteSaveStatus } from '../lib/noteDrafts';
@@ -60,7 +61,7 @@ export const useOfflineSync = () => {
               await db.notes.update(item.entityId, { synced: true });
               await clearNoteDraft(item.entityId);
               if (isActiveNote(item.entityId)) {
-                emitNoteSaveStatus(item.entityId, 'cloud', 'Saved to cloud');
+                emitNoteSaveStatus(item.entityId, 'cloud', isVaultMode() ? 'Saved to vault' : 'Saved to cloud');
               }
             } else {
               await db.folders.update(item.entityId, { synced: true });

@@ -17,6 +17,10 @@ import {
   initialSync
 } from '../lib/dataAccess';
 import { detectNotesCorruption, downloadAllFromCloud } from '../lib/syncHealth';
+import { getVaultPath, hashString, isVaultMode } from '../lib/platform';
+
+/** Cloud and each local vault keep separate dashboard caches. */
+const DASHBOARD_CACHE_KEY = isVaultMode() ? `cachedDashboards:vault:${hashString(getVaultPath() || '')}` : 'cachedDashboards';
 
 export const useDashboardData = () => {
   const { user } = useAuth();
@@ -102,7 +106,7 @@ export const useDashboardData = () => {
 
   const fetchDashboards = async () => {
     // Try to load from cache first
-    const cached = localStorage.getItem('cachedDashboards');
+    const cached = localStorage.getItem(DASHBOARD_CACHE_KEY);
     if (cached) {
       try {
         const data = JSON.parse(cached);
@@ -132,7 +136,7 @@ export const useDashboardData = () => {
       setDashboards(data || []);
       
       // Cache for offline use
-      localStorage.setItem('cachedDashboards', JSON.stringify(data || []));
+      localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data || []));
       
       // Set active dashboard (first one or the one marked as active)
       const active = data?.find(d => d.is_active) || data?.[0] || null;

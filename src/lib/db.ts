@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { getVaultPath, hashString, isVaultMode } from './platform';
 
 export interface Note {
   id: string;
@@ -53,7 +54,8 @@ export class FlowDatabase extends Dexie {
   meta!: Table<MetaData, string>;
 
   constructor() {
-    super('FlowDB');
+    // Each local vault gets its own cache so it never mixes with cloud notes.
+    super(isVaultMode() ? `FlowDB-vault-${hashString(getVaultPath() || '')}` : 'FlowDB');
     
     // Version 1: Original schema
     this.version(1).stores({

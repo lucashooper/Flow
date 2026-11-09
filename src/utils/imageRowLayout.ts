@@ -3,6 +3,7 @@ import type { EditorView } from 'prosemirror-view';
 import type { Node as PMNode } from 'prosemirror-model';
 import { DEFAULT_IMAGE_WIDTH, getEditorContentMaxWidth, IMAGE_ROW_GAP } from './editorLayout';
 import { logImageDrop } from './imageDropDebug';
+import { mountedEditorDom } from './editorMount';
 
 export interface RowImage {
   pos: number;
@@ -252,8 +253,9 @@ export function getImageGutterRects(editor: Editor): Array<{
     leftImagePos: number;
   }> = [];
 
+  const root = mountedEditorDom(editor);
+  if (!root) return gutters;
   const { view } = editor;
-  const root = view.dom as HTMLElement;
 
   const paragraphs = root.querySelectorAll(
     'p:has(.resizable-image-wrapper + .resizable-image-wrapper)',

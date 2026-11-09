@@ -4,6 +4,9 @@ import { ensureTrailingParagraph } from './ensureEditableSpaceAroundImages';
 
 type UploadFn = (file: File) => Promise<string | null>;
 
+/** Blob previews whose upload is already under way (see watchStrayBlobImages). */
+export const pendingBlobUploads = new Set<string>();
+
 /** Insert an image immediately with a blob preview, upload in background. */
 export function insertImageFast(
   view: EditorView,
@@ -32,6 +35,7 @@ export function insertImageFast(
   // Leave an empty paragraph below so users can click and type after the image.
   ensureTrailingParagraph(view, true);
 
+  pendingBlobUploads.add(blobUrl);
   void uploadImage(file)
     .then((uploadedUrl) => {
       if (!uploadedUrl) return;
@@ -61,7 +65,8 @@ export function insertImageFast(
     })
     .catch(() => {
       // Keep blob preview if upload fails
-    });
+    })
+    .finally(() => pendingBlobUploads.delete(blobUrl));
 }
 
 /** TipTap chain variant for file drops. */

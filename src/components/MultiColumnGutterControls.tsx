@@ -7,6 +7,7 @@ import {
   insertBlockBetweenImages,
   type BlockInsertAction,
 } from '../utils/imageRowLayout';
+import { whenEditorMounted } from '../utils/editorMount';
 
 interface MultiColumnGutterControlsProps {
   editor: Editor | null;
@@ -45,26 +46,28 @@ export const MultiColumnGutterControls = ({
   useEffect(() => {
     if (!editor || isFullscreen) return;
 
-    refreshGutters();
+    return whenEditorMounted(editor, (dom) => {
+      refreshGutters();
 
-    const onUpdate = () => refreshGutters();
-    editor.on('update', onUpdate);
-    editor.on('selectionUpdate', onUpdate);
+      const onUpdate = () => refreshGutters();
+      editor.on('update', onUpdate);
+      editor.on('selectionUpdate', onUpdate);
 
-    const scrollParent = editor.view.dom.closest('.editor-root');
-    scrollParent?.addEventListener('scroll', refreshGutters, { passive: true });
-    window.addEventListener('resize', refreshGutters);
+      const scrollParent = dom.closest('.editor-root');
+      scrollParent?.addEventListener('scroll', refreshGutters, { passive: true });
+      window.addEventListener('resize', refreshGutters);
 
-    const observer = new ResizeObserver(refreshGutters);
-    observer.observe(editor.view.dom);
+      const observer = new ResizeObserver(refreshGutters);
+      observer.observe(dom);
 
-    return () => {
-      editor.off('update', onUpdate);
-      editor.off('selectionUpdate', onUpdate);
-      scrollParent?.removeEventListener('scroll', refreshGutters);
-      window.removeEventListener('resize', refreshGutters);
-      observer.disconnect();
-    };
+      return () => {
+        editor.off('update', onUpdate);
+        editor.off('selectionUpdate', onUpdate);
+        scrollParent?.removeEventListener('scroll', refreshGutters);
+        window.removeEventListener('resize', refreshGutters);
+        observer.disconnect();
+      };
+    });
   }, [editor, isFullscreen, refreshGutters]);
 
   const handleSelect = (action: BlockInsertAction) => {

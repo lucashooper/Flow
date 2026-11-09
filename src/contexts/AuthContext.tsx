@@ -8,6 +8,7 @@ import {
   setOfflineMode,
 } from '../lib/offlineAuth';
 import type { AuthContextType, User, UserProfile } from '../types';
+import { closeVaultAndReload, isVaultMode } from '../lib/platform';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -48,7 +49,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    const cachedUser = getCachedAuthUser();
+    // In a local vault the session comes from the vault, never from a cached cloud login.
+    const cachedUser = isVaultMode() ? null : getCachedAuthUser();
 
     // Linear-style: hydrate from local session cache immediately so the shell renders fast.
     if (cachedUser) {
@@ -199,6 +201,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    if (isVaultMode()) {
+      // "Signing out" of a vault closes it and returns to the vault picker.
+      closeVaultAndReload();
+      return;
+    }
     const wasOffline = readOfflineMode();
     setOfflineMode(false);
     setOfflineModeState(false);

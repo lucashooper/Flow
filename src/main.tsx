@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { isVaultMode } from './lib/platform'
+import { installDesktopIntegrations } from './lib/desktop'
+import { VaultOpenError } from './components/VaultOpenError'
 
 // Apply saved theme class to <html> before React renders
 (() => {
@@ -18,12 +21,31 @@ import { ThemeProvider } from './contexts/ThemeContext'
   } catch {}
 })();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ThemeProvider>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ThemeProvider>
-  </StrictMode>,
-)
+async function start() {
+  const root = createRoot(document.getElementById('root')!);
+  installDesktopIntegrations();
+
+  // Desktop app with a local vault: open it before anything reads data.
+  if (isVaultMode()) {
+    try {
+      const { bootstrapVault } = await import('./lib/vault/bootstrap');
+      await bootstrapVault();
+    } catch (error) {
+      console.error('Could not open vault:', error);
+      root.render(<VaultOpenError error={error} />);
+      return;
+    }
+  }
+
+  root.render(
+    <StrictMode>
+      <ThemeProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ThemeProvider>
+    </StrictMode>,
+  );
+}
+
+void start();
