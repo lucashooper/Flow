@@ -104,6 +104,17 @@ export const useDashboardData = () => {
     return () => window.removeEventListener('dataReconciled', handleReconciled);
   }, [activeDashboard?.id]);
 
+  // Dashboards changed on another device (local vaults synced via iCloud etc.)
+  useEffect(() => {
+    const onVaultChanged = (e: Event) => {
+      const tables: string[] = (e as CustomEvent<{ tables: string[] }>).detail?.tables ?? [];
+      if (tables.includes('dashboards')) void fetchDashboards();
+    };
+    window.addEventListener('vaultChanged', onVaultChanged);
+    return () => window.removeEventListener('vaultChanged', onVaultChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchDashboards = async () => {
     // Try to load from cache first
     const cached = localStorage.getItem(DASHBOARD_CACHE_KEY);

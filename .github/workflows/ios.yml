@@ -1,0 +1,125 @@
+# Builds the Flow Notes iPhone app and uploads it to TestFlight.
+#
+# Run it from the Actions tab ("iOS (TestFlight)" → Run workflow).
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   APPLE_TEAM_ID        Apple Developer Team ID (developer.apple.com → Membership)
+#   APPLE_API_KEY_ID     App Store Connect API key ID
+#   APPLE_API_ISSUER     App Store Connect API issuer ID
+#   APPLE_API_KEY_P8     contents of the AuthKey_<id>.p8 file
+#   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY  (optional, for Flow Cloud sign-in)
+#
+# Without the Apple secrets it only checks that the code compiles for iPhone.
+name: iOS (TestFlight)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    env:
+      HAS_SIGNING: ${{ secrets.APPLE_API_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+      ICLOUD_CONTAINER: iCloud.app.flownotes.ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Check the Rust code compiles for iPhone
+        run: cargo build --manifest-path src-tauri/Cargo.toml --lib --target aarch64-apple-ios
+
+      - name: Stop here without Apple signing secrets
+        if: env.HAS_SIGNING != 'true'
+        run: echo "::notice::Compiles for iPhone. Add the Apple secrets listed at the top of .github/workflows/ios.yml to build and upload to TestFlight."
+
+      - name: Set up App Store Connect API key
+        if: env.HAS_SIGNING == 'true'
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          printf '%s\n' "$APPLE_API_KEY_P8" > ~/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          echo "APPLE_API_KEY_PATH=$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" >> "$GITHUB_ENV"
+          node -e "
+            const fs = require('fs'); const f = 'src-tauri/tauri.ios.conf.json';
+            const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+            c.bundle.iOS.developmentTeam = process.env.APPLE_TEAM_ID;
+            fs.writeFileSync(f, JSON.stringify(c, null, 2));
+          "
+
+      - name: Generate the Xcode project
+        if: env.HAS_SIGNING == 'true'
+        run: npx tauri ios init --ci
+        env:
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Add iCloud Drive (so the vault syncs with the computer)
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          set -euo pipefail
+          ENT=$(find src-tauri/gen/apple -name "*.entitlements" | head -1)
+          PLIST=$(find src-tauri/gen/apple -name "Info.plist" -path "*_iOS*" | head -1)
+          echo "Entitlements: $ENT"; echo "Info.plist: $PLIST"
+          C="$ICLOUD_CONTAINER"
+          PB=/usr/libexec/PlistBuddy
+          $PB -c "Add :com.apple.developer.icloud-container-identifiers array" \
+              -c "Add :com.apple.developer.icloud-container-identifiers:0 string $C" \
+              -c "Add :com.apple.developer.icloud-services array" \
+              -c "Add :com.apple.developer.icloud-services:0 string CloudDocuments" \
+              -c "Add :com.apple.developer.ubiquity-container-identifiers array" \
+              -c "Add :com.apple.developer.ubiquity-container-identifiers:0 string $C" "$ENT"
+          $PB -c "Add :NSUbiquitousContainers dict" \
+              -c "Add :NSUbiquitousContainers:$C dict" \
+              -c "Add :NSUbiquitousContainers:$C:NSUbiquitousContainerIsDocumentScopePublic bool true" \
+              -c "Add :NSUbiquitousContainers:$C:NSUbiquitousContainerName string Flow Notes" \
+              -c "Add :NSUbiquitousContainers:$C:NSUbiquitousContainerSupportedFolderLevels string Any" \
+              -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST"
+          cat "$ENT"
+
+      - name: Build signed app
+        if: env.HAS_SIGNING == 'true'
+        run: npx tauri ios build --export-method app-store-connect --build-number ${{ github.run_number }}
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Upload to TestFlight
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          IPA=$(find src-tauri/gen/apple/build -name "*.ipa" | head -1)
+          echo "Uploading $IPA"
+          xcrun altool --upload-app --type ios --file "$IPA" \
+            --apiKey "${{ secrets.APPLE_API_KEY_ID }}" --apiIssuer "${{ secrets.APPLE_API_ISSUER }}"
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_SIGNING == 'true'
+        with:
+          name: ios-ipa
+          path: src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: warn

@@ -26,6 +26,11 @@ export function isDesktopApp(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+/** The iPhone / iPad app (same Tauri app, built for iOS). */
+export function isIOSApp(): boolean {
+  return isDesktopApp() && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export function isWindowsPlatform(): boolean {
   return typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent);
 }

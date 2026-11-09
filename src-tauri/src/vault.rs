@@ -56,7 +56,17 @@ fn resolve(root: &Path, rel: &str) -> Result<PathBuf, String> {
     Ok(out)
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+/// Last-modified time in ms since the epoch (0 if unknown).
+fn mtime_ms(meta: &fs::Metadata) -> u64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Write via a temp file + rename, and return the file's new modified time.
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<u64, String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Could not create folder: {e}"))?;
     }
@@ -69,7 +79,8 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::rename(&tmp, path).map_err(|e| {
         let _ = fs::remove_file(&tmp);
         format!("Could not save {}: {e}", path.display())
-    })
+    })?;
+    Ok(fs::metadata(path).map(|m| mtime_ms(&m)).unwrap_or(0))
 }
 
 #[derive(Serialize)]
@@ -127,13 +138,13 @@ pub fn vault_read_text(path: String, state: State<'_, VaultState>) -> Result<Opt
 }
 
 #[tauri::command]
-pub fn vault_write_text(path: String, contents: String, state: State<'_, VaultState>) -> Result<(), String> {
+pub fn vault_write_text(path: String, contents: String, state: State<'_, VaultState>) -> Result<u64, String> {
     let full = resolve(&root(&state)?, &path)?;
     write_atomic(&full, contents.as_bytes())
 }
 
 #[tauri::command]
-pub fn vault_write_bytes(path: String, base64: String, state: State<'_, VaultState>) -> Result<(), String> {
+pub fn vault_write_bytes(path: String, base64: String, state: State<'_, VaultState>) -> Result<u64, String> {
     let full = resolve(&root(&state)?, &path)?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(base64.as_bytes())
@@ -155,7 +166,7 @@ fn is_hidden(name: &str) -> bool {
     name.starts_with('.')
 }
 
-fn collect_notes(root: &Path, dir: &Path, depth: usize, out: &mut Vec<String>) {
+fn collect_notes(root: &Path, dir: &Path, depth: usize, out: &mut Vec<(String, u64)>) {
     if depth > 64 {
         return;
     }
@@ -175,7 +186,8 @@ fn collect_notes(root: &Path, dir: &Path, depth: usize, out: &mut Vec<String>) {
         } else if ft.is_file() && name.to_lowercase().ends_with(".json") {
             if let Ok(rel) = path.strip_prefix(root) {
                 let parts: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-                out.push(parts.join("/"));
+                let mtime = entry.metadata().map(|m| mtime_ms(&m)).unwrap_or(0);
+                out.push((parts.join("/"), mtime));
             }
         }
     }
@@ -183,11 +195,29 @@ fn collect_notes(root: &Path, dir: &Path, depth: usize, out: &mut Vec<String>) {
 
 /// Every note file in the vault (all `.json` files outside hidden folders and attachments/).
 #[tauri::command]
-pub fn vault_list_note_files(state: State<'_, VaultState>) -> Result<Vec<String>, String> {
+pub fn vault_list_note_files(state: State<'_, VaultState>) -> Result<Vec<(String, u64)>, String> {
     let root = root(&state)?;
     let mut out = Vec::new();
     collect_notes(&root, &root, 0, &mut out);
     Ok(out)
+}
+
+/// Entries of one folder inside the vault: (name, is_dir, modified ms). Missing folder = empty.
+#[tauri::command]
+pub fn vault_list_dir(path: String, state: State<'_, VaultState>) -> Result<Vec<(String, bool, u64)>, String> {
+    let full = resolve(&root(&state)?, &path)?;
+    let Ok(entries) = fs::read_dir(&full) else { return Ok(Vec::new()) };
+    Ok(entries
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.ends_with(".flow-tmp") {
+                return None;
+            }
+            let meta = e.metadata().ok()?;
+            Some((name, meta.is_dir(), mtime_ms(&meta)))
+        })
+        .collect())
 }
 
 /// Returns true if `dir` is empty after pruning.

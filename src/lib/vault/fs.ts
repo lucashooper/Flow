@@ -2,13 +2,23 @@
  * Minimal file-system interface a vault is read from / written to.
  * Paths are always relative to the vault root and use forward slashes.
  */
+export interface DirEntry {
+  name: string;
+  isDir: boolean;
+  /** Last-modified time in ms */
+  mtime: number;
+}
+
 export interface VaultFS {
   readText(path: string): Promise<string | null>;
-  writeText(path: string, contents: string): Promise<void>;
-  writeBytes(path: string, bytes: Uint8Array): Promise<void>;
+  /** Returns the file's new last-modified time (ms). */
+  writeText(path: string, contents: string): Promise<number>;
+  writeBytes(path: string, bytes: Uint8Array): Promise<number>;
   remove(path: string): Promise<void>;
-  /** Every file under the vault (recursive), skipping hidden folders and attachments/. */
-  listNoteFiles(): Promise<string[]>;
+  /** Every note file under the vault (recursive), skipping hidden folders and attachments/. */
+  listNoteFiles(): Promise<{ path: string; mtime: number }[]>;
+  /** Entries of one folder (empty if it doesn't exist). */
+  listDir(path: string): Promise<DirEntry[]>;
   /** Remove folders left empty after notes moved or were deleted. */
   pruneEmptyDirs(): Promise<void>;
 }
@@ -45,16 +55,21 @@ export class TauriVaultFS implements VaultFS {
     return this.invoke<string | null>('vault_read_text', { path });
   }
   writeText(path: string, contents: string) {
-    return this.invoke<void>('vault_write_text', { path, contents });
+    return this.invoke<number>('vault_write_text', { path, contents });
   }
   writeBytes(path: string, bytes: Uint8Array) {
-    return this.invoke<void>('vault_write_bytes', { path, base64: bytesToBase64(bytes) });
+    return this.invoke<number>('vault_write_bytes', { path, base64: bytesToBase64(bytes) });
   }
   remove(path: string) {
     return this.invoke<void>('vault_remove', { path });
   }
-  listNoteFiles() {
-    return this.invoke<string[]>('vault_list_note_files');
+  async listNoteFiles() {
+    const rows = await this.invoke<[string, number][]>('vault_list_note_files');
+    return rows.map(([path, mtime]) => ({ path, mtime }));
+  }
+  async listDir(path: string) {
+    const rows = await this.invoke<[string, boolean, number][]>('vault_list_dir', { path });
+    return rows.map(([name, isDir, mtime]) => ({ name, isDir, mtime }));
   }
   pruneEmptyDirs() {
     return this.invoke<void>('vault_prune_empty_dirs');
@@ -64,24 +79,46 @@ export class TauriVaultFS implements VaultFS {
 /** In-memory VaultFS — used to build export zips and in tests. */
 export class MemoryVaultFS implements VaultFS {
   files = new Map<string, string | Uint8Array>();
+  mtimes = new Map<string, number>();
+  private clock = 1;
 
+  private touch(path: string) {
+    const t = this.clock++;
+    this.mtimes.set(path, t);
+    return t;
+  }
   async readText(path: string) {
     const v = this.files.get(path);
     return typeof v === 'string' ? v : null;
   }
   async writeText(path: string, contents: string) {
     this.files.set(path, contents);
+    return this.touch(path);
   }
   async writeBytes(path: string, bytes: Uint8Array) {
     this.files.set(path, bytes);
+    return this.touch(path);
   }
   async remove(path: string) {
     this.files.delete(path);
+    this.mtimes.delete(path);
   }
   async listNoteFiles() {
-    return [...this.files.keys()].filter(
-      (p) => !p.split('/').some((seg) => seg.startsWith('.')) && !p.startsWith('attachments/'),
-    );
+    return [...this.files.keys()]
+      .filter((p) => !p.split('/').some((seg) => seg.startsWith('.')) && !p.startsWith('attachments/'))
+      .map((path) => ({ path, mtime: this.mtimes.get(path) ?? 0 }));
+  }
+  async listDir(dir: string) {
+    const prefix = `${dir.replace(/\/+$/, '')}/`;
+    const out = new Map<string, DirEntry>();
+    for (const path of this.files.keys()) {
+      if (!path.startsWith(prefix)) continue;
+      const rest = path.slice(prefix.length);
+      const [name, ...more] = rest.split('/');
+      if (more.length) out.set(name, { name, isDir: true, mtime: 0 });
+      else out.set(name, { name, isDir: false, mtime: this.mtimes.get(path) ?? 0 });
+    }
+    return [...out.values()];
   }
   async pruneEmptyDirs() {
     /* nothing to do — directories are implicit */

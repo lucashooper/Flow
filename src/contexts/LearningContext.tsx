@@ -227,6 +227,19 @@ export function LearningProvider({
       .then(({ data }) => setCards((data as LearningCard[]) ?? []));
   }, [enabled, user?.id]);
 
+  // Changes synced in from another device (phone ↔ computer).
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
+    const reload = (e: Event) => {
+      const tables: string[] = (e as CustomEvent<{ tables: string[] }>).detail?.tables ?? [];
+      if (tables.includes(GAPS_TABLE)) void supabase.from(GAPS_TABLE).select('*').order('created_at', { ascending: false }).then(({ data }) => setGaps((data as LearningGap[]) ?? []));
+      if (tables.includes(EXPLANATIONS_TABLE)) void supabase.from(EXPLANATIONS_TABLE).select('*').order('created_at', { ascending: false }).then(({ data }) => setExplanations((data as LearningExplanation[]) ?? []));
+      if (tables.includes(CARDS_TABLE)) void supabase.from(CARDS_TABLE).select('*').order('created_at', { ascending: true }).then(({ data }) => setCards((data as LearningCard[]) ?? []));
+    };
+    window.addEventListener('vaultChanged', reload);
+    return () => window.removeEventListener('vaultChanged', reload);
+  }, [enabled, user?.id]);
+
   const dueCards = useMemo(() => {
     const now = new Date(clock);
     return cards.filter((c) => isDueToday(c, now)).sort((a, b) => a.due_at.localeCompare(b.due_at));

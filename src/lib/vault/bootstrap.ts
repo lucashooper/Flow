@@ -1,10 +1,21 @@
 import { db, setLastSyncTime, type Folder, type Note } from '../db';
-import { getVaultPath, isWindowsPlatform, LOCAL_VAULT_USER } from '../platform';
+import { getVaultPath, isIOSApp, isWindowsPlatform, LOCAL_VAULT_USER } from '../platform';
 import { installSupabaseClient } from '../supabase';
 import { sanitizeSyncPayload } from '../syncPayloads';
 import { TauriVaultFS } from './fs';
 import { createVaultClient } from './localClient';
 import { CANONICAL_ATTACHMENT_PREFIX, VaultStore } from './store';
+
+/** Ask iOS to download vault files that are still only in iCloud. */
+async function requestICloudDownloads(root: string) {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const n = await invoke<number>('vault_icloud_download', { root });
+    if (n > 0) console.log(`☁️ Downloading ${n} file(s) from iCloud`);
+  } catch (e) {
+    console.warn('iCloud download request failed', e);
+  }
+}
 
 /** URL prefix the desktop webview uses for the flowvault:// attachment protocol. */
 export function platformAttachmentPrefix(): string {
@@ -27,6 +38,9 @@ export async function bootstrapVault(): Promise<void> {
   } catch {
     /* ignore */
   }
+
+  // iPhone: make sure files iCloud hasn't downloaded yet are fetched first.
+  if (isIOSApp()) await requestICloudDownloads(path);
 
   const fs = await TauriVaultFS.open(path, { create: false });
   const store = await VaultStore.load(fs, {
@@ -58,4 +72,48 @@ export async function bootstrapVault(): Promise<void> {
     await db.folders.bulkPut(store.rows('folders').map((f) => ({ ...(f as Folder), synced: true })));
   });
   await setLastSyncTime(new Date().toISOString());
+
+  startLiveRefresh(store);
+}
+
+/**
+ * Pick up changes synced in from other devices (iCloud Drive, Syncthing…)
+ * while the app is open: when the window regains focus, and every 20s while
+ * it's visible.
+ */
+function startLiveRefresh(store: VaultStore) {
+  let running = false;
+  const run = async () => {
+    if (running || document.visibilityState !== 'visible') return;
+    running = true;
+    try {
+      if (isIOSApp()) await requestICloudDownloads(getVaultPath() || '');
+      const changes = await store.refresh();
+      const { upserted, removedIds } = changes.notes;
+      const foldersChanged = changes.tables.has('folders');
+      if (!upserted.length && !removedIds.length && !changes.tables.size) return;
+
+      // Don't overwrite edits made here that are still waiting to be saved.
+      const pending = new Set((await db.outbox.toArray()).map((i) => i.entityId));
+      await db.transaction('rw', db.notes, db.folders, async () => {
+        const fresh = upserted.filter((n) => !pending.has(n.id));
+        if (fresh.length) await db.notes.bulkPut(fresh.map((n) => ({ ...(n as Note), synced: true })));
+        if (removedIds.length) await db.notes.bulkDelete(removedIds.filter((id) => !pending.has(id)));
+        if (foldersChanged) {
+          await db.folders.clear();
+          await db.folders.bulkPut(store.rows('folders').map((f) => ({ ...(f as Folder), synced: true })));
+        }
+      });
+      console.log('🔄 Vault changed on another device', { notes: upserted.length, removed: removedIds.length, tables: [...changes.tables] });
+      window.dispatchEvent(new CustomEvent('vaultChanged', { detail: { tables: [...changes.tables] } }));
+      window.dispatchEvent(new Event('dataReconciled'));
+    } catch (e) {
+      console.warn('Vault refresh failed', e);
+    } finally {
+      running = false;
+    }
+  };
+  window.addEventListener('focus', () => void run());
+  document.addEventListener('visibilitychange', () => void run());
+  setInterval(() => void run(), 20_000);
 }

@@ -4,6 +4,7 @@ import { Cloud, FolderOpen, FolderPlus, HardDrive, Loader2 } from 'lucide-react'
 import {
   getRecentVaults,
   isDesktopApp,
+  isIOSApp,
   openVaultAndReload,
   switchToCloudAndReload,
   vaultDisplayName,
@@ -24,9 +25,19 @@ export const DesktopWelcome = () => {
   const [error, setError] = useState('');
   const [defaultPath, setDefaultPath] = useState('');
   const [recent, setRecent] = useState<{ path: string; ok: boolean }[]>([]);
+  const [iosLocation, setIosLocation] = useState<{ path: string; icloud: boolean } | null>(null);
+
+  // iPhone: one vault, in Flow's iCloud Drive folder (or on the phone if iCloud is off).
+  useEffect(() => {
+    if (!isIOSApp()) return;
+    void import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke<{ path: string; icloud: boolean } | null>('vault_default_location'))
+      .then(setIosLocation)
+      .catch((e) => setError(String(e)));
+  }, []);
 
   useEffect(() => {
-    if (!isDesktopApp()) return;
+    if (!isDesktopApp() || isIOSApp()) return;
     void defaultNewVaultPath().then(setDefaultPath).catch(() => {});
     void Promise.all(
       getRecentVaults().map(async (path) => ({
@@ -68,6 +79,36 @@ export const DesktopWelcome = () => {
           <p className="text-sm" style={{ color: '#8a8a8a' }}>Choose where your notes live. You can change this later in Settings.</p>
         </div>
 
+        {isIOSApp() ? (
+          <div className="flex flex-col gap-3">
+            <button
+              className={card}
+              style={cardStyle}
+              disabled={!!busy || !iosLocation}
+              onClick={() => run('ios', async () => iosLocation?.path ?? null)}
+            >
+              <div className="flex items-start gap-4">
+                {iosLocation?.icloud === false ? (
+                  <HardDrive className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: ACCENT }} />
+                ) : (
+                  <Cloud className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: ACCENT }} />
+                )}
+                <div>
+                  <h2 className="text-base font-medium mb-1">
+                    {busy === 'ios' ? 'Opening…' : iosLocation?.icloud === false ? 'Keep notes on this iPhone' : 'Use my iCloud vault'}
+                  </h2>
+                  <p className="text-sm" style={{ color: '#8a8a8a', lineHeight: 1.55 }}>
+                    {!iosLocation
+                      ? 'Finding your iCloud Drive…'
+                      : iosLocation.icloud
+                        ? 'Your vault lives in iCloud Drive → Flow Notes → Flow Vault and syncs with Flow on your computer. Open that folder in the desktop app (Settings → Data & Sync → Switch vault) to use the same notes.'
+                        : "iCloud Drive isn't available, so notes stay on this iPhone. Turn on iCloud Drive in Settings to sync with your computer."}
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+        ) : (
         <div className="flex flex-col gap-3">
           <div className={card} style={cardStyle}>
             <div className="flex items-start gap-4">
@@ -131,6 +172,7 @@ export const DesktopWelcome = () => {
             </button>
           )}
         </div>
+        )}
 
         {error && (
           <p className="mt-4 text-sm px-4 py-3 rounded-lg" style={{ color: '#fca5a5', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>

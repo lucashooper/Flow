@@ -171,4 +171,84 @@ await test('a brand-new table survives a reload', async () => {
   assert.equal(s2.rows('learning_gaps').length, 1);
 });
 
+await test('rows are one file each under .flow/data', async () => {
+  const f = new MemoryVaultFS();
+  const st = await VaultStore.load(f, opts());
+  const c = createVaultClient(st, USER, CANONICAL_ATTACHMENT_PREFIX);
+  const { data } = await c.from('learning_cards').insert([{ user_id: USER.id, question: 'q1' }, { user_id: USER.id, question: 'q2' }]).select();
+  assert.ok(f.files.has(`.flow/data/learning_cards/${data[0].id}.json`));
+  assert.ok(f.files.has(`.flow/data/learning_cards/${data[1].id}.json`));
+  await c.from('learning_cards').update({ question: 'q1!' }).eq('id', data[0].id);
+  assert.equal(JSON.parse(f.files.get(`.flow/data/learning_cards/${data[0].id}.json`) as string).question, 'q1!');
+  await c.from('learning_cards').delete().eq('id', data[1].id);
+  assert.ok(!f.files.has(`.flow/data/learning_cards/${data[1].id}.json`));
+});
+
+await test('old single-file vaults are migrated', async () => {
+  const f = new MemoryVaultFS();
+  await f.writeText('.flow/vault.json', JSON.stringify({ app: 'Flow Notes', version: 1, tables: ['tasks', 'learning_gaps'] }));
+  await f.writeText('.flow/tasks.json', JSON.stringify([{ id: 't1', user_id: 'x', title: 'Old task', updated_at: '1' }]));
+  await f.writeText('.flow/learning_gaps.json', JSON.stringify([{ id: 'g1', user_id: 'x', passage: 'p', confusion: 'c', updated_at: '1' }]));
+  await f.writeText('.flow/dashboards.json', JSON.stringify([{ id: 'd1', user_id: 'x', name: 'Main', updated_at: '1' }]));
+  const st = await VaultStore.load(f, opts());
+  assert.equal(st.rows('tasks')[0].title, 'Old task');
+  assert.equal(st.rows('learning_gaps').length, 1);
+  assert.equal(st.rows('dashboards')[0].name, 'Main');
+  assert.ok(!f.files.has('.flow/tasks.json') && f.files.has('.flow/data/tasks/t1.json'));
+  assert.equal(JSON.parse(f.files.get('.flow/vault.json') as string).version, 2);
+  const again = await VaultStore.load(f, opts());
+  assert.equal(again.rows('tasks').length, 1);
+});
+
+await test('sync conflict copies: newest wins, older kept in .flow/conflicts', async () => {
+  const f = new MemoryVaultFS();
+  await VaultStore.load(f, opts());
+  await f.writeText('.flow/data/learning_cards/c1.json', JSON.stringify({ id: 'c1', question: 'older', updated_at: '2026-01-01' }));
+  await f.writeText('.flow/data/learning_cards/c1 2.json', JSON.stringify({ id: 'c1', question: 'newer', updated_at: '2026-02-01' }));
+  await f.writeText('Unsorted/Note.json', JSON.stringify({ kind: 'flow-note', id: 'n1', title: 'Note', content: 'old', updated_at: '1' }));
+  await f.writeText('Unsorted/Note 2.json', JSON.stringify({ kind: 'flow-note', id: 'n1', title: 'Note', content: 'new', updated_at: '2' }));
+  const st = await VaultStore.load(f, opts());
+  assert.equal(st.rows('learning_cards').length, 1);
+  assert.equal(st.rows('learning_cards')[0].question, 'newer');
+  assert.equal(JSON.parse(f.files.get('.flow/data/learning_cards/c1.json') as string).question, 'newer');
+  assert.ok(!f.files.has('.flow/data/learning_cards/c1 2.json'));
+  assert.equal(st.rows('notes').length, 1);
+  assert.equal(st.rows('notes')[0].content, 'new');
+  const conflicts = [...f.files.keys()].filter((k) => k.startsWith('.flow/conflicts/'));
+  assert.equal(conflicts.length, 2, 'both older copies kept');
+  assert.ok(conflicts.some((k) => (f.files.get(k) as string).includes('older')));
+  assert.ok(conflicts.some((k) => (f.files.get(k) as string).includes('"old"')));
+});
+
+await test('refresh picks up edits, new files and deletions from another device', async () => {
+  const f = new MemoryVaultFS();
+  const st = await VaultStore.load(f, opts());
+  const c = createVaultClient(st, USER, CANONICAL_ATTACHMENT_PREFIX);
+  await c.from('notes').upsert({ id: 'n1', title: 'Mine', content: 'a', user_id: USER.id, created_at: '1', updated_at: '1' });
+  const { data: card } = await c.from('learning_cards').insert({ user_id: USER.id, question: 'q' }).select().single();
+  let ch = await st.refresh();
+  assert.equal(ch.notes.upserted.length + ch.notes.removedIds.length + ch.tables.size, 0, 'own writes are not changes');
+  const notePath = [...f.files.keys()].find((k) => k.endsWith('Mine.json'))!;
+  await f.writeText(notePath, JSON.stringify({ kind: 'flow-note', id: 'n1', title: 'Mine', content: 'edited on phone', updated_at: '9' }));
+  await f.writeText('Unsorted/Phone.json', JSON.stringify({ kind: 'flow-note', id: 'n2', title: 'Phone', content: 'x', updated_at: '9' }));
+  await f.writeText(`.flow/data/learning_cards/${card.id}.json`, JSON.stringify({ ...card, question: 'q from phone', updated_at: '9' }));
+  await f.writeText('.flow/data/learning_gaps/g9.json', JSON.stringify({ id: 'g9', passage: 'p', confusion: 'c', updated_at: '9' }));
+  ch = await st.refresh();
+  assert.deepEqual(ch.notes.upserted.map((n) => n.id).sort(), ['n1', 'n2']);
+  assert.equal(st.rows('notes').find((n) => n.id === 'n1')!.content, 'edited on phone');
+  assert.ok(ch.tables.has('learning_cards') && ch.tables.has('learning_gaps'));
+  assert.equal(st.rows('learning_cards')[0].question, 'q from phone');
+  await f.remove('Unsorted/Phone.json');
+  await f.remove(`.flow/data/learning_cards/${card.id}.json`);
+  ch = await st.refresh();
+  assert.deepEqual(ch.notes.removedIds, ['n2']);
+  assert.equal(st.rows('learning_cards').length, 0);
+  // a note renamed on the other device is moved, not deleted
+  await f.remove(notePath);
+  await f.writeText('Unsorted/Renamed.json', JSON.stringify({ kind: 'flow-note', id: 'n1', title: 'Renamed', content: 'r', updated_at: '99' }));
+  ch = await st.refresh();
+  assert.deepEqual(ch.notes.removedIds, []);
+  assert.equal(st.rows('notes').find((n) => n.id === 'n1')!.title, 'Renamed');
+});
+
 console.log(`\n${passed} tests passed`);
