@@ -1,3 +1,4 @@
+mod ai;
 mod vault;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,6 +17,10 @@ pub fn run() {
             vault::vault_remove,
             vault::vault_list_note_files,
             vault::vault_prune_empty_dirs,
+            ai::ai_key_status,
+            ai::ai_key_set,
+            ai::ai_key_remove,
+            ai::anthropic_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Flow Notes");

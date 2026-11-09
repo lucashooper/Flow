@@ -68,9 +68,11 @@ interface TiptapEditorProps {
   searchQuery?: string;
   noteTitle?: string;
   onEditorReady?: () => void;
+  /** Receives the editor instance (and null on unmount). */
+  onEditor?: (editor: Editor | null) => void;
 }
 
-export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle, onEditorReady }: TiptapEditorProps) => {
+export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingData, onDrawingChange, placeholder, searchQuery, noteTitle, onEditorReady, onEditor }: TiptapEditorProps) => {
   const { isPresenting: isFullscreen } = useFocusMode();
   const [showBubbleMenu, setShowBubbleMenu] = useState(false);
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -609,6 +611,13 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       setContextMenu(null);
     }
   }, [editor, isFullscreen]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    onEditor?.(editor);
+    return () => onEditor?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   // Images pasted natively as temporary blob: links get uploaded and saved
   useEffect(() => {

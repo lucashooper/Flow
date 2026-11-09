@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Link2 } from 'lucide-react';
+import { ExplainBackModal } from './ExplainBack';
 import { useLearning } from '../../contexts/LearningContext';
 import { LEARNING_STATUSES, linkedNoteIds, statusEmoji } from '../../lib/learning';
 import type { Note } from '../../types';
@@ -11,8 +12,21 @@ interface PanelProps {
 
 /** Status (🟥 / 🟨 / 🟩) and source line, under a concept note's title. */
 export function LearningNoteHeader({ note, onNoteUpdate }: PanelProps) {
+  const learning = useLearning();
   const [source, setSource] = useState(note.source ?? '');
+  const [explaining, setExplaining] = useState(false);
   useEffect(() => setSource(note.source ?? ''), [note.id, note.source]);
+  const attempts = (learning?.explanations ?? []).filter((e) => e.note_id === note.id).length;
+
+  // "Set status" from an Explain-it-back critique
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const { noteId, status } = (e as CustomEvent<{ noteId: string; status: Note['learning_status'] }>).detail;
+      if (noteId === note.id) void onNoteUpdate(note.id, { learning_status: status });
+    };
+    window.addEventListener('learning:setStatus', onSet);
+    return () => window.removeEventListener('learning:setStatus', onSet);
+  }, [note.id, onNoteUpdate]);
 
   const saveSource = () => {
     const next = source.trim() || null;
@@ -42,6 +56,16 @@ export function LearningNoteHeader({ note, onNoteUpdate }: PanelProps) {
           );
         })}
       </div>
+      <button
+        type="button"
+        onClick={() => setExplaining(true)}
+        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80"
+        style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+        title="Explain it back: write it for a 12-year-old and get critiqued"
+      >
+        🧑‍🏫 Explain it back{attempts > 0 && <span className="opacity-80">· {attempts}</span>}
+      </button>
+      {explaining && <ExplainBackModal note={note} onClose={() => setExplaining(false)} />}
       <label className="flex items-center gap-1.5 flex-1 min-w-[200px]">
         <BookOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--muted)' }} />
         <input

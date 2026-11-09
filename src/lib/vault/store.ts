@@ -26,7 +26,11 @@ const MARKER_FILE = `${META_DIR}/vault.json`;
 const NOTE_FILE_KIND = 'flow-note';
 
 /** Tables the app uses besides notes. Unknown tables are created on demand. */
-const KNOWN_TABLES = ['dashboards', 'folders', 'tasks', 'cards', 'user_profiles', 'profiles', 'feedback'];
+const KNOWN_TABLES = [
+  'dashboards', 'folders', 'tasks', 'cards', 'user_profiles', 'profiles', 'feedback',
+  // Learning space
+  'learning_gaps', 'learning_explanations', 'learning_cards',
+];
 
 /** Canonical (portable) URL prefix for vault attachments, stored in files. */
 export const CANONICAL_ATTACHMENT_PREFIX = 'flowvault://localhost/';
@@ -113,6 +117,8 @@ export function layoutNotes(notes: Row[], folders: Row[], dashboards: Row[]): Ma
 
 export class VaultStore {
   private tables = new Map<string, Row[]>();
+  /** Tables recorded in .flow/vault.json (read back on every launch). */
+  private listed = new Set<string>();
   /** Where each note currently lives on disk. */
   private notePaths = new Map<string, string>();
   private queue: Promise<unknown> = Promise.resolve();
@@ -176,6 +182,7 @@ export class VaultStore {
     }
 
     const tableNames = new Set([...KNOWN_TABLES, ...((marker?.tables as string[]) ?? [])]);
+    ((marker?.tables as string[]) ?? []).forEach((t) => store.listed.add(t));
     for (const name of tableNames) {
       const text = await fs.readText(`${META_DIR}/${name}.json`);
       const rows = text ? store.fromDisk<Row[]>(text) : [];
@@ -297,7 +304,7 @@ export class VaultStore {
    */
   commit(table: string, next: Row[], changedIds: Set<string>, deletedIds: Set<string>): Promise<void> {
     const run = async () => {
-      const isNew = !this.tables.has(table);
+      const isNew = table !== 'notes' && !this.listed.has(table);
       this.tables.set(table, next);
       if (table === 'notes') {
         for (const id of deletedIds) {
@@ -335,7 +342,8 @@ export class VaultStore {
   // ------------------------------------------------------------ persistence
 
   private async writeMarker() {
-    const tables = [...this.tables.keys()].filter((t) => t !== 'notes');
+    const tables = [...new Set([...this.listed, ...this.tables.keys()])].filter((t) => t !== 'notes');
+    tables.forEach((t) => this.listed.add(t));
     await this.fs.writeText(
       MARKER_FILE,
       JSON.stringify({ app: 'Flow Notes', version: VAULT_FORMAT_VERSION, tables }, null, 2),

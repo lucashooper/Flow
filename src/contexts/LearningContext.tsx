@@ -3,10 +3,11 @@ import { db } from '../lib/db';
 import { escapeHtml, isLearningDashboard, setLearningBridge } from '../lib/learning';
 import { isVaultMode } from '../lib/platform';
 import { supabase } from '../lib/supabase';
-import type { Dashboard, LearningGap, Note } from '../types';
+import type { Dashboard, LearningExplanation, LearningGap, Note } from '../types';
 import { useAuth } from './AuthContext';
 
 const GAPS_TABLE = 'learning_gaps';
+const EXPLANATIONS_TABLE = 'learning_explanations';
 
 export interface NewGap {
   passage: string;
@@ -37,6 +38,12 @@ interface LearningContextValue {
   setCaptureOpen: (open: boolean) => void;
   inboxOpen: boolean;
   setInboxOpen: (open: boolean) => void;
+
+  // Explain it back
+  explanations: LearningExplanation[];
+  saveExplanation: (noteId: string, explanation: string, critique: unknown, model: string | null) => Promise<LearningExplanation | null>;
+  /** Add [[links]] to the end of an open note. */
+  appendLinks: (noteId: string, links: { id: string; title: string }[]) => void;
 }
 
 const LearningContext = createContext<LearningContextValue | null>(null);
@@ -80,6 +87,7 @@ export function LearningProvider({
   const [learningNotes, setLearningNotes] = useState<Note[]>([]);
   const [gaps, setGaps] = useState<LearningGap[]>([]);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [explanations, setExplanations] = useState<LearningExplanation[]>([]);
   const [inboxOpen, setInboxOpen] = useState(false);
 
   // Keep a fresh list of concept notes (for [[links]], backlinks and titles).
@@ -163,6 +171,37 @@ export function LearningProvider({
       .then(({ data }) => setGaps((data as LearningGap[]) ?? []));
   }, [enabled, user?.id]);
 
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
+    void supabase
+      .from(EXPLANATIONS_TABLE)
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setExplanations((data as LearningExplanation[]) ?? []));
+  }, [enabled, user?.id]);
+
+  const saveExplanation = useCallback(
+    async (noteId: string, explanation: string, critique: unknown, model: string | null) => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from(EXPLANATIONS_TABLE)
+        .insert({ user_id: user.id, note_id: noteId, explanation, critique, model })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error('Could not save explanation', error);
+        return null;
+      }
+      setExplanations((prev) => [data as LearningExplanation, ...prev]);
+      return data as LearningExplanation;
+    },
+    [user?.id],
+  );
+
+  const appendLinks = useCallback((noteId: string, links: { id: string; title: string }[]) => {
+    window.dispatchEvent(new CustomEvent('learning:appendLinks', { detail: { noteId, links } }));
+  }, []);
+
   const addGap = useCallback(
     async (gap: NewGap) => {
       if (!user?.id) return false;
@@ -244,6 +283,9 @@ export function LearningProvider({
     setCaptureOpen,
     inboxOpen,
     setInboxOpen,
+    explanations,
+    saveExplanation,
+    appendLinks,
   };
 
   return <LearningContext.Provider value={value}>{children}</LearningContext.Provider>;

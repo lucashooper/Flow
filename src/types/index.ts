@@ -19,6 +19,19 @@ export interface Note {
 
 export type LearningStatus = 'fuzzy' | 'getting' | 'clear';
 
+/** One "Explain it back" attempt and Claude's critique of it. */
+export interface LearningExplanation {
+  id: string;
+  user_id: string;
+  note_id: string;
+  explanation: string;
+  /** Critique JSON (see src/lib/ai/explainBack.ts) */
+  critique: unknown;
+  model: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** A captured "explanatory gap": something I read and didn't understand yet. */
 export interface LearningGap {
   id: string;

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ApiKeyForm } from './learning/ExplainBack';
 import { Download, ExternalLink, FolderOpen, HardDrive, Loader2, MonitorDown, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ALL_RELEASES_URL, detectDesktopOS, DESKTOP_DOWNLOADS } from '../lib/downloads';
@@ -71,6 +72,7 @@ export function StorageSettings() {
           To keep computers in sync automatically, put the vault inside iCloud Drive, Dropbox, OneDrive or Google Drive.
           Each note is its own file, and the folder is your backup.
         </div>
+        <AiKeySettings />
         {error && <p className="text-sm mt-3" style={{ color: '#f87171' }}>{error}</p>}
       </div>
     );
@@ -187,6 +189,53 @@ export function StorageSettings() {
       {busy && progress && <p className="text-sm mt-3" style={{ color: 'var(--muted)' }}>{progressText(progress)}</p>}
       {message && <p className="text-sm mt-3" style={{ color: '#4ade80' }}>{message}</p>}
       {error && <p className="text-sm mt-3" style={{ color: '#f87171' }}>{error}</p>}
+    </div>
+  );
+}
+
+/** Anthropic API key for the Learning features — kept in the OS keychain. */
+function AiKeySettings() {
+  const [status, setStatus] = useState<boolean | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const refresh = () =>
+    import('../lib/ai/claude').then(({ hasApiKey }) => hasApiKey()).then(setStatus).catch(() => setStatus(false));
+  useEffect(() => {
+    void refresh();
+  }, []);
+  if (status === null) return null;
+
+  return (
+    <div className="mt-4 text-sm rounded-lg p-4" style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--muted)' }}>
+      <p className="font-medium mb-1" style={{ color: 'var(--text)' }}>🧑‍🏫 Claude for the Learning space</p>
+      {status && !replacing ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>Your Anthropic API key is saved in your system keychain (not in the vault).</span>
+          <span className="flex gap-2">
+            <button type="button" onClick={() => setReplacing(true)} className="px-3 py-1 rounded-lg text-xs" style={{ backgroundColor: 'var(--bg-elev)', color: 'var(--text)' }}>
+              Replace
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { removeApiKey } = await import('../lib/ai/claude');
+                await removeApiKey();
+                void refresh();
+              }}
+              className="px-3 py-1 rounded-lg text-xs"
+              style={{ backgroundColor: 'var(--bg-elev)', color: '#f87171' }}
+            >
+              Remove
+            </button>
+          </span>
+        </div>
+      ) : (
+        <ApiKeyForm
+          onSaved={() => {
+            setReplacing(false);
+            void refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

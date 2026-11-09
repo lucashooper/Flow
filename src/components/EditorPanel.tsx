@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import type { Note } from '../types';
+import type { Editor } from '@tiptap/react';
 import { TiptapEditor } from './TiptapEditor';
 import { NoteSaveStatus } from './NoteSaveStatus';
 import { BacklinksPanel, LearningNoteHeader } from './learning/LearningNotePanels';
@@ -28,6 +29,24 @@ interface EditorPanelProps {
 export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProps) => {
   const { isPresenting } = useFocusMode();
   const isConcept = useIsConceptNote(note);
+  const editorInstanceRef = useRef<Editor | null>(null);
+
+  // "Explain it back" suggestions: add [[links]] to the end of this note.
+  useEffect(() => {
+    const onAppend = (e: Event) => {
+      const { noteId, links } = (e as CustomEvent<{ noteId: string; links: { id: string; title: string }[] }>).detail;
+      const editor = editorInstanceRef.current;
+      if (!note || noteId !== note.id || !editor || editor.isDestroyed || !links.length) return;
+      const content: { type: string; text?: string; attrs?: Record<string, string> }[] = [{ type: 'text', text: '🔗 ' }];
+      links.forEach((l, i) => {
+        if (i > 0) content.push({ type: 'text', text: ' · ' });
+        content.push({ type: 'wikiLink', attrs: { id: l.id, title: l.title } });
+      });
+      editor.commands.insertContentAt(editor.state.doc.content.size, { type: 'paragraph', content });
+    };
+    window.addEventListener('learning:appendLinks', onAppend);
+    return () => window.removeEventListener('learning:appendLinks', onAppend);
+  }, [note]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
@@ -414,6 +433,9 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             noteTitle={title}
             onDrawingChange={handleDrawingChange}
             onEditorReady={handleEditorReady}
+            onEditor={(ed) => {
+              editorInstanceRef.current = ed;
+            }}
             placeholder="Start writing..."
             searchQuery={searchQuery}
           />

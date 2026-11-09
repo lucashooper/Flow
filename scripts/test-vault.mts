@@ -159,4 +159,16 @@ await test('layout: note in dashboard root and unknown dashboard', async () => {
   assert.equal(m.get('a'), 'Unsorted/T.json'); assert.equal(m.get('b'), 'D/T.json');
 });
 
+await test('a brand-new table survives a reload', async () => {
+  const nfs = new MemoryVaultFS();
+  const s1 = await VaultStore.load(nfs, opts());
+  const c1 = createVaultClient(s1, USER, CANONICAL_ATTACHMENT_PREFIX);
+  await c1.from('some_new_table').select('*'); // a read first must not hide it
+  await c1.from('some_new_table').insert({ user_id: USER.id, x: 1 });
+  await c1.from('learning_gaps').insert({ user_id: USER.id, passage: 'p', confusion: 'c' });
+  const s2 = await VaultStore.load(nfs, opts());
+  assert.equal(s2.rows('some_new_table').length, 1);
+  assert.equal(s2.rows('learning_gaps').length, 1);
+});
+
 console.log(`\n${passed} tests passed`);
