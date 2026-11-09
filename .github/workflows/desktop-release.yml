@@ -91,7 +91,8 @@ jobs:
           set -euo pipefail
           mkdir -p out
           shopt -s nullglob
-          copy_sig() { for f in $1.sig; do cp "$f" "$2.sig"; done; }
+          # File names contain spaces ("Flow Notes_0.4.0_…"), so quote everything.
+          copy_sig() { if [ -f "$1.sig" ]; then cp "$1.sig" "$2.sig"; fi; }
           case "${{ runner.os }}" in
             macOS)
               B=src-tauri/target/universal-apple-darwin/release/bundle
