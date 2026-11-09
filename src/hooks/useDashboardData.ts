@@ -539,6 +539,63 @@ export const useDashboardData = () => {
     fetchDashboards();
   };
 
+  /**
+   * Create a note with fields filled in (title, content, learning fields…) in a
+   * given dashboard. Opens it unless `open: false`.
+   */
+  const createNoteWith = async (
+    dashboardId: string | null,
+    fields: Partial<Note>,
+    options: { open?: boolean } = {},
+  ): Promise<Note | null> => {
+    if (!user?.id) return null;
+    const created = await createNote(user.id, dashboardId, null);
+    await updateNote(created.id, fields);
+    const note = { ...created, ...fields } as Note;
+    if (dashboardId === activeDashboard?.id) {
+      setNotes(prev => (prev ? [note, ...prev] : [note]));
+    }
+    if (options.open !== false) handleNoteSelect(note.id);
+    return note;
+  };
+
+  // ==================== LEARNING SPACE ====================
+
+  const LAST_DASHBOARD_KEY = 'flow_last_non_learning_dashboard';
+
+  /** Switch to the 🧠 Learning dashboard, creating it the first time. */
+  const openLearningSpace = async (): Promise<Dashboard | null> => {
+    let learning = dashboards.find(d => d.kind === 'learning') ?? null;
+    if (!learning) {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('dashboards')
+        .insert({ user_id: user.id, name: 'Learning', emoji: '🧠', kind: 'learning', is_active: false })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error('Could not create Learning space', error);
+        return null;
+      }
+      learning = data as Dashboard;
+      setDashboards(prev => [...prev, learning!]);
+    }
+    if (activeDashboard && activeDashboard.kind !== 'learning') {
+      localStorage.setItem(LAST_DASHBOARD_KEY, activeDashboard.id);
+    }
+    await handleDashboardChange(learning);
+    return learning;
+  };
+
+  /** Go back to the dashboard used before entering the Learning space. */
+  const leaveLearningSpace = async () => {
+    const lastId = localStorage.getItem(LAST_DASHBOARD_KEY);
+    const target =
+      dashboards.find(d => d.id === lastId && d.kind !== 'learning') ??
+      dashboards.find(d => d.kind !== 'learning');
+    if (target) await handleDashboardChange(target);
+  };
+
   return {
     // State
     notes,
@@ -566,5 +623,8 @@ export const useDashboardData = () => {
     handleFolderDelete,
     handleDashboardChange,
     handleDashboardsUpdate,
+    createNoteWith,
+    openLearningSpace,
+    leaveLearningSpace,
   };
 };

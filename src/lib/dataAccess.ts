@@ -111,6 +111,9 @@ export async function updateNote(noteId: string, updates: Partial<Note>): Promis
     drawing_data: note.drawing_data,
     is_starred: note.is_starred,
     updated_at: note.updated_at,
+    // Learning fields (kept only in local vaults — see sanitizeNotePayload)
+    source: note.source ?? null,
+    learning_status: note.learning_status ?? null,
   }));
 }
 

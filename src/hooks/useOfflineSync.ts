@@ -17,9 +17,16 @@ export const useOfflineSync = () => {
   const { user } = useAuth();
   const isSyncing = useRef(false);
   const syncInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  /** A sync was requested while one was running: run again right after. */
+  const resyncRequested = useRef(false);
 
   const syncToServer = async () => {
-    if (!user?.id || !navigator.onLine || isSyncing.current || isOfflineMode()) return;
+    if (!user?.id || !navigator.onLine || isOfflineMode()) return;
+    if (isSyncing.current) {
+      resyncRequested.current = true;
+      return;
+    }
+    resyncRequested.current = false;
 
     isSyncing.current = true;
     window.dispatchEvent(new Event('syncStart'));
@@ -67,8 +74,21 @@ export const useOfflineSync = () => {
               await db.folders.update(item.entityId, { synced: true });
             }
             
-            // Remove from outbox
-            await db.outbox.delete(item.id);
+            // Remove from outbox — unless the note was edited while this upload was
+            // in flight. The entry then holds a newer payload; deleting it used to
+            // drop that edit. Check and delete atomically, then upload again.
+            const superseded = await db.transaction('rw', db.outbox, async () => {
+              const latest = await db.outbox.get(item.id);
+              if (latest && (latest.createdAt !== item.createdAt || JSON.stringify(latest.payload) !== JSON.stringify(item.payload))) {
+                return true;
+              }
+              await db.outbox.delete(item.id);
+              return false;
+            });
+            if (superseded) {
+              resyncRequested.current = true;
+              continue;
+            }
             console.log('✅ Synced', item.entityType, item.entityId);
           } else if (item.operation === 'delete') {
             const table = item.entityType === 'note' ? 'notes' : 'folders';
@@ -171,6 +191,8 @@ export const useOfflineSync = () => {
     } finally {
       isSyncing.current = false;
       window.dispatchEvent(new Event('syncEnd'));
+      // Edits queued during this sync would otherwise wait for the 60s timer.
+      if (resyncRequested.current) setTimeout(() => void syncToServer(), 0);
     }
   };
 

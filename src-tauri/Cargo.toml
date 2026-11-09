@@ -1,6 +1,6 @@
 [package]
 name = "flow-notes"
-version = "0.1.0"
+version = "0.2.0"
 description = "Flow Notes desktop app"
 authors = ["Flow Notes"]
 edition = "2021"

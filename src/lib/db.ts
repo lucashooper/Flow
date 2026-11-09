@@ -14,6 +14,8 @@ export interface Note {
   drawing_data: any | null;
   is_starred: boolean;
   position?: number;
+  source?: string | null;
+  learning_status?: 'fuzzy' | 'getting' | 'clear' | null;
   synced: boolean; // Track if synced to server
 }
 

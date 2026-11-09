@@ -1,4 +1,5 @@
 import { db } from './db';
+import { isVaultMode } from './platform';
 
 /** Fields the Supabase `folders` table accepts (position is local-only until migrated). */
 const FOLDER_SYNC_FIELDS = [
@@ -25,8 +26,11 @@ export function sanitizeFolderPayload(payload: Record<string, unknown>): Record<
   return pickFields(payload, FOLDER_SYNC_FIELDS);
 }
 
+/** Learning fields live only in local vaults for now (Flow Cloud has no columns for them). */
+const VAULT_NOTE_EXTRA_FIELDS = ['source', 'learning_status'] as const;
+
 export function sanitizeNotePayload(payload: Record<string, unknown>): Record<string, unknown> {
-  return pickFields(payload, NOTE_SYNC_FIELDS);
+  return pickFields(payload, isVaultMode() ? [...NOTE_SYNC_FIELDS, ...VAULT_NOTE_EXTRA_FIELDS] : NOTE_SYNC_FIELDS);
 }
 
 export function sanitizeSyncPayload(

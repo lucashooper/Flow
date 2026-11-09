@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react
 import type { Note } from '../types';
 import { TiptapEditor } from './TiptapEditor';
 import { NoteSaveStatus } from './NoteSaveStatus';
+import { BacklinksPanel, LearningNoteHeader } from './learning/LearningNotePanels';
+import { useIsConceptNote } from '../contexts/LearningContext';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { getNote } from '../lib/dataAccess';
 import { getEditorContentMaxWidth } from '../utils/editorLayout';
@@ -25,6 +27,7 @@ interface EditorPanelProps {
 
 export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProps) => {
   const { isPresenting } = useFocusMode();
+  const isConcept = useIsConceptNote(note);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [drawingData, setDrawingData] = useState<string>('');
@@ -386,6 +389,7 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             style={{ color: 'var(--text)', lineHeight: '1.2', padding: 0 }}
           />
           <NoteSaveStatus noteId={note.id} restoredFromDraft={restoredFromDraft} />
+          {isConcept && !isPresenting && <LearningNoteHeader note={note} onNoteUpdate={onNoteUpdate} />}
         </div>
       </div>
 
@@ -413,6 +417,11 @@ export const EditorPanel = ({ note, onNoteUpdate, searchQuery }: EditorPanelProp
             placeholder="Start writing..."
             searchQuery={searchQuery}
           />
+        )}
+        {isConcept && !isPresenting && contentReady && (
+          <div className="px-8" style={{ maxWidth: `${editorMaxWidth}px`, margin: '0 auto' }}>
+            <BacklinksPanel note={note} />
+          </div>
         )}
       </div>
     </div>

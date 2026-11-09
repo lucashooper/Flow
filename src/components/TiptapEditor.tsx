@@ -15,6 +15,7 @@ import { ResizableImage } from '../extensions/ResizableImage.tsx';
 import { ResizableVideo } from '../extensions/ResizableVideo.tsx';
 import { FontSize } from '../extensions/FontSize';
 import { ImagePaste } from '../extensions/ImagePaste';
+import { WikiLink } from '../extensions/WikiLink';
 import { ColoredBold } from '../extensions/ColoredBold';
 // import { QuoteMark } from '../extensions/QuoteMark'; // Disabled - causing glitching bug
 import { DrawingNode } from '../extensions/DrawingNode';
@@ -238,6 +239,7 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       ImagePaste.configure({
         uploadImage,
       }),
+      WikiLink,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {

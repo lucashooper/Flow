@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderPlus, Search, Star, CheckCircle, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Plus, FolderPlus, Search, Star, CheckCircle, Calendar as CalendarIcon, X, Brain, Inbox } from 'lucide-react';
+import { useLearning } from '../contexts/LearningContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {} from '@dnd-kit/core';
@@ -53,6 +54,8 @@ export const Sidebar = ({
   isMobile = false,
 }: SidebarProps) => {
   const navigate = useNavigate();
+  const learning = useLearning();
+  const inboxCount = learning?.gaps.filter((g) => !g.concept_note_id).length ?? 0;
   const { userProfile, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
@@ -486,6 +489,15 @@ export const Sidebar = ({
             >
               <CalendarIcon className="w-4 h-4 text-[#888888] transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.color = '#888888'} />
             </button>
+            {learning?.enabled && (
+              <button
+                onClick={() => void (learning.isActive ? learning.leaveSpace() : learning.openSpace())}
+                className={`p-1.5 rounded transition-colors ${learning.isActive ? 'bg-[#1f1f1f]' : 'hover:bg-[#252525]'}`}
+                title={learning.isActive ? 'Leave the Learning space' : '🧠 Learning space'}
+              >
+                <Brain className="w-4 h-4" style={{ color: learning.isActive ? 'var(--accent)' : '#888888' }} />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {isMobile && onCloseMobile && (
@@ -534,6 +546,32 @@ export const Sidebar = ({
             className="w-full pl-10 pr-3 py-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-sm text-[#e5e5e5] placeholder-[#888888] focus:outline-none focus:border-[#A0522D]"
           />
         </div>
+
+        {learning?.isActive && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <button
+              onClick={() => learning.setCaptureOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium hover:bg-[#252525] transition-colors"
+              style={{ border: '1px solid #2a2a2a', color: '#e5e5e5' }}
+              title="Capture a gap (Ctrl/⌘ + Shift + G)"
+            >
+              🕳️ ＋ Gap
+            </button>
+            <button
+              onClick={() => learning.setInboxOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium hover:bg-[#252525] transition-colors"
+              style={{ border: '1px solid #2a2a2a', color: '#e5e5e5' }}
+              title="Gap inbox"
+            >
+              <Inbox className="w-3.5 h-3.5" /> Inbox
+              {inboxCount > 0 && (
+                <span className="px-1.5 rounded-full text-[10px]" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
+                  {inboxCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Notes and Folders List */}

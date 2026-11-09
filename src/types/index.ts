@@ -11,6 +11,25 @@ export interface Note {
   position?: number;
   created_at: string;
   updated_at: string;
+  /** Learning space: where the idea comes from, e.g. "Gödel, Escher, Bach p. 42" */
+  source?: string | null;
+  /** Learning space: how well I understand it */
+  learning_status?: LearningStatus | null;
+}
+
+export type LearningStatus = 'fuzzy' | 'getting' | 'clear';
+
+/** A captured "explanatory gap": something I read and didn't understand yet. */
+export interface LearningGap {
+  id: string;
+  user_id: string;
+  passage: string;
+  source: string | null;
+  confusion: string;
+  /** Set once the gap has been turned into a concept note */
+  concept_note_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Folder {
@@ -35,6 +54,8 @@ export interface Dashboard {
   cover_image: string | null;
   is_active: boolean;
   parent_id: string | null; // For nested dashboards (dashboard groups)
+  /** 'learning' marks the 🧠 Learning space (local vaults only for now) */
+  kind?: 'learning' | null;
   position?: number; // For custom drag-and-drop ordering
   created_at: string;
   updated_at: string;

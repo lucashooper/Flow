@@ -424,3 +424,21 @@ body { background-color: var(--bg-panel) !important; }
   font-size: 1.05em;
   color: inherit;
 }
+
+/* 🧠 Learning space: [[wikilink]] chips */
+.ProseMirror .wikilink,
+.wikilink {
+  display: inline;
+  padding: 0 0.3em;
+  border-radius: 0.35em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ProseMirror .wikilink::before { content: '[['; opacity: 0.35; font-weight: 400; }
+.ProseMirror .wikilink::after { content: ']]'; opacity: 0.35; font-weight: 400; }
+.ProseMirror .wikilink:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.ProseMirror .wikilink.ProseMirror-selectednode { outline: 1px solid var(--accent); }

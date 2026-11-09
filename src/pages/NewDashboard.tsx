@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { LearningProvider } from '../contexts/LearningContext';
+import { GapCaptureModal, GapInboxModal } from '../components/learning/GapModals';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
@@ -106,6 +108,9 @@ export const NewDashboard = () => {
     handleFolderDelete,
     handleDashboardChange,
     handleDashboardsUpdate,
+    createNoteWith,
+    openLearningSpace,
+    leaveLearningSpace,
   } = useDashboardData();
 
   const handleNoteSelectWithFocus = (noteId: string) => {
@@ -384,6 +389,15 @@ export const NewDashboard = () => {
           ) : null}
         </DragOverlay>
 
+        <LearningProvider
+          dashboards={dashboards}
+          activeDashboard={activeDashboard}
+          notes={notes}
+          openNote={handleNoteSelectWithFocus}
+          createNoteWith={createNoteWith}
+          openLearningSpace={openLearningSpace}
+          leaveLearningSpace={leaveLearningSpace}
+        >
         <AppLayout
           notes={notes || []}
           folders={folders}
@@ -433,6 +447,9 @@ export const NewDashboard = () => {
             />
           </WorkspaceProvider>
         </AppLayout>
+        <GapCaptureModal />
+        <GapInboxModal />
+        </LearningProvider>
       </DndContext>
 
     {/* Simple floating timer for dashboard */}

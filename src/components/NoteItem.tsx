@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { statusEmoji } from '../lib/learning';
 import { Trash2, Edit3, Smile, Star, EyeOff, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Note } from '../types';
@@ -241,6 +242,9 @@ export const NoteItem = ({ note, depth, isSelected, onSelect, onUpdate, onDelete
                   <div className="text-sm truncate font-medium" style={{ color: 'var(--text)' }} data-debug="title">
                     {note.title}
                   </div>
+                  {statusEmoji(note.learning_status) && (
+                    <span className="text-[10px] flex-shrink-0" title="Understanding">{statusEmoji(note.learning_status)}</span>
+                  )}
                   {(note.is_starred ?? false) && (
                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
                   )}
