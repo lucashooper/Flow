@@ -79,11 +79,11 @@ export const Login = () => {
         {/* Flow Logo */}
         <div className="flex flex-col items-center mb-10 select-none" style={{ cursor: 'default' }}>
           <img 
-            src="/FlowIcon-Main.png" 
+            src="/FlowIcon-App.png" 
             alt="Flow" 
             className="w-16 h-16 mb-6 select-none"
             style={{
-              filter: 'drop-shadow(0 4px 12px rgba(79, 195, 247, 0.3))',
+              filter: 'drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45))',
               cursor: 'default',
               userSelect: 'none'
             }}

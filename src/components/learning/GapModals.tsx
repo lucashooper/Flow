@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Inbox, Trash2, X } from 'lucide-react';
 import { useLearning } from '../../contexts/LearningContext';
 
+import { VoiceButton } from '../VoiceButton';
+
 const LAST_SOURCE_KEY = 'flow_last_gap_source';
 
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
@@ -105,6 +107,8 @@ export function GapCaptureModal() {
           <span className="text-xs" style={{ color: 'var(--muted)' }}>
             Ctrl/⌘ + Enter to save · Ctrl/⌘ + Shift + G to open from anywhere
           </span>
+          <span className="flex items-center gap-2">
+          <VoiceButton getTarget={() => document.querySelector<HTMLInputElement>('input[placeholder^="❓"]')} />
           <button
             type="button"
             disabled={!canSave}
@@ -114,6 +118,7 @@ export function GapCaptureModal() {
           >
             Save to inbox
           </button>
+          </span>
         </div>
       </div>
     </Overlay>

@@ -9,7 +9,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/FlowIcon-Main.png",
+      "src": "/FlowIcon-App.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

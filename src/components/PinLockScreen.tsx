@@ -110,7 +110,7 @@ export const PinLockScreen = ({ pinHash, onUnlock }: PinLockScreenProps) => {
         className="mb-8"
       >
         <img
-          src="/FlowIcon-Main.png"
+          src="/FlowIcon-App.png"
           alt="Flow"
           className="w-20 h-20 object-contain"
         />

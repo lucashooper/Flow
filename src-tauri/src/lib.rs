@@ -1,6 +1,7 @@
 mod ai;
 mod location;
 mod vault;
+mod voice;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -32,6 +33,7 @@ pub fn run() {
             ai::ai_key_set,
             ai::ai_key_remove,
             ai::anthropic_fetch,
+            voice::start_dictation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Flow Notes");

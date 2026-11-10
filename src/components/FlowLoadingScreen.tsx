@@ -11,7 +11,7 @@ export function FlowLoadingScreen({
       style={{ backgroundColor: '#121212' }}
     >
       <img
-        src="/FlowIcon-Main.png"
+        src="/FlowIcon-App.png"
         alt="Flow Notes"
         className="mb-6 h-14 w-14 rounded-2xl shadow-lg"
         style={{ boxShadow: '0 8px 32px rgba(160, 82, 45, 0.25)' }}

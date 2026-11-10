@@ -74,7 +74,7 @@ export const DesktopWelcome = () => {
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ backgroundColor: '#0a0a0a', color: '#e5e5e5' }}>
       <div className="w-full max-w-lg">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src="/FlowIcon-Main.png" alt="" className="w-14 h-14 mb-4" style={{ filter: 'drop-shadow(0 2px 12px rgba(79,195,247,0.35))' }} />
+          <img src="/FlowIcon-App.png" alt="" className="w-14 h-14 mb-4" style={{ filter: 'drop-shadow(0 6px 20px rgba(0, 0, 0, 0.5))' }} />
           <h1 className="text-3xl font-light mb-2" style={{ letterSpacing: '-0.02em' }}>Welcome to Flow</h1>
           <p className="text-sm" style={{ color: '#8a8a8a' }}>Choose where your notes live. You can change this later in Settings.</p>
         </div>

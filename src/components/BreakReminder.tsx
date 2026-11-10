@@ -24,7 +24,7 @@ export const BreakReminder = ({ enabled, intervalMinutes = 50 }: BreakReminderPr
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Time for a break! ☕', {
             body: `You've been working for ${intervalMinutes} minutes. Take a short break to stay fresh.`,
-            icon: '/FlowIcon-Main.png',
+            icon: '/FlowIcon-App.png',
             tag: 'break-reminder',
           });
         }

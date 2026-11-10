@@ -185,7 +185,7 @@ export const CardViewer = ({ card, isOpen, onClose }: CardViewerProps) => {
               {/* Flow Logo Watermark */}
               <div className="flex justify-between items-start">
                 <img 
-                  src="/FlowIcon-Main.png" 
+                  src="/FlowIcon-App.png" 
                   alt="Flow" 
                   className="w-8 h-8 md:w-10 md:h-10 opacity-60"
                 />

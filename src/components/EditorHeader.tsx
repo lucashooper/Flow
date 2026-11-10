@@ -1,4 +1,5 @@
 import { Minimize2, Maximize2, SunDim, Pencil, Timer, Menu, MoreVertical, FileText, CreditCard, CheckCircle, Volume2, TrendingUp, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { VoiceButton } from './VoiceButton';
 import { SyncStatus } from './SyncStatus';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useState, useEffect, useCallback } from 'react';
@@ -218,6 +219,7 @@ export const EditorHeader = ({
               {syncIndicatorEnabled && (
                 <SyncStatus />
               )}
+              <VoiceButton variant="icon" getTarget={() => document.querySelector<HTMLElement>('.ProseMirror[contenteditable="true"]')} />
               <button
                 onClick={() => setIsTimerVisible(!isTimerVisible)}
                 className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"

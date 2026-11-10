@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, History, KeyRound, Loader2, X } from 'lucide-react';
 import { useLearning } from '../../contexts/LearningContext';
 import { describeAiError, hasApiKey, saveApiKey } from '../../lib/ai/claude';
+import { VoiceButton } from '../VoiceButton';
 import { critiqueExplanation, type Critique } from '../../lib/ai/explainBack';
 import { escapeHtml, LEARNING_STATUSES, linkedNoteIds } from '../../lib/learning';
 import type { LearningExplanation, Note } from '../../types';
@@ -380,8 +381,10 @@ export function ExplainBackModal({ note, onClose }: { note: Note; onClose: () =>
             {error && <p className="text-sm mt-2" style={{ color: '#f87171' }}>{error}</p>}
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                {busy ? 'Claude is reading your explanation… this can take up to a minute.' : 'Ctrl/⌘ + Enter to submit · your draft is kept if you close this'}
+                {busy ? 'Claude is reading your explanation… this can take up to a minute.' : 'Ctrl/⌘ + Enter to submit · 🎤 Speak to say it out loud'}
               </span>
+              <span className="flex items-center gap-2">
+              <VoiceButton getTarget={() => textRef.current} />
               <button
                 type="button"
                 disabled={!text.trim() || busy || keyReady === false}
@@ -391,6 +394,7 @@ export function ExplainBackModal({ note, onClose }: { note: Note; onClose: () =>
               >
                 {busy && <Loader2 className="w-4 h-4 animate-spin" />} Get critique
               </button>
+              </span>
             </div>
           </>
         )}

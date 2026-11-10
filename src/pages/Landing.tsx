@@ -56,10 +56,10 @@ export const Landing = ({ scrollTo }: { scrollTo?: string } = {}) => {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img 
-              src="/FlowIcon-Main.png" 
+              src="/FlowIcon-App.png" 
               alt="Flow" 
               className="w-8 h-8"
-              style={{ filter: 'drop-shadow(0 2px 8px rgba(79, 195, 247, 0.3))' }}
+              style={{ filter: 'drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45))' }}
             />
             <span className="text-xl font-semibold" style={{ color: '#e5e5e5' }}>Flow</span>
           </div>
