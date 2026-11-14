@@ -111,7 +111,17 @@ jobs:
           [ "${{ runner.os }}" = "macOS" ] && [ -z "$MAC_SIGNED" ] && echo "::warning::Mac app is not Developer ID signed (add APPLE_CERTIFICATE etc.): macOS will block it until opened via Privacy & Security"
           echo "Extra config: $EXTRA"
           if ! npx tauri build ${{ matrix.args }} --config "$EXTRA"; then
-            if [ -n "${APPLE_CERTIFICATE:-}" ]; then
+            if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -z "${UPDATER_FALLBACK:-}" ]; then
+              # Usually a wrong/missing TAURI_SIGNING_PRIVATE_KEY_PASSWORD. Ship the installers anyway.
+              echo "::error::Signing the update files failed (check TAURI_SIGNING_PRIVATE_KEY_PASSWORD matches the key's password). Publishing installers without auto-update files."
+              UPDATER_FALLBACK=1
+              EXTRA=$(node -e "const c=JSON.parse(process.argv[1]); (c.bundle ??= {}).createUpdaterArtifacts=false; process.stdout.write(JSON.stringify(c))" "$EXTRA")
+              if ! npx tauri build ${{ matrix.args }} --config "$EXTRA"; then
+                [ -z "${APPLE_CERTIFICATE:-}" ] && exit 1
+                unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY
+                npx tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+              fi
+            elif [ -n "${APPLE_CERTIFICATE:-}" ]; then
               # Don't let a signing problem block the whole release: build unsigned and warn.
               echo "::error::Developer ID signing failed (check APPLE_CERTIFICATE is a base64 .p12 WITH its private key, and APPLE_CERTIFICATE_PASSWORD matches). Publishing an unsigned Mac build instead."
               unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY
