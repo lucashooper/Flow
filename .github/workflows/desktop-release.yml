@@ -103,7 +103,7 @@ jobs:
           [ "${{ runner.os }}" = "macOS" ] && [ -z "$MAC_SIGNED" ] && echo "::warning::Mac app is not Developer ID signed (add APPLE_CERTIFICATE etc.): macOS will block it until opened via Privacy & Security"
           echo "Extra config: $EXTRA"
           if ! npx tauri build ${{ matrix.args }} --config "$EXTRA"; then
-            if [ -n "$MAC_SIGNED" ]; then
+            if [ -n "$APPLE_CERTIFICATE" ]; then
               # Don't let a signing problem block the whole release: build unsigned and warn.
               echo "::error::Developer ID signing failed (check APPLE_CERTIFICATE is a base64 .p12 WITH its private key, and APPLE_CERTIFICATE_PASSWORD matches). Publishing an unsigned Mac build instead."
               unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY
