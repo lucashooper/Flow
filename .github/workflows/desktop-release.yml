@@ -102,7 +102,17 @@ jobs:
           [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: building without auto-update files"
           [ "${{ runner.os }}" = "macOS" ] && [ -z "$MAC_SIGNED" ] && echo "::warning::Mac app is not Developer ID signed (add APPLE_CERTIFICATE etc.): macOS will block it until opened via Privacy & Security"
           echo "Extra config: $EXTRA"
-          npx tauri build ${{ matrix.args }} --config "$EXTRA"
+          if ! npx tauri build ${{ matrix.args }} --config "$EXTRA"; then
+            if [ -n "$MAC_SIGNED" ]; then
+              # Don't let a signing problem block the whole release: build unsigned and warn.
+              echo "::error::Developer ID signing failed (check APPLE_CERTIFICATE is a base64 .p12 WITH its private key, and APPLE_CERTIFICATE_PASSWORD matches). Publishing an unsigned Mac build instead."
+              unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY
+              EXTRA=$(node -e "const c={}; if (!process.env.TAURI_SIGNING_PRIVATE_KEY) c.bundle={createUpdaterArtifacts:false}; process.stdout.write(JSON.stringify(c))")
+              npx tauri build ${{ matrix.args }} --config "$EXTRA"
+            else
+              exit 1
+            fi
+          fi
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
