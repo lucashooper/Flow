@@ -9,6 +9,10 @@
 # Optional repository secrets (Settings → Secrets and variables → Actions):
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — enable "Sign in to Flow Cloud"
 #   in the desktop app. Without them the app works with local vaults only.
+#   APPLE_CERTIFICATE (base64 Developer ID Application .p12), APPLE_CERTIFICATE_PASSWORD,
+#   APPLE_SIGNING_IDENTITY ("Developer ID Application: Name (TEAMID)"), plus
+#   APPLE_API_KEY_ID / APPLE_API_ISSUER / APPLE_API_KEY_P8 — sign and notarize the
+#   Mac app so macOS opens it without a security warning.
 #   TAURI_SIGNING_PRIVATE_KEY — signs updates so installed apps can update
 #   themselves (the public key is in src-tauri/tauri.conf.json). Without it,
 #   installers are still built but no update is published.
@@ -46,6 +50,8 @@ jobs:
             rust_targets: ''
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    env:
+      HAS_MAC_CERT: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,20 +76,44 @@ jobs:
 
       - run: npm ci
 
+      - name: Set up Mac signing + notarization (when the secrets exist)
+        if: runner.os == 'macOS' && env.HAS_MAC_CERT == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          printf '%s\n' "$APPLE_API_KEY_P8" > ~/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          echo "APPLE_API_KEY_PATH=$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" >> "$GITHUB_ENV"
+          echo "MAC_SIGNED=1" >> "$GITHUB_ENV"
+
       - name: Build app
         shell: bash
         run: |
-          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            npx tauri build ${{ matrix.args }}
-          else
-            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: building without auto-update files"
-            npx tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
-          fi
+          # Extra config: skip updater files without the signing key; on Mac,
+          # sign with the Developer ID instead of ad-hoc when it's available.
+          EXTRA=$(node -e "
+            const c = {};
+            if (!process.env.TAURI_SIGNING_PRIVATE_KEY) c.bundle = { createUpdaterArtifacts: false };
+            if (process.env.MAC_SIGNED) (c.bundle ??= {}).macOS = { signingIdentity: process.env.APPLE_SIGNING_IDENTITY };
+            process.stdout.write(JSON.stringify(c));
+          ")
+          [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: building without auto-update files"
+          [ "${{ runner.os }}" = "macOS" ] && [ -z "$MAC_SIGNED" ] && echo "::warning::Mac app is not Developer ID signed (add APPLE_CERTIFICATE etc.): macOS will block it until opened via Privacy & Security"
+          echo "Extra config: $EXTRA"
+          npx tauri build ${{ matrix.args }} --config "$EXTRA"
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          # Mac only: Developer ID certificate (base64 .p12) + notarization via the App Store Connect API key
+          APPLE_CERTIFICATE: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_API_ISSUER: ${{ runner.os == 'macOS' && env.MAC_SIGNED && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY: ${{ runner.os == 'macOS' && env.MAC_SIGNED && secrets.APPLE_API_KEY_ID || '' }}
 
       - name: Collect installers with stable names
         shell: bash
