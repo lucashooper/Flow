@@ -220,6 +220,7 @@ export const EditorHeader = ({
                 <SyncStatus />
               )}
               <VoiceButton variant="icon" getTarget={() => document.querySelector<HTMLElement>('.ProseMirror[contenteditable="true"]')} />
+              {pomodoroEnabled && (
               <button
                 onClick={() => setIsTimerVisible(!isTimerVisible)}
                 className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"
@@ -227,6 +228,7 @@ export const EditorHeader = ({
               >
                 <Timer className="w-5 h-5 text-[#888888]" />
               </button>
+              )}
               <button
                 onClick={() => setIsTasksVisible(!isTasksVisible)}
                 className="p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors"

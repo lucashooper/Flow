@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import EmojiPickerReact, { Theme } from 'emoji-picker-react';
+import EmojiPickerReact, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { motion } from 'framer-motion';
 
 interface EmojiPickerProps {
@@ -83,6 +83,9 @@ export const EmojiPicker = ({ position, onSelect, onClose }: EmojiPickerProps) =
           height={size.height}
           skinTonesDisabled
           previewConfig={{ showPreview: false }}
+          // System emoji font: shows instantly and offline (the default downloads
+          // every emoji as an image from a CDN, which made the picker slow to fill).
+          emojiStyle={EmojiStyle.NATIVE}
         />
         {/* Resize handle */}
         <div

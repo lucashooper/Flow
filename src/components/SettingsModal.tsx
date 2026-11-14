@@ -693,7 +693,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                             writePluginSetting('focusModeEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: focusModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: focusModeEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -714,7 +714,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                             writePluginSetting('fullscreenModeEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: fullscreenModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: fullscreenModeEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: fullscreenModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -732,10 +732,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !pomodoroEnabled;
                             setPomodoroEnabled(newValue);
-                            localStorage.setItem('pomodoroEnabled', JSON.stringify(newValue));
+                            writePluginSetting('pomodoroEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: pomodoroEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: pomodoroEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: pomodoroEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -753,10 +753,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !wordCountEnabled;
                             setWordCountEnabled(newValue);
-                            localStorage.setItem('wordCountEnabled', JSON.stringify(newValue));
+                            writePluginSetting('wordCountEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: wordCountEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: wordCountEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: wordCountEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -774,10 +774,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !drawingModeEnabled;
                             setDrawingModeEnabled(newValue);
-                            localStorage.setItem('drawingModeEnabled', JSON.stringify(newValue));
+                            writePluginSetting('drawingModeEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: drawingModeEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: drawingModeEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: drawingModeEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -795,10 +795,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !cardsEnabled;
                             setCardsEnabled(newValue);
-                            localStorage.setItem('cardsEnabled', JSON.stringify(newValue));
+                            writePluginSetting('cardsEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: cardsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: cardsEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: cardsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -816,10 +816,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !syncIndicatorEnabled;
                             setSyncIndicatorEnabled(newValue);
-                            localStorage.setItem('syncIndicatorEnabled', JSON.stringify(newValue));
+                            writePluginSetting('syncIndicatorEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: syncIndicatorEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: syncIndicatorEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: syncIndicatorEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -837,10 +837,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !ambientSoundsEnabled;
                             setAmbientSoundsEnabled(newValue);
-                            localStorage.setItem('ambientSoundsEnabled', JSON.stringify(newValue));
+                            writePluginSetting('ambientSoundsEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: ambientSoundsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: ambientSoundsEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: ambientSoundsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -858,10 +858,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !focusStatsEnabled;
                             setFocusStatsEnabled(newValue);
-                            localStorage.setItem('focusStatsEnabled', JSON.stringify(newValue));
+                            writePluginSetting('focusStatsEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: focusStatsEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: focusStatsEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: focusStatsEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -878,10 +878,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !plannerEnabled;
                             setPlannerEnabled(newValue);
-                            localStorage.setItem('plannerEnabled', JSON.stringify(newValue));
+                            writePluginSetting('plannerEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: plannerEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: plannerEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: plannerEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -899,10 +899,10 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                           onClick={() => {
                             const newValue = !breakRemindersEnabled;
                             setBreakRemindersEnabled(newValue);
-                            localStorage.setItem('breakRemindersEnabled', JSON.stringify(newValue));
+                            writePluginSetting('breakRemindersEnabled', newValue);
                           }}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                          style={{ backgroundColor: breakRemindersEnabled ? 'var(--accent)' : 'var(--bg-elev)' }}
+                          style={{ backgroundColor: breakRemindersEnabled ? 'var(--accent)' : '#3f3f46' }}
                         >
                           <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" style={{ transform: breakRemindersEnabled ? 'translateX(24px)' : 'translateX(4px)' }} />
                         </button>
@@ -1133,12 +1133,12 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       onClick={() => {
                         const newValue = !tabsEnabled;
                         setTabsEnabled(newValue);
-                        localStorage.setItem('tabsEnabled', JSON.stringify(newValue));
+                        writePluginSetting('tabsEnabled', newValue);
                         window.location.reload();
                       }}
                       className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                       style={{
-                        backgroundColor: tabsEnabled ? 'var(--accent)' : 'var(--bg-elev)',
+                        backgroundColor: tabsEnabled ? 'var(--accent)' : '#3f3f46',
                       }}
                     >
                       <span
