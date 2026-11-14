@@ -8,6 +8,7 @@ import { isVaultMode } from './lib/platform'
 import { installDesktopIntegrations } from './lib/desktop'
 import { VaultOpenError } from './components/VaultOpenError'
 import { UpdateToast } from './components/UpdateToast'
+import { FindBar } from './components/FindBar'
 import { startAutoUpdateChecks } from './lib/updates'
 
 // Apply saved theme class to <html> before React renders
@@ -46,6 +47,7 @@ async function start() {
         <AuthProvider>
           <App />
           <UpdateToast />
+          <FindBar />
         </AuthProvider>
       </ThemeProvider>
     </StrictMode>,

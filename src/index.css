@@ -442,3 +442,13 @@ body { background-color: var(--bg-panel) !important; }
 .ProseMirror .wikilink::after { content: ']]'; opacity: 0.35; font-weight: 400; }
 .ProseMirror .wikilink:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .ProseMirror .wikilink.ProseMirror-selectednode { outline: 1px solid var(--accent); }
+
+/* Ctrl/⌘ + F find bar (desktop app): match highlights, painted without touching notes */
+::highlight(flow-find) {
+  background-color: rgba(250, 204, 21, 0.35);
+  color: inherit;
+}
+::highlight(flow-find-current) {
+  background-color: #f97316;
+  color: #fff;
+}
