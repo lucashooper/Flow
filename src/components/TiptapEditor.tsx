@@ -243,9 +243,13 @@ export const TiptapEditor = ({ content, onChange, drawingData: initialDrawingDat
       }),
       WikiLink,
       Link.configure({
-        openOnClick: false,
+        // Click a link to open it (new tab on the web; the system browser in the desktop app).
+        openOnClick: true,
+        enableClickSelection: false,
         HTMLAttributes: {
           class: 'text-[#D97706] underline cursor-pointer',
+          target: '_blank',
+          rel: 'noopener noreferrer',
         },
       }),
       EmojiIconDecorator,
