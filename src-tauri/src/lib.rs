@@ -34,6 +34,12 @@ pub fn run() {
             ai::ai_key_remove,
             ai::anthropic_fetch,
             voice::start_dictation,
+            #[cfg(desktop)]
+            voice::voice_model_status,
+            #[cfg(desktop)]
+            voice::voice_model_download,
+            #[cfg(desktop)]
+            voice::voice_transcribe,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Flow Notes");

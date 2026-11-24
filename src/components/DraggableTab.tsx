@@ -43,21 +43,39 @@ export const DraggableTab = ({ note, isActive, onTabClick, onTabClose }: Draggab
           ? 'active text-[#e5e5e5]'
           : 'text-[#888888] hover:bg-[#151515] hover:text-[#e5e5e5] border-r border-[#1a1a1a]'
       } ${isDragging ? 'z-50 shadow-lg' : ''}`}
-      onClick={() => onTabClick(note.id)}
+      onClick={(e) => {
+        // A click that lands in the close area closes, even if it just misses the icon.
+        if ((e.target as HTMLElement).closest('[data-tab-close]')) return;
+        onTabClick(note.id);
+      }}
+      onAuxClick={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          onTabClose(note.id);
+        }
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 1) e.preventDefault(); // no autoscroll on middle-click
+      }}
     >
       <span className="text-sm truncate flex-1 select-none">{note.title || 'Untitled'}</span>
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onTabClose(note.id);
-        }}
+        type="button"
+        data-tab-close
+        aria-label="Close tab"
+        title="Close tab"
         onPointerDown={(e) => {
-          // Prevent drag from starting when clicking close button
+          // Close on press: no drag starts and the tab is never selected first.
           e.stopPropagation();
+          e.preventDefault();
+          if (e.button === 0) onTabClose(note.id);
         }}
-        className="opacity-0 group-hover:opacity-100 hover:bg-[#2a2a2a] rounded p-0.5 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+        className={`-my-1 -mr-2 flex items-center justify-center w-7 h-7 flex-shrink-0 rounded-md hover:bg-[#2a2a2a] transition-opacity ${
+          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}
       >
-        <X className="w-3 h-3" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );

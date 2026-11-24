@@ -1,0 +1,4 @@
+[env]
+# Build the speech engine (whisper.cpp) for any CPU, not just the build machine's:
+# otherwise a release built on a newer CI machine can crash on older computers.
+GGML_NATIVE = "OFF"
